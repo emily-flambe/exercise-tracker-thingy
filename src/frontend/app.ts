@@ -1,5 +1,9 @@
 import * as api from './api';
-import type { Workout, WorkoutExercise, Set, CustomExercise } from './api';
+import type { Workout, WorkoutExercise, Set, CustomExercise, User } from './api';
+
+// ==================== AUTH STATE ====================
+let currentUser: User | null = null;
+let isRegisterMode = false;
 
 // ==================== DEFAULT EXERCISE LIBRARY ====================
 interface Exercise {
@@ -105,6 +109,14 @@ function formatDate(ts: number): string {
 
 function $(id: string): HTMLElement {
   return document.getElementById(id)!;
+}
+
+function $input(id: string): HTMLInputElement {
+  return document.getElementById(id) as HTMLInputElement;
+}
+
+function $select(id: string): HTMLSelectElement {
+  return document.getElementById(id) as unknown as HTMLSelectElement;
 }
 
 // ==================== DATA LOADING ====================
@@ -299,14 +311,17 @@ function saveSetInline(exerciseIndex: number): void {
 }
 
 function updateSet(exerciseIndex: number, setIndex: number, field: string, value: string): void {
+  const set = state.currentWorkout!.exercises[exerciseIndex].sets[setIndex];
   if (field === 'note') {
     if (value.trim()) {
-      state.currentWorkout!.exercises[exerciseIndex].sets[setIndex].note = value.trim();
+      set.note = value.trim();
     } else {
-      delete state.currentWorkout!.exercises[exerciseIndex].sets[setIndex].note;
+      delete set.note;
     }
-  } else {
-    (state.currentWorkout!.exercises[exerciseIndex].sets[setIndex] as Record<string, unknown>)[field] = parseInt(value) || 0;
+  } else if (field === 'weight') {
+    set.weight = parseInt(value) || 0;
+  } else if (field === 'reps') {
+    set.reps = parseInt(value) || 0;
   }
 }
 
@@ -668,10 +683,10 @@ function showExercisesEditView(): void {
 function showCreateExercise(): void {
   state.editingExercise = null;
   $('edit-exercise-title').textContent = 'New Exercise';
-  ($('exercise-name-input') as HTMLInputElement).value = '';
-  ($('exercise-name-input') as HTMLInputElement).disabled = false;
-  ($('exercise-category-input') as HTMLSelectElement).value = 'Other';
-  ($('exercise-category-input') as HTMLSelectElement).disabled = false;
+  $input('exercise-name-input').value = '';
+  $input('exercise-name-input').disabled = false;
+  $select('exercise-category-input').value = 'Other';
+  $select('exercise-category-input').disabled = false;
   document.querySelectorAll('input[name="weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = false;
     (r as HTMLInputElement).disabled = false;
@@ -698,10 +713,10 @@ function showEditExercise(exerciseName: string): void {
   };
 
   $('edit-exercise-title').textContent = 'Edit Exercise';
-  ($('exercise-name-input') as HTMLInputElement).value = exercise.name;
-  ($('exercise-name-input') as HTMLInputElement).disabled = !isCustom;
-  ($('exercise-category-input') as HTMLSelectElement).value = exercise.category;
-  ($('exercise-category-input') as HTMLSelectElement).disabled = !isCustom;
+  $input('exercise-name-input').value = exercise.name;
+  $input('exercise-name-input').disabled = !isCustom;
+  $select('exercise-category-input').value = exercise.category;
+  $select('exercise-category-input').disabled = !isCustom;
 
   document.querySelectorAll('input[name="weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = (r as HTMLInputElement).value === exercise.type;
@@ -761,8 +776,8 @@ function getRecentSetsForExercise(exerciseName: string, limit: number): Array<{ 
 }
 
 function hideEditExercise(): void {
-  ($('exercise-name-input') as HTMLInputElement).disabled = false;
-  ($('exercise-category-input') as HTMLSelectElement).disabled = false;
+  $input('exercise-name-input').disabled = false;
+  $select('exercise-category-input').disabled = false;
   document.querySelectorAll('input[name="weight-type"]').forEach(r => (r as HTMLInputElement).disabled = false);
 
   state.editingExercise = null;
@@ -777,8 +792,8 @@ function setExerciseUnit(unit: 'lbs' | 'kg'): void {
 }
 
 async function saveExercise(): Promise<void> {
-  const name = ($('exercise-name-input') as HTMLInputElement).value.trim();
-  const category = ($('exercise-category-input') as HTMLSelectElement).value;
+  const name = $input('exercise-name-input').value.trim();
+  const category = $select('exercise-category-input').value;
   const typeInput = document.querySelector('input[name="weight-type"]:checked') as HTMLInputElement | null;
   const unit = currentExerciseUnit;
 
@@ -838,10 +853,114 @@ async function clearAllData(): Promise<void> {
   }
 }
 
+// ==================== AUTH ====================
+function showAuthScreen(): void {
+  $('auth-screen').classList.remove('hidden');
+  $('main-app').classList.add('hidden');
+}
+
+function showMainApp(): void {
+  $('auth-screen').classList.add('hidden');
+  $('main-app').classList.remove('hidden');
+  if (currentUser) {
+    $('settings-username').textContent = currentUser.username;
+  }
+}
+
+function showLoginForm(): void {
+  isRegisterMode = false;
+  $('auth-login-tab').classList.add('border-blue-500', 'text-blue-400');
+  $('auth-login-tab').classList.remove('border-gray-700', 'text-gray-400');
+  $('auth-register-tab').classList.remove('border-blue-500', 'text-blue-400');
+  $('auth-register-tab').classList.add('border-gray-700', 'text-gray-400');
+  $('auth-submit-btn').textContent = 'Login';
+  ($('auth-password') as HTMLInputElement).autocomplete = 'current-password';
+  hideAuthError();
+}
+
+function showRegisterForm(): void {
+  isRegisterMode = true;
+  $('auth-register-tab').classList.add('border-blue-500', 'text-blue-400');
+  $('auth-register-tab').classList.remove('border-gray-700', 'text-gray-400');
+  $('auth-login-tab').classList.remove('border-blue-500', 'text-blue-400');
+  $('auth-login-tab').classList.add('border-gray-700', 'text-gray-400');
+  $('auth-submit-btn').textContent = 'Create Account';
+  ($('auth-password') as HTMLInputElement).autocomplete = 'new-password';
+  hideAuthError();
+}
+
+function showAuthError(message: string): void {
+  const errorEl = $('auth-error');
+  errorEl.textContent = message;
+  errorEl.classList.remove('hidden');
+}
+
+function hideAuthError(): void {
+  $('auth-error').classList.add('hidden');
+}
+
+async function handleAuthSubmit(e: Event): Promise<void> {
+  e.preventDefault();
+  const username = ($('auth-username') as HTMLInputElement).value.trim();
+  const password = ($('auth-password') as HTMLInputElement).value;
+
+  if (!username || !password) {
+    showAuthError('Please enter username and password');
+    return;
+  }
+
+  try {
+    if (isRegisterMode) {
+      const response = await api.register(username, password);
+      currentUser = response.user;
+    } else {
+      const response = await api.login(username, password);
+      currentUser = response.user;
+    }
+    await loadData();
+    showMainApp();
+  } catch (error) {
+    if (error instanceof api.ApiError) {
+      showAuthError(error.message);
+    } else {
+      showAuthError('An error occurred. Please try again.');
+    }
+  }
+}
+
+function logout(): void {
+  api.logout();
+  currentUser = null;
+  state.history = [];
+  state.customExercises = [];
+  state.currentWorkout = null;
+  state.editingWorkoutId = null;
+  ($('auth-username') as HTMLInputElement).value = '';
+  ($('auth-password') as HTMLInputElement).value = '';
+  showLoginForm();
+  showAuthScreen();
+}
+
 // ==================== INIT ====================
 async function init(): Promise<void> {
-  await loadData();
-  renderAddExerciseList(getAllExercises());
+  // Set up auth form handler
+  $('auth-form').addEventListener('submit', handleAuthSubmit);
+
+  // Check if already authenticated
+  if (api.isAuthenticated()) {
+    try {
+      currentUser = await api.getCurrentUser();
+      await loadData();
+      showMainApp();
+      renderAddExerciseList(getAllExercises());
+    } catch {
+      // Token invalid or expired
+      api.logout();
+      showAuthScreen();
+    }
+  } else {
+    showAuthScreen();
+  }
 }
 
 // Export app object to window for onclick handlers
@@ -874,6 +993,9 @@ async function init(): Promise<void> {
   deleteExercise,
   setExerciseUnit,
   clearAllData,
+  showLoginForm,
+  showRegisterForm,
+  logout,
 };
 
 init();

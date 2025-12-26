@@ -108,7 +108,38 @@ export interface UpdateExerciseRequest {
   unit?: Unit;
 }
 
+// User types
+export interface User {
+  id: string;
+  username: string;
+  created_at: number;
+}
+
+export interface UserRow {
+  id: string;
+  username: string;
+  password_hash: string;
+  created_at: number;
+}
+
+// Auth request/response types
+export interface RegisterRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 // Cloudflare bindings
 export interface Env {
   DB: D1Database;
+  JWT_SECRET: string;
 }

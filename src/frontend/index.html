@@ -9,6 +9,38 @@
 </head>
 <body class="bg-gray-900 text-gray-100">
   <div class="phone-frame bg-gray-800">
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="p-4">
+      <div class="flex flex-col items-center justify-center py-12">
+        <h1 class="text-2xl font-bold mb-8">Workout Tracker</h1>
+
+        <div class="w-full max-w-sm">
+          <div class="flex mb-6">
+            <button onclick="app.showLoginForm()" id="auth-login-tab" class="flex-1 py-2 text-center border-b-2 border-blue-500 text-blue-400">Login</button>
+            <button onclick="app.showRegisterForm()" id="auth-register-tab" class="flex-1 py-2 text-center border-b-2 border-gray-700 text-gray-400">Register</button>
+          </div>
+
+          <div id="auth-error" class="hidden bg-red-900/50 text-red-300 p-3 rounded-lg mb-4 text-sm"></div>
+
+          <form id="auth-form" class="space-y-4">
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Username</label>
+              <input type="text" id="auth-username" autocomplete="username" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+            </div>
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Password</label>
+              <input type="password" id="auth-password" autocomplete="current-password" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+            </div>
+            <button type="submit" id="auth-submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg">
+              Login
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="main-app" class="hidden">
     <div class="main-content">
 
       <!-- TAB: WORKOUT -->
@@ -180,10 +212,19 @@
           </header>
           <div class="space-y-4">
             <div class="bg-gray-700 rounded-lg p-4">
+              <div class="font-medium mb-1">Logged in as</div>
+              <div class="text-sm text-blue-400" id="settings-username"></div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
               <div class="font-medium mb-1">Clear All Data</div>
               <div class="text-sm text-gray-400 mb-3">This will delete all workout history</div>
               <button onclick="app.clearAllData()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">
                 Clear Data
+              </button>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <button onclick="app.logout()" class="w-full text-red-400 font-medium">
+                Logout
               </button>
             </div>
             <div class="text-center text-gray-500 text-sm mt-8">
@@ -214,6 +255,7 @@
         <span class="text-xs">Settings</span>
       </button>
     </nav>
+    </div>
   </div>
 
   <script type="module" src="./app.ts"></script>

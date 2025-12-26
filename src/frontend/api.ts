@@ -1,6 +1,7 @@
 // API client for workout tracker
 
 const API_BASE = '/api';
+const TOKEN_KEY = 'workout_auth_token';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -9,21 +10,84 @@ export class ApiError extends Error {
   }
 }
 
+// Token management
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+export function isAuthenticated(): boolean {
+  return !!getToken();
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new ApiError(response.status, error.error || 'Request failed');
+    const errorData = await response.json().catch(() => ({ error: 'Request failed' })) as { error?: string };
+    throw new ApiError(response.status, errorData.error || 'Request failed');
   }
 
   return response.json();
+}
+
+// User types
+export interface User {
+  id: string;
+  username: string;
+  created_at: number;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
+// Auth API
+export async function register(username: string, password: string): Promise<AuthResponse> {
+  const response = await apiFetch<AuthResponse>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  setToken(response.token);
+  return response;
+}
+
+export async function login(username: string, password: string): Promise<AuthResponse> {
+  const response = await apiFetch<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  setToken(response.token);
+  return response;
+}
+
+export async function getCurrentUser(): Promise<User> {
+  return apiFetch<User>('/auth/me');
+}
+
+export function logout(): void {
+  clearToken();
 }
 
 // Workout types matching backend

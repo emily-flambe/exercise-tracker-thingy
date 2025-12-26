@@ -9,20 +9,60 @@ import type {
   CustomExercise,
   CreateWorkoutRequest,
   CreateExerciseRequest,
+  UserRow,
+  User,
 } from '../types';
-
-const DEFAULT_USER_ID = 'default';
 
 function generateId(): string {
   return crypto.randomUUID();
 }
 
+// ==================== USERS ====================
+
+export async function getUserByUsername(db: D1Database, username: string): Promise<UserRow | null> {
+  return db
+    .prepare('SELECT * FROM users WHERE username = ?')
+    .bind(username)
+    .first<UserRow>();
+}
+
+export async function getUserById(db: D1Database, id: string): Promise<User | null> {
+  const row = await db
+    .prepare('SELECT id, username, created_at FROM users WHERE id = ?')
+    .bind(id)
+    .first<UserRow>();
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    username: row.username,
+    created_at: row.created_at,
+  };
+}
+
+export async function createUser(db: D1Database, username: string, passwordHash: string): Promise<User> {
+  const id = generateId();
+  const now = Date.now();
+
+  await db
+    .prepare('INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)')
+    .bind(id, username, passwordHash, now)
+    .run();
+
+  return {
+    id,
+    username,
+    created_at: now,
+  };
+}
+
 // ==================== WORKOUTS ====================
 
-export async function getAllWorkouts(db: D1Database): Promise<Workout[]> {
+export async function getAllWorkouts(db: D1Database, userId: string): Promise<Workout[]> {
   const workoutRows = await db
     .prepare('SELECT * FROM workouts WHERE user_id = ? ORDER BY start_time DESC')
-    .bind(DEFAULT_USER_ID)
+    .bind(userId)
     .all<WorkoutRow>();
 
   const workouts: Workout[] = [];
@@ -42,10 +82,10 @@ export async function getAllWorkouts(db: D1Database): Promise<Workout[]> {
   return workouts;
 }
 
-export async function getWorkout(db: D1Database, id: string): Promise<Workout | null> {
+export async function getWorkout(db: D1Database, id: string, userId: string): Promise<Workout | null> {
   const row = await db
     .prepare('SELECT * FROM workouts WHERE id = ? AND user_id = ?')
-    .bind(id, DEFAULT_USER_ID)
+    .bind(id, userId)
     .first<WorkoutRow>();
 
   if (!row) return null;
@@ -91,13 +131,13 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
   return exercises;
 }
 
-export async function createWorkout(db: D1Database, data: CreateWorkoutRequest): Promise<Workout> {
+export async function createWorkout(db: D1Database, userId: string, data: CreateWorkoutRequest): Promise<Workout> {
   const id = generateId();
   const now = Date.now();
 
   await db
     .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(id, DEFAULT_USER_ID, data.start_time, data.end_time ?? null, now)
+    .bind(id, userId, data.start_time, data.end_time ?? null, now)
     .run();
 
   // Insert exercises and sets
@@ -121,7 +161,7 @@ export async function createWorkout(db: D1Database, data: CreateWorkoutRequest):
 
   return {
     id,
-    user_id: DEFAULT_USER_ID,
+    user_id: userId,
     start_time: data.start_time,
     end_time: data.end_time,
     exercises: data.exercises,
@@ -129,8 +169,8 @@ export async function createWorkout(db: D1Database, data: CreateWorkoutRequest):
   };
 }
 
-export async function updateWorkout(db: D1Database, id: string, data: CreateWorkoutRequest): Promise<Workout | null> {
-  const existing = await getWorkout(db, id);
+export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest): Promise<Workout | null> {
+  const existing = await getWorkout(db, id, userId);
   if (!existing) return null;
 
   // Update workout row
@@ -164,13 +204,13 @@ export async function updateWorkout(db: D1Database, id: string, data: CreateWork
     }
   }
 
-  return getWorkout(db, id);
+  return getWorkout(db, id, userId);
 }
 
-export async function deleteWorkout(db: D1Database, id: string): Promise<boolean> {
+export async function deleteWorkout(db: D1Database, id: string, userId: string): Promise<boolean> {
   const result = await db
     .prepare('DELETE FROM workouts WHERE id = ? AND user_id = ?')
-    .bind(id, DEFAULT_USER_ID)
+    .bind(id, userId)
     .run();
 
   return result.meta.changes > 0;
@@ -178,10 +218,10 @@ export async function deleteWorkout(db: D1Database, id: string): Promise<boolean
 
 // ==================== CUSTOM EXERCISES ====================
 
-export async function getAllCustomExercises(db: D1Database): Promise<CustomExercise[]> {
+export async function getAllCustomExercises(db: D1Database, userId: string): Promise<CustomExercise[]> {
   const rows = await db
     .prepare('SELECT * FROM custom_exercises WHERE user_id = ? ORDER BY name')
-    .bind(DEFAULT_USER_ID)
+    .bind(userId)
     .all<CustomExerciseRow>();
 
   return rows.results.map(row => ({
@@ -195,10 +235,10 @@ export async function getAllCustomExercises(db: D1Database): Promise<CustomExerc
   }));
 }
 
-export async function getCustomExercise(db: D1Database, id: string): Promise<CustomExercise | null> {
+export async function getCustomExercise(db: D1Database, id: string, userId: string): Promise<CustomExercise | null> {
   const row = await db
     .prepare('SELECT * FROM custom_exercises WHERE id = ? AND user_id = ?')
-    .bind(id, DEFAULT_USER_ID)
+    .bind(id, userId)
     .first<CustomExerciseRow>();
 
   if (!row) return null;
@@ -214,18 +254,18 @@ export async function getCustomExercise(db: D1Database, id: string): Promise<Cus
   };
 }
 
-export async function createCustomExercise(db: D1Database, data: CreateExerciseRequest): Promise<CustomExercise> {
+export async function createCustomExercise(db: D1Database, userId: string, data: CreateExerciseRequest): Promise<CustomExercise> {
   const id = generateId();
   const now = Date.now();
 
   await db
     .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, DEFAULT_USER_ID, data.name, data.type, data.category, data.unit, now)
+    .bind(id, userId, data.name, data.type, data.category, data.unit, now)
     .run();
 
   return {
     id,
-    user_id: DEFAULT_USER_ID,
+    user_id: userId,
     name: data.name,
     type: data.type,
     category: data.category,
@@ -234,8 +274,8 @@ export async function createCustomExercise(db: D1Database, data: CreateExerciseR
   };
 }
 
-export async function updateCustomExercise(db: D1Database, id: string, data: CreateExerciseRequest): Promise<CustomExercise | null> {
-  const existing = await getCustomExercise(db, id);
+export async function updateCustomExercise(db: D1Database, id: string, userId: string, data: CreateExerciseRequest): Promise<CustomExercise | null> {
+  const existing = await getCustomExercise(db, id, userId);
   if (!existing) return null;
 
   await db
@@ -243,13 +283,13 @@ export async function updateCustomExercise(db: D1Database, id: string, data: Cre
     .bind(data.name, data.type, data.category, data.unit, id)
     .run();
 
-  return getCustomExercise(db, id);
+  return getCustomExercise(db, id, userId);
 }
 
-export async function deleteCustomExercise(db: D1Database, id: string): Promise<boolean> {
+export async function deleteCustomExercise(db: D1Database, id: string, userId: string): Promise<boolean> {
   const result = await db
     .prepare('DELETE FROM custom_exercises WHERE id = ? AND user_id = ?')
-    .bind(id, DEFAULT_USER_ID)
+    .bind(id, userId)
     .run();
 
   return result.meta.changes > 0;
@@ -257,7 +297,7 @@ export async function deleteCustomExercise(db: D1Database, id: string): Promise<
 
 // ==================== DATA MANAGEMENT ====================
 
-export async function clearAllData(db: D1Database): Promise<void> {
-  await db.prepare('DELETE FROM workouts WHERE user_id = ?').bind(DEFAULT_USER_ID).run();
-  await db.prepare('DELETE FROM custom_exercises WHERE user_id = ?').bind(DEFAULT_USER_ID).run();
+export async function clearAllData(db: D1Database, userId: string): Promise<void> {
+  await db.prepare('DELETE FROM workouts WHERE user_id = ?').bind(userId).run();
+  await db.prepare('DELETE FROM custom_exercises WHERE user_id = ?').bind(userId).run();
 }

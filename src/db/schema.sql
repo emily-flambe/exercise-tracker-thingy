@@ -1,8 +1,13 @@
--- Users table (single-user for now, but prepared for multi-user)
+-- Users table
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
+
+-- Index for username lookups
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
 -- Custom exercises (user-created or overrides of defaults)
 CREATE TABLE IF NOT EXISTS custom_exercises (
@@ -58,5 +63,3 @@ CREATE TABLE IF NOT EXISTS sets (
 -- Index for looking up sets in a workout exercise
 CREATE INDEX IF NOT EXISTS idx_sets_workout_exercise ON sets(workout_exercise_id);
 
--- Insert default user (single-user mode)
-INSERT OR IGNORE INTO users (id, created_at) VALUES ('default', 1735200000000);

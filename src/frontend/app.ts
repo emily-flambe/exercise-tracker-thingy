@@ -1,0 +1,879 @@
+import * as api from './api';
+import type { Workout, WorkoutExercise, Set, CustomExercise } from './api';
+
+// ==================== DEFAULT EXERCISE LIBRARY ====================
+interface Exercise {
+  name: string;
+  type: 'total' | '/side' | '+bar' | 'bodyweight';
+  category: string;
+  unit: 'lbs' | 'kg';
+}
+
+const exerciseLibrary: Exercise[] = [
+  { name: 'Bench Press', type: 'total', category: 'Chest', unit: 'lbs' },
+  { name: 'Incline Bench Press', type: 'total', category: 'Chest', unit: 'lbs' },
+  { name: 'Dumbbell Press', type: '/side', category: 'Chest', unit: 'lbs' },
+  { name: 'Incline Dumbbell Press', type: '/side', category: 'Chest', unit: 'lbs' },
+  { name: 'Cable Fly', type: 'total', category: 'Chest', unit: 'lbs' },
+  { name: 'Deadlift', type: '+bar', category: 'Back', unit: 'lbs' },
+  { name: 'Lat Pulldown', type: 'total', category: 'Back', unit: 'lbs' },
+  { name: 'Seated Cable Row', type: 'total', category: 'Back', unit: 'lbs' },
+  { name: 'Barbell Row', type: '+bar', category: 'Back', unit: 'lbs' },
+  { name: 'Dumbbell Row', type: '/side', category: 'Back', unit: 'lbs' },
+  { name: 'Pull-ups', type: 'bodyweight', category: 'Back', unit: 'lbs' },
+  { name: 'Overhead Press', type: '+bar', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Dumbbell Shoulder Press', type: '/side', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Lateral Raise', type: '/side', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Face Pull', type: 'total', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Barbell Curl', type: 'total', category: 'Biceps', unit: 'lbs' },
+  { name: 'Hammer Curl', type: '/side', category: 'Biceps', unit: 'lbs' },
+  { name: 'Preacher Curl', type: '/side', category: 'Biceps', unit: 'lbs' },
+  { name: 'Tricep Pushdown', type: 'total', category: 'Triceps', unit: 'lbs' },
+  { name: 'Skull Crusher', type: '+bar', category: 'Triceps', unit: 'lbs' },
+  { name: 'Squat', type: '+bar', category: 'Legs', unit: 'lbs' },
+  { name: 'Romanian Deadlift', type: '+bar', category: 'Legs', unit: 'lbs' },
+  { name: 'Leg Press', type: 'total', category: 'Legs', unit: 'lbs' },
+  { name: 'Leg Curl', type: 'total', category: 'Legs', unit: 'lbs' },
+  { name: 'Calf Raise', type: 'total', category: 'Legs', unit: 'lbs' },
+  { name: 'Lunges', type: '/side', category: 'Legs', unit: 'lbs' },
+];
+
+// ==================== STATE ====================
+interface AppState {
+  currentWorkout: {
+    startTime: number;
+    exercises: WorkoutExercise[];
+  } | null;
+  editingWorkoutId: string | null;
+  history: Workout[];
+  customExercises: CustomExercise[];
+  editingExercise: {
+    id: string | null;
+    name: string;
+    isCustom: boolean;
+  } | null;
+}
+
+const state: AppState = {
+  currentWorkout: null,
+  editingWorkoutId: null,
+  history: [],
+  customExercises: [],
+  editingExercise: null,
+};
+
+let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
+
+// ==================== HELPERS ====================
+function getAllExercises(): Exercise[] {
+  const customNames = new Set(state.customExercises.map(e => e.name.toLowerCase()));
+  const defaults = exerciseLibrary.filter(e => !customNames.has(e.name.toLowerCase()));
+  return [...defaults, ...state.customExercises.map(c => ({
+    name: c.name,
+    type: c.type,
+    category: c.category,
+    unit: c.unit,
+  }))];
+}
+
+function getExerciseUnit(exerciseName: string): 'lbs' | 'kg' {
+  const exercise = getAllExercises().find(e => e.name === exerciseName);
+  return exercise?.unit || 'lbs';
+}
+
+function getTypeColor(type: string): string {
+  if (type === '+bar') return 'text-yellow-500';
+  if (type === '/side') return 'text-purple-400';
+  if (type === 'bodyweight') return 'text-green-400';
+  return 'text-cyan-400';
+}
+
+function getTypeLabel(type: string): string {
+  if (type === '+bar') return '+bar weight';
+  if (type === '/side') return 'per side';
+  if (type === 'bodyweight') return 'bodyweight';
+  return 'total weight';
+}
+
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const y = String(d.getFullYear()).slice(-2);
+  return `${m}/${day}/${y}`;
+}
+
+function $(id: string): HTMLElement {
+  return document.getElementById(id)!;
+}
+
+// ==================== DATA LOADING ====================
+async function loadData(): Promise<void> {
+  try {
+    const [workouts, exercises] = await Promise.all([
+      api.getWorkouts(),
+      api.getCustomExercises(),
+    ]);
+    state.history = workouts;
+    state.customExercises = exercises;
+  } catch (error) {
+    console.error('Failed to load data:', error);
+  }
+}
+
+// ==================== TAB NAVIGATION ====================
+function switchTab(tabName: string): void {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  $('tab-' + tabName).classList.add('active');
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.classList.remove('text-blue-400');
+    btn.classList.add('text-gray-400');
+  });
+  $('nav-' + tabName).classList.remove('text-gray-400');
+  $('nav-' + tabName).classList.add('text-blue-400');
+
+  if (tabName === 'history') renderHistory();
+  if (tabName === 'exercises') renderExerciseCategories();
+}
+
+function showWorkoutScreen(screenId: string): void {
+  document.querySelectorAll('#tab-workout .screen').forEach(s => s.classList.remove('active'));
+  $(screenId).classList.add('active');
+}
+
+// ==================== WORKOUT ====================
+function startWorkout(): void {
+  state.currentWorkout = {
+    startTime: Date.now(),
+    exercises: [],
+  };
+  state.editingWorkoutId = null;
+  $('workout-title').textContent = "Today's Workout";
+  $('workout-finish-btn').textContent = 'Finish';
+  showWorkoutScreen('workout-active');
+  renderWorkout();
+}
+
+async function finishWorkout(): Promise<void> {
+  if (!state.currentWorkout || state.currentWorkout.exercises.length === 0) {
+    state.currentWorkout = null;
+    state.editingWorkoutId = null;
+    showWorkoutScreen('workout-empty');
+    return;
+  }
+
+  try {
+    const workoutData = {
+      start_time: state.currentWorkout.startTime,
+      end_time: Date.now(),
+      exercises: state.currentWorkout.exercises,
+    };
+
+    if (state.editingWorkoutId) {
+      await api.updateWorkout(state.editingWorkoutId, workoutData);
+    } else {
+      await api.createWorkout(workoutData);
+    }
+
+    await loadData();
+    state.currentWorkout = null;
+    state.editingWorkoutId = null;
+    showWorkoutScreen('workout-empty');
+  } catch (error) {
+    console.error('Failed to save workout:', error);
+    alert('Failed to save workout');
+  }
+}
+
+function renderWorkout(): void {
+  const list = $('exercise-list');
+  if (!state.currentWorkout) {
+    list.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = state.currentWorkout.exercises.map((ex, i) => {
+    const exercise = getAllExercises().find(e => e.name === ex.name) || { type: 'total', unit: 'lbs' };
+    const prevSets = getPreviousSets(ex.name);
+
+    const lastSet = ex.sets.length > 0 ? ex.sets[ex.sets.length - 1] : (prevSets[0] || { weight: 0, reps: 10 });
+    const nextSetNum = ex.sets.length + 1;
+
+    let setsHtml = `
+      <div class="text-sm">
+        ${ex.sets.length > 0 ? `
+          ${ex.sets.map((set, si) => `
+            <div class="py-1 border-b border-gray-600">
+              <div class="flex items-center gap-2">
+                <span class="w-6 text-gray-400 text-xs">${si + 1}</span>
+                <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500">
+                <span class="text-gray-400">x</span>
+                <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500">
+                <button onclick="app.deleteSet(${i}, ${si})" class="text-red-400 text-xs px-2 hover:text-red-300">x</button>
+              </div>
+              <input type="text" value="${set.note || ''}" onchange="app.updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600">
+            </div>
+          `).join('')}
+        ` : (prevSets.length > 0 ? `
+          <div class="mb-3">
+            <div class="text-gray-500 text-xs mb-2">Last time: ${prevSets.map(s => s.weight + 'x' + s.reps).join(', ')}</div>
+            <button onclick="app.copyAllSets(${i})" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm">Copy all ${prevSets.length} sets</button>
+          </div>
+        ` : '')}
+
+        <div id="add-set-collapsed-${i}" class="mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-gray-600' : ''}">
+          <button onclick="app.showAddSetForm(${i})" class="text-blue-400 text-sm">+ Add set</button>
+        </div>
+        <div id="add-set-expanded-${i}" class="hidden mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-gray-600' : ''}">
+          <div class="flex items-center gap-2">
+            <span class="text-gray-400 text-xs w-6">${nextSetNum}</span>
+            <input type="number" id="weight-${i}" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500" placeholder="wt">
+            <span class="text-gray-400">x</span>
+            <input type="number" id="reps-${i}" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500" placeholder="reps">
+            <button onclick="app.saveSetInline(${i})" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Save</button>
+            <button onclick="app.hideAddSetForm(${i})" class="text-gray-400 text-sm">Cancel</button>
+          </div>
+          <input type="text" id="note-${i}" placeholder="note (optional)" class="mt-2 ml-6 w-40 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600">
+        </div>
+      </div>
+    `;
+
+    return `
+      <div class="bg-gray-700 rounded-lg p-4 mb-3">
+        <div class="flex justify-between items-start mb-3">
+          <div>
+            <div class="font-medium">${ex.name}</div>
+            <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
+          </div>
+          <button onclick="app.removeExercise(${i})" class="text-red-400 text-sm px-2 hover:text-red-300">x</button>
+        </div>
+        ${setsHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+function getPreviousSets(exerciseName: string): Set[] {
+  for (const workout of state.history) {
+    const ex = workout.exercises.find(e => e.name === exerciseName);
+    if (ex && ex.sets.length > 0) return ex.sets;
+  }
+  return [];
+}
+
+function removeExercise(index: number): void {
+  if (confirm('Remove this exercise?')) {
+    state.currentWorkout!.exercises.splice(index, 1);
+    renderWorkout();
+  }
+}
+
+// ==================== INLINE SET LOGGING ====================
+function showAddSetForm(exerciseIndex: number): void {
+  const ex = state.currentWorkout!.exercises[exerciseIndex];
+  const prevSets = getPreviousSets(ex.name);
+  const lastSet = ex.sets.length > 0 ? ex.sets[ex.sets.length - 1] : (prevSets[0] || { weight: 0, reps: 10 });
+
+  $('add-set-collapsed-' + exerciseIndex).classList.add('hidden');
+  $('add-set-expanded-' + exerciseIndex).classList.remove('hidden');
+  ($('weight-' + exerciseIndex) as HTMLInputElement).value = String(lastSet.weight);
+  ($('reps-' + exerciseIndex) as HTMLInputElement).value = String(lastSet.reps);
+  ($('weight-' + exerciseIndex) as HTMLInputElement).focus();
+}
+
+function hideAddSetForm(exerciseIndex: number): void {
+  $('add-set-collapsed-' + exerciseIndex).classList.remove('hidden');
+  $('add-set-expanded-' + exerciseIndex).classList.add('hidden');
+}
+
+function saveSetInline(exerciseIndex: number): void {
+  const weight = parseInt(($('weight-' + exerciseIndex) as HTMLInputElement).value) || 0;
+  const reps = parseInt(($('reps-' + exerciseIndex) as HTMLInputElement).value) || 0;
+  const note = ($('note-' + exerciseIndex) as HTMLInputElement).value.trim();
+
+  const set: Set = { weight, reps };
+  if (note) set.note = note;
+
+  state.currentWorkout!.exercises[exerciseIndex].sets.push(set);
+  renderWorkout();
+}
+
+function updateSet(exerciseIndex: number, setIndex: number, field: string, value: string): void {
+  if (field === 'note') {
+    if (value.trim()) {
+      state.currentWorkout!.exercises[exerciseIndex].sets[setIndex].note = value.trim();
+    } else {
+      delete state.currentWorkout!.exercises[exerciseIndex].sets[setIndex].note;
+    }
+  } else {
+    (state.currentWorkout!.exercises[exerciseIndex].sets[setIndex] as Record<string, unknown>)[field] = parseInt(value) || 0;
+  }
+}
+
+function deleteSet(exerciseIndex: number, setIndex: number): void {
+  state.currentWorkout!.exercises[exerciseIndex].sets.splice(setIndex, 1);
+  renderWorkout();
+}
+
+function copyAllSets(exerciseIndex: number): void {
+  const ex = state.currentWorkout!.exercises[exerciseIndex];
+  const prevSets = getPreviousSets(ex.name);
+  if (prevSets.length > 0) {
+    ex.sets = prevSets.map(s => ({ weight: s.weight, reps: s.reps }));
+    renderWorkout();
+  }
+}
+
+// ==================== ADD EXERCISE ====================
+const categoryMapping: Record<string, string[]> = {
+  push: ['Chest', 'Shoulders', 'Triceps'],
+  pull: ['Back', 'Biceps'],
+  legs: ['Legs'],
+  core: ['Core'],
+};
+
+let currentCategoryFilter = 'all';
+let currentSort = { field: 'recent', asc: true };
+
+function getLastLoggedDate(exerciseName: string): number | null {
+  for (const workout of state.history) {
+    const ex = workout.exercises.find(e => e.name === exerciseName);
+    if (ex && ex.sets.length > 0) {
+      return workout.start_time;
+    }
+  }
+  return null;
+}
+
+function showAddExercise(): void {
+  ($('add-exercise-search') as HTMLInputElement).value = '';
+  currentCategoryFilter = 'all';
+  currentSort = { field: 'recent', asc: true };
+  updateCategoryPills();
+  updateSortButtons();
+  filterAddExercises();
+  showWorkoutScreen('workout-add-exercise');
+}
+
+function hideAddExercise(): void {
+  showWorkoutScreen('workout-active');
+}
+
+function filterByCategory(category: string): void {
+  currentCategoryFilter = category;
+  updateCategoryPills();
+  filterAddExercises();
+}
+
+function updateCategoryPills(): void {
+  document.querySelectorAll('.category-pill').forEach(pill => {
+    const el = pill as HTMLElement;
+    if (el.dataset.category === currentCategoryFilter) {
+      el.className = 'category-pill bg-blue-600 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap';
+    } else {
+      el.className = 'category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap hover:bg-gray-600';
+    }
+  });
+}
+
+function toggleSort(field: string): void {
+  if (currentSort.field === field) {
+    currentSort.asc = !currentSort.asc;
+  } else {
+    currentSort.field = field;
+    currentSort.asc = true;
+  }
+  updateSortButtons();
+  filterAddExercises();
+}
+
+function updateSortButtons(): void {
+  const alphaBtn = $('sort-alpha');
+  const recentBtn = $('sort-recent');
+
+  if (currentSort.field === 'alpha') {
+    alphaBtn.className = 'text-blue-400';
+    alphaBtn.textContent = currentSort.asc ? 'A-Z' : 'Z-A';
+    recentBtn.className = 'text-gray-400';
+    recentBtn.textContent = 'Recent';
+  } else {
+    recentBtn.className = 'text-blue-400';
+    recentBtn.textContent = currentSort.asc ? 'Recent' : 'Oldest';
+    alphaBtn.className = 'text-gray-400';
+    alphaBtn.textContent = 'A-Z';
+  }
+}
+
+function filterAddExercises(): void {
+  const query = ($('add-exercise-search') as HTMLInputElement).value.toLowerCase();
+  let filtered = getAllExercises();
+
+  if (currentCategoryFilter !== 'all') {
+    const allowedCategories = categoryMapping[currentCategoryFilter] || [];
+    filtered = filtered.filter(e => allowedCategories.includes(e.category));
+  }
+
+  if (query) {
+    filtered = filtered.filter(e => e.name.toLowerCase().includes(query));
+  }
+
+  if (currentSort.field === 'alpha') {
+    filtered.sort((a, b) => {
+      const cmp = a.name.localeCompare(b.name);
+      return currentSort.asc ? cmp : -cmp;
+    });
+  } else {
+    filtered.sort((a, b) => {
+      const aDate = getLastLoggedDate(a.name) || 0;
+      const bDate = getLastLoggedDate(b.name) || 0;
+      const cmp = bDate - aDate;
+      return currentSort.asc ? cmp : -cmp;
+    });
+  }
+
+  renderAddExerciseList(filtered);
+}
+
+function renderAddExerciseList(exercises: Exercise[]): void {
+  const container = $('add-exercise-results');
+  container.innerHTML = exercises.map(e => {
+    const lastLogged = getLastLoggedDate(e.name);
+    const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+    return `
+      <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
+        <span class="font-medium">${e.name}</span>
+        ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+      </button>
+    `;
+  }).join('');
+}
+
+function addExerciseToWorkout(name: string): void {
+  state.currentWorkout!.exercises.push({ name, sets: [] });
+  renderWorkout();
+  hideAddExercise();
+}
+
+// ==================== HISTORY ====================
+function renderHistory(): void {
+  const list = $('history-list');
+  if (state.history.length === 0) {
+    list.innerHTML = '<p class="text-gray-500 text-center py-8">No workout history yet</p>';
+    return;
+  }
+
+  list.innerHTML = state.history.map((w, i) => {
+    const exerciseNames = w.exercises.map(e => e.name).slice(0, 3).join(', ');
+    const more = w.exercises.length > 3 ? ` +${w.exercises.length - 3} more` : '';
+
+    return `
+      <div class="bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600" onclick="app.editWorkout('${w.id}')">
+        <div class="font-medium">${formatDate(w.start_time)}</div>
+        <div class="text-sm text-gray-400">${w.exercises.length} exercises</div>
+        <div class="text-xs text-gray-500 mt-1">${exerciseNames}${more}</div>
+        <div class="mt-3 pt-3 border-t border-gray-600">
+          <button onclick="event.stopPropagation(); app.copyWorkout('${w.id}')" class="text-gray-400 text-sm hover:text-blue-400">Copy to new workout</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function editWorkout(id: string): void {
+  const source = state.history.find(w => w.id === id);
+  if (!source) return;
+
+  state.currentWorkout = {
+    startTime: source.start_time,
+    exercises: JSON.parse(JSON.stringify(source.exercises)),
+  };
+  state.editingWorkoutId = id;
+  $('workout-title').textContent = formatDate(source.start_time);
+  $('workout-finish-btn').textContent = 'Save';
+  switchTab('workout');
+  showWorkoutScreen('workout-active');
+  renderWorkout();
+}
+
+function copyWorkout(id: string): void {
+  const source = state.history.find(w => w.id === id);
+  if (!source) return;
+
+  state.currentWorkout = {
+    startTime: Date.now(),
+    exercises: source.exercises.map(e => ({
+      name: e.name,
+      sets: [],
+    })),
+  };
+  state.editingWorkoutId = null;
+  $('workout-title').textContent = "Today's Workout";
+  $('workout-finish-btn').textContent = 'Finish';
+  switchTab('workout');
+  showWorkoutScreen('workout-active');
+  renderWorkout();
+}
+
+// ==================== EXERCISES TAB ====================
+const mainCategories = [
+  { name: 'Push', subCategories: ['Chest', 'Shoulders', 'Triceps'] },
+  { name: 'Pull', subCategories: ['Back', 'Biceps'] },
+  { name: 'Legs', subCategories: ['Legs'] },
+  { name: 'Core', subCategories: ['Core'] },
+  { name: 'Other', subCategories: ['Cardio', 'Other'] },
+];
+
+let exerciseTabSort = { field: 'recent', asc: true };
+const expandedCategories = new Set<string>();
+
+function toggleExerciseTabSort(field: string): void {
+  if (exerciseTabSort.field === field) {
+    exerciseTabSort.asc = !exerciseTabSort.asc;
+  } else {
+    exerciseTabSort.field = field;
+    exerciseTabSort.asc = true;
+  }
+  updateExerciseTabSortButtons();
+  renderExerciseCategories();
+}
+
+function updateExerciseTabSortButtons(): void {
+  const alphaBtn = $('exercise-tab-sort-alpha');
+  const recentBtn = $('exercise-tab-sort-recent');
+
+  if (exerciseTabSort.field === 'alpha') {
+    alphaBtn.className = 'text-blue-400';
+    alphaBtn.textContent = exerciseTabSort.asc ? 'A-Z' : 'Z-A';
+    recentBtn.className = 'text-gray-400';
+    recentBtn.textContent = 'Recent';
+  } else {
+    recentBtn.className = 'text-blue-400';
+    recentBtn.textContent = exerciseTabSort.asc ? 'Recent' : 'Oldest';
+    alphaBtn.className = 'text-gray-400';
+    alphaBtn.textContent = 'A-Z';
+  }
+}
+
+function sortExercises(exercises: Exercise[]): Exercise[] {
+  const sorted = [...exercises];
+  if (exerciseTabSort.field === 'alpha') {
+    sorted.sort((a, b) => {
+      const cmp = a.name.localeCompare(b.name);
+      return exerciseTabSort.asc ? cmp : -cmp;
+    });
+  } else {
+    sorted.sort((a, b) => {
+      const aDate = getLastLoggedDate(a.name) || 0;
+      const bDate = getLastLoggedDate(b.name) || 0;
+      const cmp = bDate - aDate;
+      return exerciseTabSort.asc ? cmp : -cmp;
+    });
+  }
+  return sorted;
+}
+
+function renderExerciseCategories(): void {
+  const allExercises = getAllExercises();
+  const container = $('exercise-categories');
+
+  container.innerHTML = mainCategories.map(main => {
+    let exercises = allExercises.filter(e => main.subCategories.includes(e.category));
+    if (exercises.length === 0) return '';
+
+    exercises = sortExercises(exercises);
+    const isExpanded = expandedCategories.has(main.name);
+
+    return `
+      <div class="mb-4">
+        <button onclick="app.toggleCategory('${main.name}')" class="flex justify-between items-center w-full py-2 text-left">
+          <span class="font-medium text-gray-300">${main.name}</span>
+          <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
+          <span id="${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+        </button>
+        <div id="${main.name}-exercises" class="space-y-2 mt-2 ${isExpanded ? '' : 'hidden'}">
+          ${exercises.map(e => {
+            const isCustom = state.customExercises.some(c => c.name === e.name);
+            const lastLogged = getLastLoggedDate(e.name);
+            const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+            return `
+              <button onclick="app.showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
+                <span class="font-medium">${e.name}</span>
+                <div class="text-right">
+                  ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+                  ${isCustom ? `<span class="text-xs text-blue-400 ml-2">custom</span>` : ''}
+                </div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleCategory(category: string): void {
+  const exercises = $(category + '-exercises');
+  const arrow = $(category + '-arrow');
+  if (exercises.classList.contains('hidden')) {
+    exercises.classList.remove('hidden');
+    arrow.innerHTML = '&#9660;';
+    expandedCategories.add(category);
+  } else {
+    exercises.classList.add('hidden');
+    arrow.innerHTML = '&#9654;';
+    expandedCategories.delete(category);
+  }
+}
+
+function filterExercises(): void {
+  const query = ($('exercise-search') as HTMLInputElement).value.toLowerCase();
+  const categories = $('exercise-categories');
+  const results = $('exercise-search-results');
+
+  if (query.length === 0) {
+    categories.classList.remove('hidden');
+    results.classList.add('hidden');
+    return;
+  }
+
+  categories.classList.add('hidden');
+  results.classList.remove('hidden');
+
+  const filtered = getAllExercises().filter(e => e.name.toLowerCase().includes(query));
+  results.innerHTML = filtered.map(e => {
+    const isCustom = state.customExercises.some(c => c.name === e.name);
+    return `
+      <button onclick="app.showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
+        <div>
+          <div class="font-medium">${e.name}</div>
+          <div class="text-xs ${getTypeColor(e.type)}">${getTypeLabel(e.type)}</div>
+        </div>
+        ${isCustom ? '<span class="text-xs text-blue-400">custom</span>' : '<span class="text-gray-500 text-xs">&#9654;</span>'}
+      </button>
+    `;
+  }).join('');
+}
+
+// ==================== EXERCISE CRUD ====================
+function showExercisesListView(): void {
+  $('exercises-list-view').classList.remove('hidden');
+  $('exercises-edit-view').classList.add('hidden');
+}
+
+function showExercisesEditView(): void {
+  $('exercises-list-view').classList.add('hidden');
+  $('exercises-edit-view').classList.remove('hidden');
+}
+
+function showCreateExercise(): void {
+  state.editingExercise = null;
+  $('edit-exercise-title').textContent = 'New Exercise';
+  ($('exercise-name-input') as HTMLInputElement).value = '';
+  ($('exercise-name-input') as HTMLInputElement).disabled = false;
+  ($('exercise-category-input') as HTMLSelectElement).value = 'Other';
+  ($('exercise-category-input') as HTMLSelectElement).disabled = false;
+  document.querySelectorAll('input[name="weight-type"]').forEach(r => {
+    (r as HTMLInputElement).checked = false;
+    (r as HTMLInputElement).disabled = false;
+  });
+  (document.querySelector('input[name="weight-type"][value="total"]') as HTMLInputElement).checked = true;
+  setExerciseUnit('lbs');
+  $('exercise-history-section').classList.add('hidden');
+  $('delete-exercise-section').classList.add('hidden');
+  showExercisesEditView();
+}
+
+function showEditExercise(exerciseName: string): void {
+  const allExercises = getAllExercises();
+  const exercise = allExercises.find(e => e.name === exerciseName);
+  if (!exercise) return;
+
+  const customExercise = state.customExercises.find(c => c.name === exerciseName);
+  const isCustom = !!customExercise;
+
+  state.editingExercise = {
+    id: customExercise?.id || null,
+    name: exerciseName,
+    isCustom,
+  };
+
+  $('edit-exercise-title').textContent = 'Edit Exercise';
+  ($('exercise-name-input') as HTMLInputElement).value = exercise.name;
+  ($('exercise-name-input') as HTMLInputElement).disabled = !isCustom;
+  ($('exercise-category-input') as HTMLSelectElement).value = exercise.category;
+  ($('exercise-category-input') as HTMLSelectElement).disabled = !isCustom;
+
+  document.querySelectorAll('input[name="weight-type"]').forEach(r => {
+    (r as HTMLInputElement).checked = (r as HTMLInputElement).value === exercise.type;
+    (r as HTMLInputElement).disabled = false;
+  });
+
+  setExerciseUnit(exercise.unit);
+
+  // Populate recent sets history
+  const recentSets = getRecentSetsForExercise(exerciseName, 10);
+  const historyList = $('exercise-history-list');
+  $('exercise-history-section').classList.remove('hidden');
+  if (recentSets.length > 0) {
+    historyList.innerHTML = `
+      <div class="flex text-gray-500 text-xs mb-1">
+        <span class="w-20">DATE</span>
+        <span class="w-16">WEIGHT</span>
+        <span class="flex-1">REPS</span>
+      </div>
+      ${recentSets.map(s => `
+        <div class="flex text-sm py-1">
+          <span class="w-20 text-gray-400">${formatDate(s.date)}</span>
+          <span class="w-16">${s.weight} ${exercise.unit}</span>
+          <span class="flex-1">${s.reps}${s.note ? ` <span class="text-gray-500 text-xs">${s.note}</span>` : ''}</span>
+        </div>
+      `).join('')}
+    `;
+  } else {
+    historyList.innerHTML = '<p class="text-gray-500 text-sm">No history yet</p>';
+  }
+
+  if (isCustom) {
+    $('delete-exercise-section').classList.remove('hidden');
+  } else {
+    $('delete-exercise-section').classList.add('hidden');
+  }
+
+  showExercisesEditView();
+}
+
+function getRecentSetsForExercise(exerciseName: string, limit: number): Array<{ date: number; weight: number; reps: number; note?: string }> {
+  const sets: Array<{ date: number; weight: number; reps: number; note?: string }> = [];
+  for (const workout of state.history) {
+    const ex = workout.exercises.find(e => e.name === exerciseName);
+    if (ex) {
+      for (const set of [...ex.sets].reverse()) {
+        sets.push({
+          date: workout.start_time,
+          weight: set.weight,
+          reps: set.reps,
+          note: set.note,
+        });
+      }
+    }
+  }
+  return sets.slice(0, limit);
+}
+
+function hideEditExercise(): void {
+  ($('exercise-name-input') as HTMLInputElement).disabled = false;
+  ($('exercise-category-input') as HTMLSelectElement).disabled = false;
+  document.querySelectorAll('input[name="weight-type"]').forEach(r => (r as HTMLInputElement).disabled = false);
+
+  state.editingExercise = null;
+  showExercisesListView();
+  renderExerciseCategories();
+}
+
+function setExerciseUnit(unit: 'lbs' | 'kg'): void {
+  currentExerciseUnit = unit;
+  $('exercise-unit-lbs').className = unit === 'lbs' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+  $('exercise-unit-kg').className = unit === 'kg' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+}
+
+async function saveExercise(): Promise<void> {
+  const name = ($('exercise-name-input') as HTMLInputElement).value.trim();
+  const category = ($('exercise-category-input') as HTMLSelectElement).value;
+  const typeInput = document.querySelector('input[name="weight-type"]:checked') as HTMLInputElement | null;
+  const unit = currentExerciseUnit;
+
+  if (!name) {
+    alert('Please enter an exercise name');
+    return;
+  }
+  if (!typeInput) {
+    alert('Please select a weight type');
+    return;
+  }
+
+  const type = typeInput.value as 'total' | '/side' | '+bar' | 'bodyweight';
+
+  try {
+    if (state.editingExercise?.id) {
+      await api.updateCustomExercise(state.editingExercise.id, { name, type, category, unit });
+    } else {
+      await api.createCustomExercise({ name, type, category, unit });
+    }
+    await loadData();
+    hideEditExercise();
+  } catch (error) {
+    console.error('Failed to save exercise:', error);
+    alert('Failed to save exercise');
+  }
+}
+
+async function deleteExercise(): Promise<void> {
+  if (!state.editingExercise?.id) return;
+
+  if (confirm(`Delete "${state.editingExercise.name}"? This cannot be undone.`)) {
+    try {
+      await api.deleteCustomExercise(state.editingExercise.id);
+      await loadData();
+      hideEditExercise();
+    } catch (error) {
+      console.error('Failed to delete exercise:', error);
+      alert('Failed to delete exercise');
+    }
+  }
+}
+
+// ==================== SETTINGS ====================
+async function clearAllData(): Promise<void> {
+  if (confirm('This will delete all workout history. Are you sure?')) {
+    try {
+      await api.clearAllData();
+      await loadData();
+      state.currentWorkout = null;
+      state.editingWorkoutId = null;
+      showWorkoutScreen('workout-empty');
+    } catch (error) {
+      console.error('Failed to clear data:', error);
+      alert('Failed to clear data');
+    }
+  }
+}
+
+// ==================== INIT ====================
+async function init(): Promise<void> {
+  await loadData();
+  renderAddExerciseList(getAllExercises());
+}
+
+// Export app object to window for onclick handlers
+(window as unknown as Record<string, unknown>).app = {
+  startWorkout,
+  finishWorkout,
+  showAddExercise,
+  hideAddExercise,
+  filterByCategory,
+  toggleSort,
+  filterAddExercises,
+  addExerciseToWorkout,
+  showAddSetForm,
+  hideAddSetForm,
+  saveSetInline,
+  updateSet,
+  deleteSet,
+  copyAllSets,
+  removeExercise,
+  switchTab,
+  editWorkout,
+  copyWorkout,
+  toggleExerciseTabSort,
+  toggleCategory,
+  filterExercises,
+  showCreateExercise,
+  showEditExercise,
+  hideEditExercise,
+  saveExercise,
+  deleteExercise,
+  setExerciseUnit,
+  clearAllData,
+};
+
+init();

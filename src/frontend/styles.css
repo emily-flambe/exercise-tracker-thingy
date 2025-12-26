@@ -1,0 +1,24 @@
+.screen { display: none; }
+.screen.active { display: block; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.phone-frame {
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+}
+
+.main-content {
+  padding-bottom: 80px;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 390px;
+  width: 100%;
+}

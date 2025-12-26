@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workout Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="bg-gray-900 text-gray-100">
+  <div class="phone-frame bg-gray-800">
+    <div class="main-content">
+
+      <!-- TAB: WORKOUT -->
+      <div id="tab-workout" class="tab-content active">
+        <div id="workout-empty" class="screen active p-4">
+          <div class="flex flex-col items-center justify-center py-24">
+            <button onclick="app.startWorkout()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-lg">
+              Start Workout
+            </button>
+          </div>
+        </div>
+
+        <div id="workout-active" class="screen p-4">
+          <header class="flex justify-between items-center mb-4 pt-2">
+            <h1 class="text-xl font-bold" id="workout-title">Today's Workout</h1>
+            <button onclick="app.finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">
+              Finish
+            </button>
+          </header>
+          <div id="exercise-list"></div>
+          <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
+            + Add Exercise
+          </button>
+        </div>
+
+        <div id="workout-add-exercise" class="screen p-4">
+          <header class="flex justify-between items-center mb-4 pt-2">
+            <button onclick="app.hideAddExercise()" class="text-blue-400">Cancel</button>
+            <h1 class="text-lg font-semibold">Add Exercise</h1>
+            <span class="w-12"></span>
+          </header>
+          <div class="flex gap-2 mb-3 overflow-x-auto" id="category-pills">
+            <button onclick="app.filterByCategory('all')" class="category-pill bg-blue-600 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="all">All</button>
+            <button onclick="app.filterByCategory('push')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="push">Push</button>
+            <button onclick="app.filterByCategory('pull')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="pull">Pull</button>
+            <button onclick="app.filterByCategory('legs')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="legs">Legs</button>
+            <button onclick="app.filterByCategory('core')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="core">Core</button>
+          </div>
+          <div class="flex gap-2 mb-4 text-xs">
+            <span class="text-gray-500">Sort:</span>
+            <button onclick="app.toggleSort('alpha')" id="sort-alpha" class="text-gray-400">A-Z</button>
+            <button onclick="app.toggleSort('recent')" id="sort-recent" class="text-blue-400">Recent</button>
+          </div>
+          <input type="text" id="add-exercise-search" placeholder="Search exercises..." oninput="app.filterAddExercises()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-blue-500">
+          <div class="space-y-2" id="add-exercise-results"></div>
+        </div>
+      </div>
+
+      <!-- TAB: HISTORY -->
+      <div id="tab-history" class="tab-content">
+        <div class="p-4">
+          <header class="mb-6 pt-2">
+            <h1 class="text-2xl font-bold">History</h1>
+          </header>
+          <div id="history-list" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- TAB: EXERCISES -->
+      <div id="tab-exercises" class="tab-content">
+        <div id="exercises-list-view" class="p-4">
+          <header class="mb-4 pt-2">
+            <div class="flex justify-between items-center mb-4">
+              <h1 class="text-2xl font-bold">Exercises</h1>
+              <button onclick="app.showCreateExercise()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm">
+                + New
+              </button>
+            </div>
+            <div class="flex gap-2 mb-3 text-xs">
+              <span class="text-gray-500">Sort:</span>
+              <button onclick="app.toggleExerciseTabSort('alpha')" id="exercise-tab-sort-alpha" class="text-gray-400">A-Z</button>
+              <button onclick="app.toggleExerciseTabSort('recent')" id="exercise-tab-sort-recent" class="text-blue-400">Recent</button>
+            </div>
+            <input type="text" id="exercise-search" placeholder="Search exercises..." oninput="app.filterExercises()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+          </header>
+          <div id="exercise-categories"></div>
+          <div id="exercise-search-results" class="space-y-2 hidden"></div>
+        </div>
+
+        <div id="exercises-edit-view" class="p-4 hidden">
+          <header class="flex justify-between items-center mb-6 pt-2">
+            <button onclick="app.hideEditExercise()" class="text-blue-400">Cancel</button>
+            <h1 class="text-lg font-semibold" id="edit-exercise-title">New Exercise</h1>
+            <button onclick="app.saveExercise()" class="text-green-400 font-medium">Save</button>
+          </header>
+
+          <div class="space-y-6">
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Exercise Name</label>
+              <input type="text" id="exercise-name-input" placeholder="e.g., Bicep Curl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Category</label>
+              <select id="exercise-category-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+                <option value="Chest">Chest</option>
+                <option value="Shoulders">Shoulders</option>
+                <option value="Triceps">Triceps</option>
+                <option value="Back">Back</option>
+                <option value="Biceps">Biceps</option>
+                <option value="Legs">Legs</option>
+                <option value="Core">Core</option>
+                <option value="Cardio">Cardio</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Unit</label>
+              <div class="flex gap-2 mb-6">
+                <button type="button" onclick="app.setExerciseUnit('lbs')" id="exercise-unit-lbs" class="bg-blue-600 px-4 py-2 rounded-lg text-sm">lbs</button>
+                <button type="button" onclick="app.setExerciseUnit('kg')" id="exercise-unit-kg" class="bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500">kg</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-3">Weight Type</label>
+              <div class="space-y-2">
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="weight-type" value="total" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-cyan-400">Total Weight</div>
+                    <div class="text-xs text-gray-400">Log the total weight (e.g., cable machines)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="weight-type" value="/side" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-purple-400">Per Side</div>
+                    <div class="text-xs text-gray-400">Weight on each side (e.g., dumbbells)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="weight-type" value="+bar" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-yellow-500">Added Weight (+bar)</div>
+                    <div class="text-xs text-gray-400">Plates added to bar (e.g., bench press)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="weight-type" value="bodyweight" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-green-400">Bodyweight</div>
+                    <div class="text-xs text-gray-400">No external weight (e.g., pull-ups)</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div id="exercise-history-section" class="mt-6 pt-6 border-t border-gray-700">
+            <div class="text-sm text-gray-400 mb-3">Recent Sets</div>
+            <div id="exercise-history-list" class="space-y-1"></div>
+          </div>
+
+          <div id="delete-exercise-section" class="mt-8 pt-6 border-t border-gray-700 hidden">
+            <button onclick="app.deleteExercise()" class="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium py-3 rounded-lg">
+              Delete Exercise
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: SETTINGS -->
+      <div id="tab-settings" class="tab-content">
+        <div class="p-4">
+          <header class="mb-6 pt-2">
+            <h1 class="text-2xl font-bold">Settings</h1>
+          </header>
+          <div class="space-y-4">
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="font-medium mb-1">Clear All Data</div>
+              <div class="text-sm text-gray-400 mb-3">This will delete all workout history</div>
+              <button onclick="app.clearAllData()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">
+                Clear Data
+              </button>
+            </div>
+            <div class="text-center text-gray-500 text-sm mt-8">
+              Workout Tracker v1.0
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav bg-gray-900 border-t border-gray-700 px-2 py-2 flex justify-around items-center">
+      <button onclick="app.switchTab('workout')" id="nav-workout" class="flex flex-col items-center py-2 px-4 text-blue-400">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span class="text-xs">Workout</span>
+      </button>
+      <button onclick="app.switchTab('history')" id="nav-history" class="flex flex-col items-center py-2 px-4 text-gray-400">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="text-xs">History</span>
+      </button>
+      <button onclick="app.switchTab('exercises')" id="nav-exercises" class="flex flex-col items-center py-2 px-4 text-gray-400">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        <span class="text-xs">Exercises</span>
+      </button>
+      <button onclick="app.switchTab('settings')" id="nav-settings" class="flex flex-col items-center py-2 px-4 text-gray-400">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="text-xs">Settings</span>
+      </button>
+    </nav>
+  </div>
+
+  <script type="module" src="./app.ts"></script>
+</body>
+</html>

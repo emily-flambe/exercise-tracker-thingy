@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exercise Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .phone-frame {
+      max-width: 390px;
+      margin: 0 auto;
+      min-height: 100vh;
+      position: relative;
+    }
+    .main-content {
+      padding-bottom: 80px;
+    }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 390px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+  <div class="phone-frame bg-gray-800">
+    <div class="main-content">
+
+      <!-- TAB: WORKOUT -->
+      <div id="tab-workout" class="tab-content active">
+        <div id="workout-empty" class="screen active p-4">
+          <div class="flex flex-col items-center justify-center py-24">
+            <button onclick="startWorkout()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-lg">
+              Start Workout
+            </button>
+          </div>
+        </div>
+
+        <div id="workout-active" class="screen p-4">
+          <header class="flex justify-between items-center mb-4 pt-2">
+            <h1 class="text-xl font-bold" id="workout-title">Today's Workout</h1>
+            <button onclick="finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">
+              Finish
+            </button>
+          </header>
+          <div id="exercise-list"></div>
+          <button onclick="showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
+            + Add Exercise
+          </button>
+        </div>
+
+        <div id="workout-add-exercise" class="screen p-4">
+          <header class="flex justify-between items-center mb-4 pt-2">
+            <button onclick="hideAddExercise()" class="text-blue-400">Cancel</button>
+            <h1 class="text-lg font-semibold">Add Exercise</h1>
+            <span class="w-12"></span>
+          </header>
+          <div class="flex gap-2 mb-3 overflow-x-auto" id="category-pills">
+            <button onclick="filterByCategory('all')" class="category-pill bg-blue-600 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="all">All</button>
+            <button onclick="filterByCategory('push')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="push">Push</button>
+            <button onclick="filterByCategory('pull')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="pull">Pull</button>
+            <button onclick="filterByCategory('legs')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="legs">Legs</button>
+            <button onclick="filterByCategory('core')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="core">Core</button>
+          </div>
+          <div class="flex gap-2 mb-4 text-xs">
+            <span class="text-gray-500">Sort:</span>
+            <button onclick="toggleSort('alpha')" id="sort-alpha" class="text-gray-400">A-Z</button>
+            <button onclick="toggleSort('recent')" id="sort-recent" class="text-blue-400">Recent</button>
+          </div>
+          <input type="text" id="add-exercise-search" placeholder="Search exercises..." oninput="filterAddExercises()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-blue-500">
+          <div class="space-y-2" id="add-exercise-results"></div>
+        </div>
+      </div>
+
+      <!-- TAB: HISTORY -->
+      <div id="tab-history" class="tab-content">
+        <div class="p-4">
+          <header class="mb-6 pt-2">
+            <h1 class="text-2xl font-bold">History</h1>
+          </header>
+          <div id="history-list" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- TAB: EXERCISES -->
+      <div id="tab-exercises" class="tab-content">
+        <!-- Exercise List View -->
+        <div id="exercises-list-view" class="p-4">
+          <header class="mb-4 pt-2">
+            <div class="flex justify-between items-center mb-4">
+              <h1 class="text-2xl font-bold">Exercises</h1>
+              <button onclick="showCreateExercise()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm">
+                + New
+              </button>
+            </div>
+            <div class="flex gap-2 mb-3 text-xs">
+              <span class="text-gray-500">Sort:</span>
+              <button onclick="toggleExerciseTabSort('alpha')" id="exercise-tab-sort-alpha" class="text-gray-400">A-Z</button>
+              <button onclick="toggleExerciseTabSort('recent')" id="exercise-tab-sort-recent" class="text-blue-400">Recent</button>
+            </div>
+            <input type="text" id="exercise-search" placeholder="Search exercises..." oninput="filterExercises()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+          </header>
+          <div id="exercise-categories"></div>
+          <div id="exercise-search-results" class="space-y-2 hidden"></div>
+        </div>
+
+        <!-- Create/Edit Exercise View -->
+        <div id="exercises-edit-view" class="p-4 hidden">
+          <header class="flex justify-between items-center mb-6 pt-2">
+            <button onclick="hideEditExercise()" class="text-blue-400">Cancel</button>
+            <h1 class="text-lg font-semibold" id="edit-exercise-title">New Exercise</h1>
+            <button onclick="saveExercise()" class="text-green-400 font-medium">Save</button>
+          </header>
+
+          <div class="space-y-6">
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Exercise Name</label>
+              <input type="text" id="exercise-name-input" placeholder="e.g., Bicep Curl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Category</label>
+              <select id="exercise-category-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+                <option value="Chest">Chest</option>
+                <option value="Shoulders">Shoulders</option>
+                <option value="Triceps">Triceps</option>
+                <option value="Back">Back</option>
+                <option value="Biceps">Biceps</option>
+                <option value="Legs">Legs</option>
+                <option value="Core">Core</option>
+                <option value="Cardio">Cardio</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Unit</label>
+              <div class="flex gap-2 mb-6">
+                <button type="button" onclick="setExerciseUnit('lbs')" id="exercise-unit-lbs" class="bg-blue-600 px-4 py-2 rounded-lg text-sm">lbs</button>
+                <button type="button" onclick="setExerciseUnit('kg')" id="exercise-unit-kg" class="bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500">kg</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-3">Weight Type</label>
+              <div class="space-y-2">
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="weight-type" value="total" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-cyan-400">Total Weight</div>
+                    <div class="text-xs text-gray-400">Log the total weight (e.g., cable machines)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="weight-type" value="/side" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-purple-400">Per Side</div>
+                    <div class="text-xs text-gray-400">Weight on each side (e.g., dumbbells)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="weight-type" value="+bar" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-yellow-500">Added Weight (+bar)</div>
+                    <div class="text-xs text-gray-400">Plates added to bar (e.g., bench press)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="weight-type" value="bodyweight" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-green-400">Bodyweight</div>
+                    <div class="text-xs text-gray-400">No external weight (e.g., pull-ups)</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div id="exercise-history-section" class="mt-6 pt-6 border-t border-gray-700">
+            <div class="text-sm text-gray-400 mb-3">Recent Sets</div>
+            <div id="exercise-history-list" class="space-y-1"></div>
+          </div>
+
+          <div id="delete-exercise-section" class="mt-8 pt-6 border-t border-gray-700 hidden">
+            <button onclick="deleteExercise()" class="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium py-3 rounded-lg">
+              Delete Exercise
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: SETTINGS -->
+      <div id="tab-settings" class="tab-content">
+        <div class="p-4">
+          <header class="mb-6 pt-2">
+            <h1 class="text-2xl font-bold">Settings</h1>
+          </header>
+          <div class="space-y-4">
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="font-medium mb-1">Clear All Data</div>
+              <div class="text-sm text-gray-400 mb-3">This will delete all workout history</div>
+              <button onclick="clearAllData()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">
+                Clear Data
+              </button>
+            </div>
+            <div class="text-center text-gray-500 text-sm mt-8">
+              Exercise Tracker v0.2<br>Prototype
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav bg-gray-900 border-t border-gray-700 px-2 py-2 flex justify-around items-center">
+      <button onclick="switchTab('workout')" id="nav-workout" class="flex flex-col items-center py-2 px-4 text-blue-400">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span class="text-xs">Workout</span>
+      </button>
+      <button onclick="switchTab('history')" id="nav-history" class="flex flex-col items-center py-2 px-4 text-gray-400">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="text-xs">History</span>
+      </button>
+      <button onclick="switchTab('exercises')" id="nav-exercises" class="flex flex-col items-center py-2 px-4 text-gray-400">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        <span class="text-xs">Exercises</span>
+      </button>
+      <button onclick="switchTab('settings')" id="nav-settings" class="flex flex-col items-center py-2 px-4 text-gray-400">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="text-xs">Settings</span>
+      </button>
+    </nav>
+  </div>
+
+<script>
+// ==================== DATA ====================
+const exerciseLibrary = [
+  { name: 'Bench Press', type: 'total', category: 'Chest', unit: 'lbs' },
+  { name: 'Incline Bench Press', type: 'total', category: 'Chest', unit: 'lbs' },
+  { name: 'Dumbbell Press', type: '/side', category: 'Chest', unit: 'lbs' },
+  { name: 'Incline Dumbbell Press', type: '/side', category: 'Chest', unit: 'lbs' },
+  { name: 'Cable Fly', type: 'total', category: 'Chest', unit: 'lbs' },
+  { name: 'Deadlift', type: '+bar', category: 'Back', unit: 'lbs' },
+  { name: 'Lat Pulldown', type: 'total', category: 'Back', unit: 'lbs' },
+  { name: 'Seated Cable Row', type: 'total', category: 'Back', unit: 'lbs' },
+  { name: 'Barbell Row', type: '+bar', category: 'Back', unit: 'lbs' },
+  { name: 'Dumbbell Row', type: '/side', category: 'Back', unit: 'lbs' },
+  { name: 'Pull-ups', type: 'bodyweight', category: 'Back', unit: 'lbs' },
+  { name: 'Overhead Press', type: '+bar', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Dumbbell Shoulder Press', type: '/side', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Lateral Raise', type: '/side', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Face Pull', type: 'total', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Barbell Curl', type: 'total', category: 'Biceps', unit: 'lbs' },
+  { name: 'Hammer Curl', type: '/side', category: 'Biceps', unit: 'lbs' },
+  { name: 'Preacher Curl', type: '/side', category: 'Biceps', unit: 'lbs' },
+  { name: 'Tricep Pushdown', type: 'total', category: 'Triceps', unit: 'lbs' },
+  { name: 'Skull Crusher', type: '+bar', category: 'Triceps', unit: 'lbs' },
+  { name: 'Squat', type: '+bar', category: 'Legs', unit: 'lbs' },
+  { name: 'Romanian Deadlift', type: '+bar', category: 'Legs', unit: 'lbs' },
+  { name: 'Leg Press', type: 'total', category: 'Legs', unit: 'lbs' },
+  { name: 'Leg Curl', type: 'total', category: 'Legs', unit: 'lbs' },
+  { name: 'Calf Raise', type: 'total', category: 'Legs', unit: 'lbs' },
+  { name: 'Lunges', type: '/side', category: 'Legs', unit: 'lbs' },
+];
+
+// ==================== STATE ====================
+let state = {
+  currentWorkout: null,
+  editingHistoryIndex: null, // index in history[] when editing a past workout
+  history: [],
+  customExercises: [],
+  currentExerciseIndex: null,
+  editingExercise: null, // { name, isCustom, index } when editing
+};
+
+let currentExerciseUnit = 'lbs'; // for exercise edit form
+
+// Get all exercises (default + custom, with custom overriding defaults)
+function getAllExercises() {
+  const customNames = new Set(state.customExercises.map(e => e.name.toLowerCase()));
+  const defaults = exerciseLibrary.filter(e => !customNames.has(e.name.toLowerCase()));
+  return [...defaults, ...state.customExercises];
+}
+
+// Load from localStorage
+function loadState() {
+  const saved = localStorage.getItem('exerciseTrackerState');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    state.history = parsed.history || [];
+    state.currentWorkout = parsed.currentWorkout || null;
+    state.customExercises = parsed.customExercises || [];
+  }
+}
+
+function saveState() {
+  localStorage.setItem('exerciseTrackerState', JSON.stringify({
+    history: state.history,
+    currentWorkout: state.currentWorkout,
+    customExercises: state.customExercises,
+  }));
+}
+
+function getExerciseUnit(exerciseName) {
+  const exercise = getAllExercises().find(e => e.name === exerciseName);
+  return exercise?.unit || 'lbs';
+}
+
+function setExerciseUnit(unit) {
+  currentExerciseUnit = unit;
+  document.getElementById('exercise-unit-lbs').className = unit === 'lbs' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+  document.getElementById('exercise-unit-kg').className = unit === 'kg' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+}
+
+// ==================== UTILS ====================
+function getTypeColor(type) {
+  if (type === '+bar') return 'text-yellow-500';
+  if (type === '/side') return 'text-purple-400';
+  return 'text-cyan-400';
+}
+
+function getTypeLabel(type) {
+  if (type === '+bar') return '+bar weight';
+  if (type === '/side') return 'per side';
+  if (type === 'bodyweight') return 'bodyweight';
+  return 'total weight';
+}
+
+function formatDuration(ms) {
+  const mins = Math.floor(ms / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const y = String(d.getFullYear()).slice(-2);
+  return `${m}/${day}/${y}`;
+}
+
+// ==================== TAB NAVIGATION ====================
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tabName).classList.add('active');
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.classList.remove('text-blue-400');
+    btn.classList.add('text-gray-400');
+  });
+  document.getElementById('nav-' + tabName).classList.remove('text-gray-400');
+  document.getElementById('nav-' + tabName).classList.add('text-blue-400');
+
+  if (tabName === 'history') renderHistory();
+  if (tabName === 'exercises') renderExerciseCategories();
+}
+
+function showWorkoutScreen(screenId) {
+  document.querySelectorAll('#tab-workout .screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+}
+
+// ==================== WORKOUT ====================
+function startWorkout() {
+  state.currentWorkout = {
+    startTime: Date.now(),
+    exercises: [],
+  };
+  state.editingHistoryIndex = null;
+  document.getElementById('workout-title').textContent = "Today's Workout";
+  document.getElementById('workout-finish-btn').textContent = 'Finish';
+  saveState();
+  showWorkoutScreen('workout-active');
+  renderWorkout();
+}
+
+function finishWorkout() {
+  if (!state.currentWorkout || state.currentWorkout.exercises.length === 0) {
+    state.currentWorkout = null;
+    state.editingHistoryIndex = null;
+    saveState();
+    showWorkoutScreen('workout-empty');
+    return;
+  }
+
+  if (state.editingHistoryIndex !== null) {
+    // Save back to history
+    state.currentWorkout.endTime = state.currentWorkout.endTime || Date.now();
+    state.history[state.editingHistoryIndex] = state.currentWorkout;
+  } else {
+    // New workout - add to history
+    state.currentWorkout.endTime = Date.now();
+    state.history.unshift(state.currentWorkout);
+  }
+
+  state.currentWorkout = null;
+  state.editingHistoryIndex = null;
+  saveState();
+  showWorkoutScreen('workout-empty');
+}
+
+function renderWorkout() {
+  const list = document.getElementById('exercise-list');
+  if (!state.currentWorkout) {
+    list.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = state.currentWorkout.exercises.map((ex, i) => {
+    const exercise = getAllExercises().find(e => e.name === ex.name) || { type: 'total', unit: 'lbs' };
+    const unit = exercise.unit || 'lbs';
+    const prevSets = getPreviousSets(ex.name);
+
+    const lastSet = ex.sets.length > 0 ? ex.sets[ex.sets.length - 1] : (prevSets[0] || { weight: 0, reps: 10 });
+    const nextSetNum = ex.sets.length + 1;
+
+    let setsHtml = `
+      <div class="text-sm">
+        ${ex.sets.length > 0 ? `
+          ${ex.sets.map((set, si) => `
+            <div class="py-1 border-b border-gray-600">
+              <div class="flex items-center gap-2">
+                <span class="w-6 text-gray-400 text-xs">${si + 1}</span>
+                <input type="number" value="${set.weight}" onchange="updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500">
+                <span class="text-gray-400">x</span>
+                <input type="number" value="${set.reps}" onchange="updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500">
+                <button onclick="deleteSet(${i}, ${si})" class="text-red-400 text-xs px-2 hover:text-red-300">x</button>
+              </div>
+              <input type="text" value="${set.note || ''}" onchange="updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600">
+            </div>
+          `).join('')}
+        ` : (prevSets.length > 0 ? `
+          <div class="mb-3">
+            <div class="text-gray-500 text-xs mb-2">Last time: ${prevSets.map(s => s.weight + 'x' + s.reps).join(', ')}</div>
+            <button onclick="copyAllSets(${i})" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm">Copy all ${prevSets.length} sets</button>
+          </div>
+        ` : '')}
+
+        <div id="add-set-collapsed-${i}" class="mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-gray-600' : ''}">
+          <button onclick="showAddSetForm(${i})" class="text-blue-400 text-sm">+ Add set</button>
+        </div>
+        <div id="add-set-expanded-${i}" class="hidden mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-gray-600' : ''}">
+          <div class="flex items-center gap-2">
+            <span class="text-gray-400 text-xs w-6">${nextSetNum}</span>
+            <input type="number" id="weight-${i}" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500" placeholder="wt">
+            <span class="text-gray-400">x</span>
+            <input type="number" id="reps-${i}" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500" placeholder="reps">
+            <button onclick="saveSetInline(${i})" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Save</button>
+            <button onclick="hideAddSetForm(${i})" class="text-gray-400 text-sm">Cancel</button>
+          </div>
+          <input type="text" id="note-${i}" placeholder="note (optional)" class="mt-2 ml-6 w-40 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600">
+        </div>
+      </div>
+    `;
+
+    return `
+      <div class="bg-gray-700 rounded-lg p-4 mb-3">
+        <div class="flex justify-between items-start mb-3">
+          <div>
+            <div class="font-medium">${ex.name}</div>
+            <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
+          </div>
+          <button onclick="removeExercise(${i})" class="text-red-400 text-sm px-2 hover:text-red-300">x</button>
+        </div>
+        ${setsHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+function getPreviousSets(exerciseName) {
+  for (const workout of state.history) {
+    const ex = workout.exercises.find(e => e.name === exerciseName);
+    if (ex && ex.sets.length > 0) return ex.sets;
+  }
+  return [];
+}
+
+function removeExercise(index) {
+  if (confirm('Remove this exercise?')) {
+    state.currentWorkout.exercises.splice(index, 1);
+    saveState();
+    renderWorkout();
+  }
+}
+
+// ==================== INLINE SET LOGGING ====================
+function showAddSetForm(exerciseIndex) {
+  const ex = state.currentWorkout.exercises[exerciseIndex];
+  const prevSets = getPreviousSets(ex.name);
+  const lastSet = ex.sets.length > 0 ? ex.sets[ex.sets.length - 1] : (prevSets[0] || { weight: 0, reps: 10 });
+
+  document.getElementById('add-set-collapsed-' + exerciseIndex).classList.add('hidden');
+  document.getElementById('add-set-expanded-' + exerciseIndex).classList.remove('hidden');
+  document.getElementById('weight-' + exerciseIndex).value = lastSet.weight;
+  document.getElementById('reps-' + exerciseIndex).value = lastSet.reps;
+  document.getElementById('weight-' + exerciseIndex).focus();
+}
+
+function hideAddSetForm(exerciseIndex) {
+  document.getElementById('add-set-collapsed-' + exerciseIndex).classList.remove('hidden');
+  document.getElementById('add-set-expanded-' + exerciseIndex).classList.add('hidden');
+}
+
+function saveSetInline(exerciseIndex) {
+  const weight = parseInt(document.getElementById('weight-' + exerciseIndex).value) || 0;
+  const reps = parseInt(document.getElementById('reps-' + exerciseIndex).value) || 0;
+  const note = document.getElementById('note-' + exerciseIndex).value.trim();
+
+  const set = { weight, reps };
+  if (note) set.note = note;
+
+  state.currentWorkout.exercises[exerciseIndex].sets.push(set);
+  saveState();
+  renderWorkout();
+}
+
+function updateSet(exerciseIndex, setIndex, field, value) {
+  if (field === 'note') {
+    if (value.trim()) {
+      state.currentWorkout.exercises[exerciseIndex].sets[setIndex].note = value.trim();
+    } else {
+      delete state.currentWorkout.exercises[exerciseIndex].sets[setIndex].note;
+    }
+  } else {
+    state.currentWorkout.exercises[exerciseIndex].sets[setIndex][field] = parseInt(value) || 0;
+  }
+  saveState();
+}
+
+function deleteSet(exerciseIndex, setIndex) {
+  state.currentWorkout.exercises[exerciseIndex].sets.splice(setIndex, 1);
+  saveState();
+  renderWorkout();
+}
+
+function copyAllSets(exerciseIndex) {
+  const ex = state.currentWorkout.exercises[exerciseIndex];
+  const prevSets = getPreviousSets(ex.name);
+  if (prevSets.length > 0) {
+    ex.sets = prevSets.map(s => ({ weight: s.weight, reps: s.reps }));
+    saveState();
+    renderWorkout();
+  }
+}
+
+// ==================== ADD EXERCISE ====================
+const categoryMapping = {
+  push: ['Chest', 'Shoulders', 'Triceps'],
+  pull: ['Back', 'Biceps'],
+  legs: ['Legs'],
+  core: ['Core'],
+};
+
+let currentCategoryFilter = 'all';
+let currentSort = { field: 'recent', asc: true };
+
+function getLastLoggedDate(exerciseName) {
+  for (const workout of state.history) {
+    const ex = workout.exercises.find(e => e.name === exerciseName);
+    if (ex && ex.sets.length > 0) {
+      return workout.startTime;
+    }
+  }
+  return null;
+}
+
+function showAddExercise() {
+  document.getElementById('add-exercise-search').value = '';
+  currentCategoryFilter = 'all';
+  currentSort = { field: 'recent', asc: true };
+  updateCategoryPills();
+  updateSortButtons();
+  filterAddExercises();
+  showWorkoutScreen('workout-add-exercise');
+}
+
+function hideAddExercise() {
+  showWorkoutScreen('workout-active');
+}
+
+function filterByCategory(category) {
+  currentCategoryFilter = category;
+  updateCategoryPills();
+  filterAddExercises();
+}
+
+function updateCategoryPills() {
+  document.querySelectorAll('.category-pill').forEach(pill => {
+    if (pill.dataset.category === currentCategoryFilter) {
+      pill.className = 'category-pill bg-blue-600 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap';
+    } else {
+      pill.className = 'category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap hover:bg-gray-600';
+    }
+  });
+}
+
+function toggleSort(field) {
+  if (currentSort.field === field) {
+    currentSort.asc = !currentSort.asc;
+  } else {
+    currentSort.field = field;
+    currentSort.asc = true;
+  }
+  updateSortButtons();
+  filterAddExercises();
+}
+
+function updateSortButtons() {
+  const alphaBtn = document.getElementById('sort-alpha');
+  const recentBtn = document.getElementById('sort-recent');
+
+  if (currentSort.field === 'alpha') {
+    alphaBtn.className = 'text-blue-400';
+    alphaBtn.textContent = currentSort.asc ? 'A-Z' : 'Z-A';
+    recentBtn.className = 'text-gray-400';
+    recentBtn.textContent = 'Recent';
+  } else {
+    recentBtn.className = 'text-blue-400';
+    recentBtn.textContent = currentSort.asc ? 'Recent' : 'Oldest';
+    alphaBtn.className = 'text-gray-400';
+    alphaBtn.textContent = 'A-Z';
+  }
+}
+
+function filterAddExercises() {
+  const query = document.getElementById('add-exercise-search').value.toLowerCase();
+  let filtered = getAllExercises();
+
+  // Apply category filter
+  if (currentCategoryFilter !== 'all') {
+    const allowedCategories = categoryMapping[currentCategoryFilter] || [];
+    filtered = filtered.filter(e => allowedCategories.includes(e.category));
+  }
+
+  // Apply search filter
+  if (query) {
+    filtered = filtered.filter(e => e.name.toLowerCase().includes(query));
+  }
+
+  // Apply sorting
+  if (currentSort.field === 'alpha') {
+    filtered.sort((a, b) => {
+      const cmp = a.name.localeCompare(b.name);
+      return currentSort.asc ? cmp : -cmp;
+    });
+  } else {
+    filtered.sort((a, b) => {
+      const aDate = getLastLoggedDate(a.name) || 0;
+      const bDate = getLastLoggedDate(b.name) || 0;
+      const cmp = bDate - aDate; // Most recent first by default
+      return currentSort.asc ? cmp : -cmp;
+    });
+  }
+
+  renderAddExerciseList(filtered);
+}
+
+function renderAddExerciseList(exercises) {
+  const container = document.getElementById('add-exercise-results');
+  container.innerHTML = exercises.map(e => {
+    const lastLogged = getLastLoggedDate(e.name);
+    const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+    return `
+      <button onclick="addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
+        <span class="font-medium">${e.name}</span>
+        ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+      </button>
+    `;
+  }).join('');
+}
+
+function addExerciseToWorkout(name) {
+  state.currentWorkout.exercises.push({ name, sets: [] });
+  saveState();
+  renderWorkout();
+  hideAddExercise();
+}
+
+// ==================== HISTORY ====================
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  if (state.history.length === 0) {
+    list.innerHTML = '<p class="text-gray-500 text-center py-8">No workout history yet</p>';
+    return;
+  }
+
+  list.innerHTML = state.history.map((w, i) => {
+    const exerciseNames = w.exercises.map(e => e.name).slice(0, 3).join(', ');
+    const more = w.exercises.length > 3 ? ` +${w.exercises.length - 3} more` : '';
+
+    return `
+      <div class="bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600" onclick="editWorkout(${i})">
+        <div class="font-medium">${formatDate(w.startTime)}</div>
+        <div class="text-sm text-gray-400">${w.exercises.length} exercises</div>
+        <div class="text-xs text-gray-500 mt-1">${exerciseNames}${more}</div>
+        <div class="mt-3 pt-3 border-t border-gray-600">
+          <button onclick="event.stopPropagation(); copyWorkout(${i})" class="text-gray-400 text-sm hover:text-blue-400">Copy to new workout</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function editWorkout(index) {
+  const source = state.history[index];
+  state.currentWorkout = JSON.parse(JSON.stringify(source)); // Deep copy
+  state.editingHistoryIndex = index;
+  document.getElementById('workout-title').textContent = formatDate(source.startTime);
+  document.getElementById('workout-finish-btn').textContent = 'Save';
+  saveState();
+  switchTab('workout');
+  showWorkoutScreen('workout-active');
+  renderWorkout();
+}
+
+function copyWorkout(index) {
+  const source = state.history[index];
+  state.currentWorkout = {
+    startTime: Date.now(),
+    exercises: source.exercises.map(e => ({
+      name: e.name,
+      sets: [], // Start fresh, but exercise order is copied
+    })),
+  };
+  state.editingHistoryIndex = null;
+  document.getElementById('workout-title').textContent = "Today's Workout";
+  document.getElementById('workout-finish-btn').textContent = 'Finish';
+  saveState();
+  switchTab('workout');
+  showWorkoutScreen('workout-active');
+  renderWorkout();
+}
+
+// ==================== EXERCISES TAB ====================
+const mainCategories = [
+  { name: 'Push', subCategories: ['Chest', 'Shoulders', 'Triceps'] },
+  { name: 'Pull', subCategories: ['Back', 'Biceps'] },
+  { name: 'Legs', subCategories: ['Legs'] },
+  { name: 'Core', subCategories: ['Core'] },
+  { name: 'Other', subCategories: ['Cardio', 'Other'] },
+];
+
+let exerciseTabSort = { field: 'recent', asc: true };
+let expandedCategories = new Set();
+
+function getMainCategory(category) {
+  for (const main of mainCategories) {
+    if (main.subCategories.includes(category)) {
+      return main.name;
+    }
+  }
+  return 'Other';
+}
+
+function toggleExerciseTabSort(field) {
+  if (exerciseTabSort.field === field) {
+    exerciseTabSort.asc = !exerciseTabSort.asc;
+  } else {
+    exerciseTabSort.field = field;
+    exerciseTabSort.asc = true;
+  }
+  updateExerciseTabSortButtons();
+  renderExerciseCategories();
+}
+
+function updateExerciseTabSortButtons() {
+  const alphaBtn = document.getElementById('exercise-tab-sort-alpha');
+  const recentBtn = document.getElementById('exercise-tab-sort-recent');
+
+  if (exerciseTabSort.field === 'alpha') {
+    alphaBtn.className = 'text-blue-400';
+    alphaBtn.textContent = exerciseTabSort.asc ? 'A-Z' : 'Z-A';
+    recentBtn.className = 'text-gray-400';
+    recentBtn.textContent = 'Recent';
+  } else {
+    recentBtn.className = 'text-blue-400';
+    recentBtn.textContent = exerciseTabSort.asc ? 'Recent' : 'Oldest';
+    alphaBtn.className = 'text-gray-400';
+    alphaBtn.textContent = 'A-Z';
+  }
+}
+
+function sortExercises(exercises) {
+  const sorted = [...exercises];
+  if (exerciseTabSort.field === 'alpha') {
+    sorted.sort((a, b) => {
+      const cmp = a.name.localeCompare(b.name);
+      return exerciseTabSort.asc ? cmp : -cmp;
+    });
+  } else {
+    sorted.sort((a, b) => {
+      const aDate = getLastLoggedDate(a.name) || 0;
+      const bDate = getLastLoggedDate(b.name) || 0;
+      const cmp = bDate - aDate;
+      return exerciseTabSort.asc ? cmp : -cmp;
+    });
+  }
+  return sorted;
+}
+
+function renderExerciseCategories() {
+  const allExercises = getAllExercises();
+  const container = document.getElementById('exercise-categories');
+
+  container.innerHTML = mainCategories.map(main => {
+    let exercises = allExercises.filter(e => main.subCategories.includes(e.category));
+    if (exercises.length === 0) return '';
+
+    exercises = sortExercises(exercises);
+    const isExpanded = expandedCategories.has(main.name);
+
+    return `
+      <div class="mb-4">
+        <button onclick="toggleCategory('${main.name}')" class="flex justify-between items-center w-full py-2 text-left">
+          <span class="font-medium text-gray-300">${main.name}</span>
+          <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
+          <span id="${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+        </button>
+        <div id="${main.name}-exercises" class="space-y-2 mt-2 ${isExpanded ? '' : 'hidden'}">
+          ${exercises.map(e => {
+            const isCustom = state.customExercises.some(c => c.name === e.name);
+            const lastLogged = getLastLoggedDate(e.name);
+            const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+            return `
+              <button onclick="showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
+                <span class="font-medium">${e.name}</span>
+                <div class="text-right">
+                  ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+                  ${isCustom ? `<span class="text-xs text-blue-400 ml-2">custom</span>` : ''}
+                </div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleCategory(category) {
+  const exercises = document.getElementById(category + '-exercises');
+  const arrow = document.getElementById(category + '-arrow');
+  if (exercises.classList.contains('hidden')) {
+    exercises.classList.remove('hidden');
+    arrow.innerHTML = '&#9660;';
+    expandedCategories.add(category);
+  } else {
+    exercises.classList.add('hidden');
+    arrow.innerHTML = '&#9654;';
+    expandedCategories.delete(category);
+  }
+}
+
+function filterExercises() {
+  const query = document.getElementById('exercise-search').value.toLowerCase();
+  const categories = document.getElementById('exercise-categories');
+  const results = document.getElementById('exercise-search-results');
+
+  if (query.length === 0) {
+    categories.classList.remove('hidden');
+    results.classList.add('hidden');
+    return;
+  }
+
+  categories.classList.add('hidden');
+  results.classList.remove('hidden');
+
+  const filtered = getAllExercises().filter(e => e.name.toLowerCase().includes(query));
+  results.innerHTML = filtered.map(e => {
+    const isCustom = state.customExercises.some(c => c.name === e.name);
+    return `
+      <button onclick="showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
+        <div>
+          <div class="font-medium">${e.name}</div>
+          <div class="text-xs ${getTypeColor(e.type)}">${getTypeLabel(e.type)}</div>
+        </div>
+        ${isCustom ? '<span class="text-xs text-blue-400">custom</span>' : '<span class="text-gray-500 text-xs">&#9654;</span>'}
+      </button>
+    `;
+  }).join('');
+}
+
+// ==================== EXERCISE CRUD ====================
+function showExercisesListView() {
+  document.getElementById('exercises-list-view').classList.remove('hidden');
+  document.getElementById('exercises-edit-view').classList.add('hidden');
+}
+
+function showExercisesEditView() {
+  document.getElementById('exercises-list-view').classList.add('hidden');
+  document.getElementById('exercises-edit-view').classList.remove('hidden');
+}
+
+function showCreateExercise() {
+  state.editingExercise = null;
+  document.getElementById('edit-exercise-title').textContent = 'New Exercise';
+  document.getElementById('exercise-name-input').value = '';
+  document.getElementById('exercise-category-input').value = 'Other';
+  document.querySelectorAll('input[name="weight-type"]').forEach(r => r.checked = false);
+  document.querySelector('input[name="weight-type"][value="total"]').checked = true;
+  setExerciseUnit('lbs');
+  document.getElementById('exercise-history-section').classList.add('hidden');
+  document.getElementById('delete-exercise-section').classList.add('hidden');
+  showExercisesEditView();
+}
+
+function showEditExercise(exerciseName) {
+  const allExercises = getAllExercises();
+  const exercise = allExercises.find(e => e.name === exerciseName);
+  if (!exercise) return;
+
+  const isCustom = state.customExercises.some(c => c.name === exerciseName);
+  const customIndex = state.customExercises.findIndex(c => c.name === exerciseName);
+
+  state.editingExercise = {
+    name: exerciseName,
+    isCustom: isCustom,
+    index: customIndex,
+  };
+
+  document.getElementById('edit-exercise-title').textContent = 'Edit Exercise';
+  document.getElementById('exercise-name-input').value = exercise.name;
+  document.getElementById('exercise-name-input').disabled = !isCustom;
+  document.getElementById('exercise-category-input').value = exercise.category;
+  document.getElementById('exercise-category-input').disabled = !isCustom;
+
+  document.querySelectorAll('input[name="weight-type"]').forEach(r => {
+    r.checked = r.value === exercise.type;
+    r.disabled = false; // Always allow weight type editing
+  });
+
+  // Set the exercise unit
+  setExerciseUnit(exercise.unit || 'lbs');
+
+  // Populate recent sets history
+  const unit = exercise.unit || 'lbs';
+  const recentSets = getRecentSetsForExercise(exerciseName, 10);
+  const historyList = document.getElementById('exercise-history-list');
+  document.getElementById('exercise-history-section').classList.remove('hidden');
+  if (recentSets.length > 0) {
+    historyList.innerHTML = `
+      <div class="flex text-gray-500 text-xs mb-1">
+        <span class="w-20">DATE</span>
+        <span class="w-16">WEIGHT</span>
+        <span class="flex-1">REPS</span>
+      </div>
+      ${recentSets.map(s => `
+        <div class="flex text-sm py-1">
+          <span class="w-20 text-gray-400">${formatDate(s.date)}</span>
+          <span class="w-16">${s.weight} ${unit}</span>
+          <span class="flex-1">${s.reps}${s.note ? ` <span class="text-gray-500 text-xs">${s.note}</span>` : ''}</span>
+        </div>
+      `).join('')}
+    `;
+  } else {
+    historyList.innerHTML = '<p class="text-gray-500 text-sm">No history yet</p>';
+  }
+
+  if (isCustom) {
+    document.getElementById('delete-exercise-section').classList.remove('hidden');
+  } else {
+    document.getElementById('delete-exercise-section').classList.add('hidden');
+  }
+
+  showExercisesEditView();
+}
+
+function getRecentSetsForExercise(exerciseName, limit) {
+  const sets = [];
+  for (const workout of state.history) {
+    const ex = workout.exercises.find(e => e.name === exerciseName);
+    if (ex) {
+      // Reverse to get most recent sets first within the workout
+      for (const set of [...ex.sets].reverse()) {
+        sets.push({
+          date: workout.startTime,
+          weight: set.weight,
+          reps: set.reps,
+          note: set.note,
+        });
+      }
+    }
+  }
+  return sets.slice(0, limit);
+}
+
+function hideEditExercise() {
+  // Re-enable inputs
+  document.getElementById('exercise-name-input').disabled = false;
+  document.getElementById('exercise-category-input').disabled = false;
+  document.querySelectorAll('input[name="weight-type"]').forEach(r => r.disabled = false);
+
+  state.editingExercise = null;
+  showExercisesListView();
+  renderExerciseCategories();
+}
+
+function saveExercise() {
+  const name = document.getElementById('exercise-name-input').value.trim();
+  const category = document.getElementById('exercise-category-input').value;
+  const typeInput = document.querySelector('input[name="weight-type"]:checked');
+  const unit = currentExerciseUnit;
+
+  if (!name) {
+    alert('Please enter an exercise name');
+    return;
+  }
+  if (!typeInput) {
+    alert('Please select a weight type');
+    return;
+  }
+
+  const type = typeInput.value;
+
+  // Check for duplicate names (except when editing the same exercise)
+  const allExercises = getAllExercises();
+  const existingIndex = allExercises.findIndex(e => e.name.toLowerCase() === name.toLowerCase());
+  if (existingIndex !== -1) {
+    if (!state.editingExercise || state.editingExercise.name.toLowerCase() !== name.toLowerCase()) {
+      alert('An exercise with this name already exists');
+      return;
+    }
+  }
+
+  if (state.editingExercise && state.editingExercise.isCustom) {
+    // Update existing custom exercise
+    state.customExercises[state.editingExercise.index] = { name, type, category, unit };
+  } else if (state.editingExercise && !state.editingExercise.isCustom) {
+    // Modifying a default exercise - create custom override
+    state.customExercises.push({ name, type, category, unit });
+  } else if (!state.editingExercise) {
+    // Create new exercise
+    state.customExercises.push({ name, type, category, unit });
+  }
+
+  saveState();
+  hideEditExercise();
+}
+
+function deleteExercise() {
+  if (!state.editingExercise || !state.editingExercise.isCustom) return;
+
+  if (confirm(`Delete "${state.editingExercise.name}"? This cannot be undone.`)) {
+    state.customExercises.splice(state.editingExercise.index, 1);
+    saveState();
+    hideEditExercise();
+  }
+}
+
+// ==================== SETTINGS ====================
+function clearAllData() {
+  if (confirm('This will delete all workout history. Are you sure?')) {
+    state.history = [];
+    state.currentWorkout = null;
+    state.editingHistoryIndex = null;
+    saveState();
+    showWorkoutScreen('workout-empty');
+  }
+}
+
+// ==================== INIT ====================
+function init() {
+  loadState();
+
+  // Auto-finish any leftover workout from a previous session
+  if (state.currentWorkout) {
+    if (state.currentWorkout.exercises.length > 0) {
+      state.currentWorkout.endTime = state.currentWorkout.endTime || Date.now();
+      state.history.unshift(state.currentWorkout);
+    }
+    state.currentWorkout = null;
+    state.editingHistoryIndex = null;
+    saveState();
+  }
+
+  renderAddExerciseList(getAllExercises());
+}
+
+init();
+</script>
+</body>
+</html>

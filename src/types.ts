@@ -1,0 +1,114 @@
+// Exercise types
+export type WeightType = 'total' | '/side' | '+bar' | 'bodyweight';
+export type Unit = 'lbs' | 'kg';
+export type Category =
+  | 'Chest'
+  | 'Shoulders'
+  | 'Triceps'
+  | 'Back'
+  | 'Biceps'
+  | 'Legs'
+  | 'Core'
+  | 'Cardio'
+  | 'Other';
+
+export interface Exercise {
+  name: string;
+  type: WeightType;
+  category: Category;
+  unit: Unit;
+}
+
+export interface CustomExercise extends Exercise {
+  id: string;
+  user_id: string;
+  created_at: number;
+}
+
+// Set and Workout types
+export interface Set {
+  weight: number;
+  reps: number;
+  note?: string;
+}
+
+export interface WorkoutExercise {
+  name: string;
+  sets: Set[];
+}
+
+export interface Workout {
+  id: string;
+  user_id: string;
+  start_time: number;
+  end_time?: number;
+  exercises: WorkoutExercise[];
+  created_at: number;
+}
+
+// Database row types
+export interface WorkoutRow {
+  id: string;
+  user_id: string;
+  start_time: number;
+  end_time: number | null;
+  created_at: number;
+}
+
+export interface WorkoutExerciseRow {
+  id: string;
+  workout_id: string;
+  exercise_name: string;
+  position: number;
+}
+
+export interface SetRow {
+  id: string;
+  workout_exercise_id: string;
+  weight: number;
+  reps: number;
+  note: string | null;
+  position: number;
+}
+
+export interface CustomExerciseRow {
+  id: string;
+  user_id: string;
+  name: string;
+  type: string;
+  category: string;
+  unit: string;
+  created_at: number;
+}
+
+// API types
+export interface CreateWorkoutRequest {
+  start_time: number;
+  end_time?: number;
+  exercises: WorkoutExercise[];
+}
+
+export interface UpdateWorkoutRequest {
+  start_time?: number;
+  end_time?: number;
+  exercises?: WorkoutExercise[];
+}
+
+export interface CreateExerciseRequest {
+  name: string;
+  type: WeightType;
+  category: Category;
+  unit: Unit;
+}
+
+export interface UpdateExerciseRequest {
+  name?: string;
+  type?: WeightType;
+  category?: Category;
+  unit?: Unit;
+}
+
+// Cloudflare bindings
+export interface Env {
+  DB: D1Database;
+}

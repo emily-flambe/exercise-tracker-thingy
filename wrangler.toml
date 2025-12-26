@@ -1,0 +1,20 @@
+name = "workout"
+main = "src/index.ts"
+compatibility_date = "2025-12-15"
+account_id = "facf6619808dc039df729531bbb26d1d"
+
+[[routes]]
+pattern = "workout.emilycogsdill.com"
+custom_domain = true
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "workout-db"
+database_id = "0b2b7e10-c9b2-4b42-b99a-e091f11c86a6"
+
+[dev]
+port = 8787

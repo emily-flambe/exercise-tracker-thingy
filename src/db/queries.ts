@@ -50,11 +50,43 @@ export async function createUser(db: D1Database, username: string, passwordHash:
     .bind(id, username, passwordHash, now)
     .run();
 
+  // Seed default exercises for the new user
+  await seedDefaultExercises(db, id);
+
   return {
     id,
     username,
     created_at: now,
   };
+}
+
+// Default exercises to seed for new users (sparse but covers main movements)
+const DEFAULT_EXERCISES: Array<{ name: string; type: string; category: string; unit: string }> = [
+  // Push
+  { name: 'Bench Press', type: '+bar', category: 'Chest', unit: 'lbs' },
+  { name: 'Overhead Press', type: '+bar', category: 'Shoulders', unit: 'lbs' },
+  { name: 'Tricep Pushdown', type: 'total', category: 'Triceps', unit: 'lbs' },
+  // Pull
+  { name: 'Deadlift', type: '+bar', category: 'Back', unit: 'lbs' },
+  { name: 'Barbell Row', type: '+bar', category: 'Back', unit: 'lbs' },
+  { name: 'Lat Pulldown', type: 'total', category: 'Back', unit: 'lbs' },
+  { name: 'Pull-ups', type: 'bodyweight', category: 'Back', unit: 'lbs' },
+  { name: 'Barbell Curl', type: 'total', category: 'Biceps', unit: 'lbs' },
+  // Legs
+  { name: 'Squat', type: '+bar', category: 'Legs', unit: 'lbs' },
+  { name: 'Leg Press', type: 'total', category: 'Legs', unit: 'lbs' },
+  { name: 'Romanian Deadlift', type: '+bar', category: 'Legs', unit: 'lbs' },
+];
+
+async function seedDefaultExercises(db: D1Database, userId: string): Promise<void> {
+  const now = Date.now();
+
+  for (const exercise of DEFAULT_EXERCISES) {
+    await db
+      .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(generateId(), userId, exercise.name, exercise.type, exercise.category, exercise.unit, now)
+      .run();
+  }
 }
 
 // ==================== WORKOUTS ====================

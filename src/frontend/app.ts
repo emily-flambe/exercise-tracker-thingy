@@ -5,42 +5,13 @@ import type { Workout, WorkoutExercise, Set, CustomExercise, User } from './api'
 let currentUser: User | null = null;
 let isRegisterMode = false;
 
-// ==================== DEFAULT EXERCISE LIBRARY ====================
+// ==================== EXERCISE TYPES ====================
 interface Exercise {
   name: string;
   type: 'total' | '/side' | '+bar' | 'bodyweight';
   category: string;
   unit: 'lbs' | 'kg';
 }
-
-const exerciseLibrary: Exercise[] = [
-  { name: 'Bench Press', type: 'total', category: 'Chest', unit: 'lbs' },
-  { name: 'Incline Bench Press', type: 'total', category: 'Chest', unit: 'lbs' },
-  { name: 'Dumbbell Press', type: '/side', category: 'Chest', unit: 'lbs' },
-  { name: 'Incline Dumbbell Press', type: '/side', category: 'Chest', unit: 'lbs' },
-  { name: 'Cable Fly', type: 'total', category: 'Chest', unit: 'lbs' },
-  { name: 'Deadlift', type: '+bar', category: 'Back', unit: 'lbs' },
-  { name: 'Lat Pulldown', type: 'total', category: 'Back', unit: 'lbs' },
-  { name: 'Seated Cable Row', type: 'total', category: 'Back', unit: 'lbs' },
-  { name: 'Barbell Row', type: '+bar', category: 'Back', unit: 'lbs' },
-  { name: 'Dumbbell Row', type: '/side', category: 'Back', unit: 'lbs' },
-  { name: 'Pull-ups', type: 'bodyweight', category: 'Back', unit: 'lbs' },
-  { name: 'Overhead Press', type: '+bar', category: 'Shoulders', unit: 'lbs' },
-  { name: 'Dumbbell Shoulder Press', type: '/side', category: 'Shoulders', unit: 'lbs' },
-  { name: 'Lateral Raise', type: '/side', category: 'Shoulders', unit: 'lbs' },
-  { name: 'Face Pull', type: 'total', category: 'Shoulders', unit: 'lbs' },
-  { name: 'Barbell Curl', type: 'total', category: 'Biceps', unit: 'lbs' },
-  { name: 'Hammer Curl', type: '/side', category: 'Biceps', unit: 'lbs' },
-  { name: 'Preacher Curl', type: '/side', category: 'Biceps', unit: 'lbs' },
-  { name: 'Tricep Pushdown', type: 'total', category: 'Triceps', unit: 'lbs' },
-  { name: 'Skull Crusher', type: '+bar', category: 'Triceps', unit: 'lbs' },
-  { name: 'Squat', type: '+bar', category: 'Legs', unit: 'lbs' },
-  { name: 'Romanian Deadlift', type: '+bar', category: 'Legs', unit: 'lbs' },
-  { name: 'Leg Press', type: 'total', category: 'Legs', unit: 'lbs' },
-  { name: 'Leg Curl', type: 'total', category: 'Legs', unit: 'lbs' },
-  { name: 'Calf Raise', type: 'total', category: 'Legs', unit: 'lbs' },
-  { name: 'Lunges', type: '/side', category: 'Legs', unit: 'lbs' },
-];
 
 // ==================== STATE ====================
 interface AppState {
@@ -71,14 +42,12 @@ let pendingDeleteWorkoutId: string | null = null;
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
-  const customNames = new Set(state.customExercises.map(e => e.name.toLowerCase()));
-  const defaults = exerciseLibrary.filter(e => !customNames.has(e.name.toLowerCase()));
-  return [...defaults, ...state.customExercises.map(c => ({
+  return state.customExercises.map(c => ({
     name: c.name,
     type: c.type,
     category: c.category,
     unit: c.unit,
-  }))];
+  }));
 }
 
 function getExerciseUnit(exerciseName: string): 'lbs' | 'kg' {

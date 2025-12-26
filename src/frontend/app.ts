@@ -67,6 +67,7 @@ const state: AppState = {
 };
 
 let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
+let pendingDeleteWorkoutId: string | null = null;
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -477,21 +478,53 @@ function renderHistory(): void {
     return;
   }
 
-  list.innerHTML = state.history.map((w, i) => {
+  list.innerHTML = state.history.map((w) => {
     const exerciseNames = w.exercises.map(e => e.name).slice(0, 3).join(', ');
     const more = w.exercises.length > 3 ? ` +${w.exercises.length - 3} more` : '';
+    const isDeleting = pendingDeleteWorkoutId === w.id;
 
     return `
       <div class="bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600" onclick="app.editWorkout('${w.id}')">
         <div class="font-medium">${formatDate(w.start_time)}</div>
         <div class="text-sm text-gray-400">${w.exercises.length} exercises</div>
         <div class="text-xs text-gray-500 mt-1">${exerciseNames}${more}</div>
-        <div class="mt-3 pt-3 border-t border-gray-600">
+        <div class="mt-3 pt-3 border-t border-gray-600 flex justify-between items-center">
           <button onclick="event.stopPropagation(); app.copyWorkout('${w.id}')" class="text-gray-400 text-sm hover:text-blue-400">Copy to new workout</button>
+          ${isDeleting ? `
+            <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+              <span class="text-red-400 text-sm">Delete?</span>
+              <button onclick="app.confirmDeleteWorkout('${w.id}')" class="bg-red-600 hover:bg-red-700 text-white text-sm px-2 py-1 rounded">Yes</button>
+              <button onclick="app.cancelDeleteWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+            </div>
+          ` : `
+            <button onclick="event.stopPropagation(); app.showDeleteWorkoutConfirm('${w.id}')" class="text-gray-500 text-sm hover:text-red-400">Delete</button>
+          `}
         </div>
       </div>
     `;
   }).join('');
+}
+
+function showDeleteWorkoutConfirm(id: string): void {
+  pendingDeleteWorkoutId = id;
+  renderHistory();
+}
+
+function cancelDeleteWorkout(): void {
+  pendingDeleteWorkoutId = null;
+  renderHistory();
+}
+
+async function confirmDeleteWorkout(id: string): Promise<void> {
+  try {
+    await api.deleteWorkout(id);
+    pendingDeleteWorkoutId = null;
+    await loadData();
+    renderHistory();
+  } catch (error) {
+    console.error('Failed to delete workout:', error);
+    alert('Failed to delete workout');
+  }
 }
 
 function editWorkout(id: string): void {
@@ -983,6 +1016,9 @@ async function init(): Promise<void> {
   switchTab,
   editWorkout,
   copyWorkout,
+  showDeleteWorkoutConfirm,
+  cancelDeleteWorkout,
+  confirmDeleteWorkout,
   toggleExerciseTabSort,
   toggleCategory,
   filterExercises,

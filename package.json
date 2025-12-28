@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm run build:frontend && wrangler dev",
+    "dev": "npm run build:frontend && wrangler dev --remote",
     "build:frontend": "vite build",
     "deploy": "npm run build:frontend && wrangler deploy",
     "test": "vitest run",
@@ -13,9 +13,14 @@
     "test:e2e:ui": "playwright test --ui",
     "db:init": "wrangler d1 execute workout-db --local --file=./src/db/schema.sql",
     "db:init:remote": "wrangler d1 execute workout-db --remote --file=./src/db/schema.sql",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cap:sync": "npm run build:frontend && npx cap sync",
+    "cap:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
     "hono": "^4.6.0"
   },
   "devDependencies": {

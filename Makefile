@@ -1,4 +1,4 @@
-.PHONY: dev build test test-e2e deploy db-init db-init-remote
+.PHONY: dev build test test-e2e deploy db-init db-init-remote android sync
 
 dev:
 	npm run dev
@@ -23,3 +23,9 @@ db-init-remote:
 
 typecheck:
 	npm run typecheck
+
+sync:
+	npm run cap:sync
+
+android:
+	npm run cap:open

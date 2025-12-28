@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Workout Tracker</string>
+    <string name="title_activity_main">Workout Tracker</string>
+    <string name="package_name">com.emilycogsdill.workout</string>
+    <string name="custom_url_scheme">com.emilycogsdill.workout</string>
+</resources>

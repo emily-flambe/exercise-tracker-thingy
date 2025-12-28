@@ -1,6 +1,9 @@
 // API client for workout tracker
 
-const API_BASE = '/api';
+// Use relative path for web, absolute URL for Capacitor (Android/iOS)
+// Capacitor serves from https://localhost, so check for that
+const isCapacitor = (window as any).Capacitor !== undefined;
+const API_BASE = isCapacitor ? 'https://workout.emilycogsdill.com/api' : '/api';
 const TOKEN_KEY = 'workout_auth_token';
 
 export class ApiError extends Error {

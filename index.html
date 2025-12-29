@@ -18,7 +18,7 @@
     }
     .main-content {
       padding-top: env(safe-area-inset-top, 24px);
-      padding-bottom: 80px;
+      padding-bottom: calc(80px + env(safe-area-inset-bottom, 8px));
     }
     .bottom-nav {
       position: fixed;
@@ -27,6 +27,7 @@
       transform: translateX(-50%);
       max-width: 390px;
       width: 100%;
+      padding-bottom: env(safe-area-inset-bottom, 8px);
     }
   </style>
 </head>

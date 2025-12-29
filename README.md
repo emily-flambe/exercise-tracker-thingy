@@ -2,6 +2,10 @@
 
 A simple workout tracking app for logging exercises, sets, and reps.
 
+**Web**: https://workout.emilycogsdill.com
+
+**Android**: [Download APK](https://github.com/emily-flambe/exercise-tracker-thingy/releases/latest)
+
 ## Features
 
 - User accounts with username/password authentication
@@ -29,5 +33,3 @@ npm run dev
 ```bash
 npm run deploy
 ```
-
-Deployed at: https://workout.emilycogsdill.com

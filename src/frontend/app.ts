@@ -1,6 +1,9 @@
 import * as api from './api';
 import type { Workout, WorkoutExercise, Set, CustomExercise, User } from './api';
 
+// Injected by Vite at build time
+declare const __APP_VERSION__: string;
+
 // ==================== AUTH STATE ====================
 let currentUser: User | null = null;
 let isRegisterMode = false;
@@ -945,6 +948,9 @@ function logout(): void {
 
 // ==================== INIT ====================
 async function init(): Promise<void> {
+  // Set version
+  $('app-version').textContent = `v${__APP_VERSION__}`;
+
   // Set up auth form handler
   $('auth-form').addEventListener('submit', handleAuthSubmit);
 

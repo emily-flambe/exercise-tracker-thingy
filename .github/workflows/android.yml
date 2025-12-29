@@ -38,17 +38,25 @@ jobs:
       - name: Build web and sync Capacitor
         run: npm run cap:sync
 
-      - name: Build debug APK
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Build release APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        env:
+          KEYSTORE_FILE: release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: workout
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: ./gradlew assembleRelease
 
       - name: Rename APK with version
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/workout-tracker-${VERSION}.apk
+          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/workout-tracker-${VERSION}.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/debug/*.apk
+          files: android/app/build/outputs/apk/release/*.apk
           generate_release_notes: true

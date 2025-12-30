@@ -8,10 +8,11 @@
   margin: 0 auto;
   min-height: 100vh;
   position: relative;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 32px);
 }
 
 .main-content {
-  padding-bottom: 80px;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px) + 16px);
 }
 
 .bottom-nav {
@@ -21,4 +22,5 @@
   transform: translateX(-50%);
   max-width: 390px;
   width: 100%;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
 }

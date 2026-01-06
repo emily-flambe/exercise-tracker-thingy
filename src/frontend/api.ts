@@ -98,11 +98,24 @@ export interface Set {
   weight: number;
   reps: number;
   note?: string;
+  isPR?: boolean;
 }
 
 export interface WorkoutExercise {
   name: string;
   sets: Set[];
+  completed?: boolean;
+}
+
+export interface PersonalRecord {
+  id: string;
+  user_id: string;
+  exercise_name: string;
+  weight: number;
+  reps: number;
+  workout_id: string;
+  set_index: number;
+  achieved_at: number;
 }
 
 export interface Workout {
@@ -190,6 +203,15 @@ export async function updateCustomExercise(id: string, data: {
 
 export async function deleteCustomExercise(id: string): Promise<void> {
   await apiFetch(`/exercises/${id}`, { method: 'DELETE' });
+}
+
+// PR API
+export async function getAllPRs(): Promise<PersonalRecord[]> {
+  return apiFetch<PersonalRecord[]>('/workouts/prs/all');
+}
+
+export async function getPRsForExercise(exerciseName: string): Promise<PersonalRecord[]> {
+  return apiFetch<PersonalRecord[]>(`/workouts/prs/${encodeURIComponent(exerciseName)}`);
 }
 
 // Data management

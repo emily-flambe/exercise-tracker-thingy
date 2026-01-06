@@ -11,6 +11,8 @@ import type {
   CreateExerciseRequest,
   UserRow,
   User,
+  PersonalRecord,
+  PersonalRecordRow,
 } from '../types';
 
 function generateId(): string {
@@ -140,6 +142,9 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
     .bind(workoutId)
     .all<WorkoutExerciseRow>();
 
+  // Get PRs for this workout
+  const prs = await getPRsForWorkout(db, workoutId);
+
   const exercises: WorkoutExercise[] = [];
 
   for (const exRow of exerciseRows.results) {
@@ -148,11 +153,22 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
       .bind(exRow.id)
       .all<SetRow>();
 
-    const sets: Set[] = setRows.results.map(s => ({
-      weight: s.weight,
-      reps: s.reps,
-      note: s.note ?? undefined,
-    }));
+    const sets: Set[] = setRows.results.map((s, index) => {
+      // Check if this set is a PR
+      const isPR = prs.some(pr =>
+        pr.exercise_name === exRow.exercise_name &&
+        pr.set_index === index &&
+        pr.weight === s.weight &&
+        pr.reps === s.reps
+      );
+
+      return {
+        weight: s.weight,
+        reps: s.reps,
+        note: s.note ?? undefined,
+        isPR,
+      };
+    });
 
     exercises.push({
       name: exRow.exercise_name,
@@ -192,14 +208,10 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     }
   }
 
-  return {
-    id,
-    user_id: userId,
-    start_time: data.start_time,
-    end_time: data.end_time,
-    exercises: data.exercises,
-    created_at: now,
-  };
+  // Detect and record PRs
+  await detectAndRecordPRs(db, userId, id, data.exercises, data.start_time);
+
+  return getWorkout(db, id, userId) as Promise<Workout>;
 }
 
 export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest): Promise<Workout | null> {
@@ -212,9 +224,14 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
     .bind(data.start_time, data.end_time ?? null, id)
     .run();
 
-  // Delete existing exercises and sets (cascade will handle sets)
+  // Delete existing exercises, sets, and PRs for this workout
   await db
     .prepare('DELETE FROM workout_exercises WHERE workout_id = ?')
+    .bind(id)
+    .run();
+
+  await db
+    .prepare('DELETE FROM personal_records WHERE workout_id = ?')
     .bind(id)
     .run();
 
@@ -236,6 +253,9 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
         .run();
     }
   }
+
+  // Detect and record PRs
+  await detectAndRecordPRs(db, userId, id, data.exercises, data.start_time);
 
   return getWorkout(db, id, userId);
 }
@@ -328,9 +348,103 @@ export async function deleteCustomExercise(db: D1Database, id: string, userId: s
   return result.meta.changes > 0;
 }
 
+// ==================== PERSONAL RECORDS ====================
+
+export async function getPRsForExercise(db: D1Database, userId: string, exerciseName: string): Promise<PersonalRecord[]> {
+  const rows = await db
+    .prepare('SELECT * FROM personal_records WHERE user_id = ? AND exercise_name = ? ORDER BY achieved_at DESC')
+    .bind(userId, exerciseName)
+    .all<PersonalRecordRow>();
+
+  return rows.results.map(row => ({
+    id: row.id,
+    user_id: row.user_id,
+    exercise_name: row.exercise_name,
+    weight: row.weight,
+    reps: row.reps,
+    workout_id: row.workout_id,
+    set_index: row.set_index,
+    achieved_at: row.achieved_at,
+  }));
+}
+
+export async function getPRsForWorkout(db: D1Database, workoutId: string): Promise<PersonalRecord[]> {
+  const rows = await db
+    .prepare('SELECT * FROM personal_records WHERE workout_id = ?')
+    .bind(workoutId)
+    .all<PersonalRecordRow>();
+
+  return rows.results.map(row => ({
+    id: row.id,
+    user_id: row.user_id,
+    exercise_name: row.exercise_name,
+    weight: row.weight,
+    reps: row.reps,
+    workout_id: row.workout_id,
+    set_index: row.set_index,
+    achieved_at: row.achieved_at,
+  }));
+}
+
+export async function getAllPRs(db: D1Database, userId: string): Promise<PersonalRecord[]> {
+  const rows = await db
+    .prepare('SELECT * FROM personal_records WHERE user_id = ? ORDER BY achieved_at DESC')
+    .bind(userId)
+    .all<PersonalRecordRow>();
+
+  return rows.results.map(row => ({
+    id: row.id,
+    user_id: row.user_id,
+    exercise_name: row.exercise_name,
+    weight: row.weight,
+    reps: row.reps,
+    workout_id: row.workout_id,
+    set_index: row.set_index,
+    achieved_at: row.achieved_at,
+  }));
+}
+
+async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: string, exercises: WorkoutExercise[], startTime: number): Promise<void> {
+  // For each exercise, check if any sets are PRs
+  for (let exerciseIndex = 0; exerciseIndex < exercises.length; exerciseIndex++) {
+    const exercise = exercises[exerciseIndex];
+
+    for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
+      const set = exercise.sets[setIndex];
+
+      // Check if this weight+reps combo is a PR
+      // A PR is when at this weight, the reps are higher than any previous workout
+      const previousBest = await db
+        .prepare(`
+          SELECT MAX(s.reps) as max_reps
+          FROM sets s
+          JOIN workout_exercises we ON s.workout_exercise_id = we.id
+          JOIN workouts w ON we.workout_id = w.id
+          WHERE w.user_id = ?
+            AND we.exercise_name = ?
+            AND s.weight = ?
+            AND w.start_time < ?
+        `)
+        .bind(userId, exercise.name, set.weight, startTime)
+        .first<{ max_reps: number | null }>();
+
+      const isPR = previousBest?.max_reps === null || set.reps > previousBest.max_reps;
+
+      if (isPR) {
+        // Record this as a PR
+        await db
+          .prepare('INSERT INTO personal_records (id, user_id, exercise_name, weight, reps, workout_id, set_index, achieved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(generateId(), userId, exercise.name, set.weight, set.reps, workoutId, setIndex, startTime)
+          .run();
+      }
+    }
+  }
+}
+
 // ==================== DATA MANAGEMENT ====================
 
 export async function clearAllData(db: D1Database, userId: string): Promise<void> {
   await db.prepare('DELETE FROM workouts WHERE user_id = ?').bind(userId).run();
   await db.prepare('DELETE FROM custom_exercises WHERE user_id = ?').bind(userId).run();
+  await db.prepare('DELETE FROM personal_records WHERE user_id = ?').bind(userId).run();
 }

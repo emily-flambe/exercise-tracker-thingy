@@ -2,6 +2,8 @@ name: Build Android APK
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -27,10 +29,16 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Set version from tag
+      - name: Set version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          npm pkg set version=$VERSION
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            npm pkg set version=$VERSION
+          else
+            # Use commit SHA for branch builds
+            VERSION="0.0.0-${GITHUB_SHA::7}"
+            npm pkg set version=$VERSION
+          fi
 
       - name: Install dependencies
         run: npm ci
@@ -52,11 +60,24 @@ jobs:
 
       - name: Rename APK with version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="0.0.0-${GITHUB_SHA::7}"
+          fi
           mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/workout-tracker-${VERSION}.apk
 
       - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: android/app/build/outputs/apk/release/*.apk
           generate_release_notes: true
+
+      - name: Upload APK artifact
+        if: startsWith(github.ref, 'refs/heads/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: workout-tracker-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 30

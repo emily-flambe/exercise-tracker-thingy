@@ -15,6 +15,7 @@ not_found_handling = "single-page-application"
 binding = "DB"
 database_name = "workout-db"
 database_id = "0b2b7e10-c9b2-4b42-b99a-e091f11c86a6"
+migrations_dir = "migrations"
 
 [dev]
 port = 8787

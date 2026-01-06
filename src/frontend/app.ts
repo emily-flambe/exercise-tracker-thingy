@@ -223,12 +223,22 @@ function renderWorkout(): void {
       </div>
     `;
 
+    const isCompleted = ex.completed || false;
+    const checkmarkIcon = isCompleted
+      ? '<svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>'
+      : '<svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+
     return `
       <div class="bg-gray-700 rounded-lg p-4 mb-3">
         <div class="flex justify-between items-start mb-3">
-          <div>
-            <div class="font-medium">${ex.name}</div>
-            <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
+          <div class="flex items-center gap-3">
+            <button onclick="app.toggleExerciseCompleted(${i})" class="flex-shrink-0 hover:opacity-80 transition-opacity">
+              ${checkmarkIcon}
+            </button>
+            <div>
+              <div class="font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}">${ex.name}</div>
+              <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
+            </div>
           </div>
           <button onclick="app.removeExercise(${i})" class="text-red-400 text-sm px-2 hover:text-red-300">x</button>
         </div>
@@ -251,6 +261,12 @@ function removeExercise(index: number): void {
     state.currentWorkout!.exercises.splice(index, 1);
     renderWorkout();
   }
+}
+
+function toggleExerciseCompleted(index: number): void {
+  const exercise = state.currentWorkout!.exercises[index];
+  exercise.completed = !exercise.completed;
+  renderWorkout();
 }
 
 // ==================== INLINE SET LOGGING ====================
@@ -437,7 +453,7 @@ function renderAddExerciseList(exercises: Exercise[]): void {
 }
 
 function addExerciseToWorkout(name: string): void {
-  state.currentWorkout!.exercises.push({ name, sets: [] });
+  state.currentWorkout!.exercises.push({ name, sets: [], completed: false });
   renderWorkout();
   hideAddExercise();
 }
@@ -524,6 +540,7 @@ function copyWorkout(id: string): void {
     exercises: source.exercises.map(e => ({
       name: e.name,
       sets: [],
+      completed: false,
     })),
   };
   state.editingWorkoutId = null;
@@ -988,6 +1005,7 @@ async function init(): Promise<void> {
   deleteSet,
   copyAllSets,
   removeExercise,
+  toggleExerciseCompleted,
   switchTab,
   editWorkout,
   copyWorkout,

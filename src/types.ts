@@ -35,6 +35,7 @@ export interface Set {
 export interface WorkoutExercise {
   name: string;
   sets: Set[];
+  completed?: boolean;
 }
 
 export interface Workout {
@@ -60,6 +61,7 @@ export interface WorkoutExerciseRow {
   workout_id: string;
   exercise_name: string;
   position: number;
+  completed: number;
 }
 
 export interface SetRow {

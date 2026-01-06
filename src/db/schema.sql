@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS workout_exercises (
   workout_id TEXT NOT NULL,
   exercise_name TEXT NOT NULL,
   position INTEGER NOT NULL,
+  completed INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
 );
 

@@ -157,6 +157,7 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
     exercises.push({
       name: exRow.exercise_name,
       sets,
+      completed: exRow.completed === 1,
     });
   }
 
@@ -178,8 +179,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     const exId = generateId();
 
     await db
-      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position) VALUES (?, ?, ?, ?)')
-      .bind(exId, id, ex.name, i)
+      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed) VALUES (?, ?, ?, ?, ?)')
+      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0)
       .run();
 
     for (let j = 0; j < ex.sets.length; j++) {
@@ -223,8 +224,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
     const exId = generateId();
 
     await db
-      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position) VALUES (?, ?, ?, ?)')
-      .bind(exId, id, ex.name, i)
+      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed) VALUES (?, ?, ?, ?, ?)')
+      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0)
       .run();
 
     for (let j = 0; j < ex.sets.length; j++) {

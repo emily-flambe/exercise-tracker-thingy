@@ -108,12 +108,8 @@ test.describe('Auto-save functionality', () => {
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
 
-    // Wait for auto-save (1.5s debounce + API call time)
-    await page.waitForTimeout(3000);
-
-    // Check console for auto-save message
-    const logs: string[] = [];
-    page.on('console', msg => logs.push(msg.text()));
+    // Wait for auto-save (1.5s debounce + small buffer)
+    await page.waitForTimeout(2000);
 
     // Navigate to history tab to verify workout was saved
     await page.getByRole('button', { name: 'History' }).click();
@@ -128,10 +124,7 @@ test.describe('Auto-save functionality', () => {
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
 
-    // Wait for first auto-save
-    await page.waitForTimeout(2000);
-
-    // Add a set
+    // Add a set immediately (don't wait for exercise to save first)
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.locator('input[placeholder="wt"]').fill('135');
     await page.locator('input[placeholder="reps"]').fill('10');

@@ -8,7 +8,7 @@
   margin: 0 auto;
   min-height: 100vh;
   position: relative;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 32px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 56px);
 }
 
 .main-content {

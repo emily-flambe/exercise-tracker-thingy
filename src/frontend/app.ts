@@ -1,5 +1,5 @@
 import * as api from './api';
-import type { Workout, WorkoutExercise, Set, CustomExercise, User } from './api';
+import type { Workout, WorkoutExercise, Set, CustomExercise, User, PersonalRecord } from './api';
 
 // Injected by Vite at build time
 declare const __APP_VERSION__: string;
@@ -30,6 +30,7 @@ interface AppState {
     name: string;
     isCustom: boolean;
   } | null;
+  allPRs: PersonalRecord[];
 }
 
 const state: AppState = {
@@ -38,6 +39,7 @@ const state: AppState = {
   history: [],
   customExercises: [],
   editingExercise: null,
+  allPRs: [],
 };
 
 let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
@@ -95,12 +97,14 @@ function $select(id: string): HTMLSelectElement {
 // ==================== DATA LOADING ====================
 async function loadData(): Promise<void> {
   try {
-    const [workouts, exercises] = await Promise.all([
+    const [workouts, exercises, prs] = await Promise.all([
       api.getWorkouts(),
       api.getCustomExercises(),
+      api.getAllPRs(),
     ]);
     state.history = workouts;
     state.customExercises = exercises;
+    state.allPRs = prs;
   } catch (error) {
     console.error('Failed to load data:', error);
   }
@@ -194,6 +198,7 @@ function renderWorkout(): void {
                 <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500">
                 <span class="text-gray-400">x</span>
                 <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500">
+                ${set.isPR ? '<span class="text-yellow-400 text-lg">★</span>' : ''}
                 <button onclick="app.deleteSet(${i}, ${si})" class="text-red-400 text-xs px-2 hover:text-red-300">x</button>
               </div>
               <input type="text" value="${set.note || ''}" onchange="app.updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600">
@@ -223,12 +228,22 @@ function renderWorkout(): void {
       </div>
     `;
 
+    const isCompleted = ex.completed || false;
+    const checkmarkIcon = isCompleted
+      ? '<svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>'
+      : '<svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+
     return `
       <div class="bg-gray-700 rounded-lg p-4 mb-3">
         <div class="flex justify-between items-start mb-3">
-          <div>
-            <div class="font-medium">${ex.name}</div>
-            <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
+          <div class="flex items-center gap-3">
+            <button onclick="app.toggleExerciseCompleted(${i})" class="flex-shrink-0 hover:opacity-80 transition-opacity">
+              ${checkmarkIcon}
+            </button>
+            <div>
+              <div class="font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}">${ex.name}</div>
+              <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
+            </div>
           </div>
           <button onclick="app.removeExercise(${i})" class="text-red-400 text-sm px-2 hover:text-red-300">x</button>
         </div>
@@ -251,6 +266,12 @@ function removeExercise(index: number): void {
     state.currentWorkout!.exercises.splice(index, 1);
     renderWorkout();
   }
+}
+
+function toggleExerciseCompleted(index: number): void {
+  const exercise = state.currentWorkout!.exercises[index];
+  exercise.completed = !exercise.completed;
+  renderWorkout();
 }
 
 // ==================== INLINE SET LOGGING ====================
@@ -331,6 +352,15 @@ function getLastLoggedDate(exerciseName: string): number | null {
     }
   }
   return null;
+}
+
+function getLatestPRForExercise(exerciseName: string): PersonalRecord | null {
+  const prs = state.allPRs.filter(pr => pr.exercise_name === exerciseName);
+  if (prs.length === 0) return null;
+
+  // Sort by achieved_at descending to get the most recent
+  prs.sort((a, b) => b.achieved_at - a.achieved_at);
+  return prs[0];
 }
 
 function showAddExercise(): void {
@@ -427,17 +457,23 @@ function renderAddExerciseList(exercises: Exercise[]): void {
   container.innerHTML = exercises.map(e => {
     const lastLogged = getLastLoggedDate(e.name);
     const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+    const latestPR = getLatestPRForExercise(e.name);
+    const prText = latestPR ? `★ ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
+
     return `
-      <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
-        <span class="font-medium">${e.name}</span>
-        ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+      <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600">
+        <div class="flex justify-between items-center">
+          <span class="font-medium">${e.name}</span>
+          ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+        </div>
+        ${prText ? `<div class="text-xs text-yellow-400 mt-1">${prText}</div>` : ''}
       </button>
     `;
   }).join('');
 }
 
 function addExerciseToWorkout(name: string): void {
-  state.currentWorkout!.exercises.push({ name, sets: [] });
+  state.currentWorkout!.exercises.push({ name, sets: [], completed: false });
   renderWorkout();
   hideAddExercise();
 }
@@ -524,6 +560,7 @@ function copyWorkout(id: string): void {
     exercises: source.exercises.map(e => ({
       name: e.name,
       sets: [],
+      completed: false,
     })),
   };
   state.editingWorkoutId = null;
@@ -730,25 +767,58 @@ function showEditExercise(exerciseName: string): void {
 
   setExerciseUnit(exercise.unit);
 
-  // Populate recent sets history
+  // Populate recent sets history and PRs
   const recentSets = getRecentSetsForExercise(exerciseName, 10);
+  const exercisePRs = state.allPRs.filter(pr => pr.exercise_name === exerciseName);
   const historyList = $('exercise-history-list');
   $('exercise-history-section').classList.remove('hidden');
-  if (recentSets.length > 0) {
-    historyList.innerHTML = `
-      <div class="flex text-gray-500 text-xs mb-1">
-        <span class="w-20">DATE</span>
-        <span class="w-16">WEIGHT</span>
-        <span class="flex-1">REPS</span>
-      </div>
-      ${recentSets.map(s => `
-        <div class="flex text-sm py-1">
-          <span class="w-20 text-gray-400">${formatDate(s.date)}</span>
-          <span class="w-16">${s.weight} ${exercise.unit}</span>
-          <span class="flex-1">${s.reps}${s.note ? ` <span class="text-gray-500 text-xs">${s.note}</span>` : ''}</span>
+
+  let historyHTML = '';
+
+  // Show PRs first if any
+  if (exercisePRs.length > 0) {
+    historyHTML += `
+      <div class="mb-3">
+        <div class="text-yellow-400 text-xs font-medium mb-2">★ PERSONAL RECORDS</div>
+        <div class="flex text-gray-500 text-xs mb-1">
+          <span class="w-20">DATE</span>
+          <span class="w-16">WEIGHT</span>
+          <span class="flex-1">REPS</span>
         </div>
-      `).join('')}
+        ${exercisePRs.sort((a, b) => b.achieved_at - a.achieved_at).slice(0, 5).map(pr => `
+          <div class="flex text-sm py-1">
+            <span class="w-20 text-gray-400">${formatDate(pr.achieved_at)}</span>
+            <span class="w-16">${pr.weight} ${exercise.unit}</span>
+            <span class="flex-1">${pr.reps}</span>
+          </div>
+        `).join('')}
+      </div>
     `;
+  }
+
+  // Then show recent history
+  if (recentSets.length > 0) {
+    historyHTML += `
+      <div>
+        <div class="text-gray-400 text-xs font-medium mb-2">RECENT SETS</div>
+        <div class="flex text-gray-500 text-xs mb-1">
+          <span class="w-20">DATE</span>
+          <span class="w-16">WEIGHT</span>
+          <span class="flex-1">REPS</span>
+        </div>
+        ${recentSets.map(s => `
+          <div class="flex text-sm py-1">
+            <span class="w-20 text-gray-400">${formatDate(s.date)}</span>
+            <span class="w-16">${s.weight} ${exercise.unit}</span>
+            <span class="flex-1">${s.reps}${s.note ? ` <span class="text-gray-500 text-xs">${s.note}</span>` : ''}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  if (historyHTML) {
+    historyList.innerHTML = historyHTML;
   } else {
     historyList.innerHTML = '<p class="text-gray-500 text-sm">No history yet</p>';
   }
@@ -988,6 +1058,7 @@ async function init(): Promise<void> {
   deleteSet,
   copyAllSets,
   removeExercise,
+  toggleExerciseCompleted,
   switchTab,
   editWorkout,
   copyWorkout,

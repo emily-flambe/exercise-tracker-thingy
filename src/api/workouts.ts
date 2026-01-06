@@ -73,4 +73,19 @@ app.delete('/:id', async (c) => {
   return c.json({ success: true });
 });
 
+// GET /api/workouts/prs/all - Get all PRs for user
+app.get('/prs/all', async (c) => {
+  const userId = c.get('userId');
+  const prs = await queries.getAllPRs(c.env.DB, userId);
+  return c.json(prs);
+});
+
+// GET /api/workouts/prs/:exerciseName - Get PRs for specific exercise
+app.get('/prs/:exerciseName', async (c) => {
+  const userId = c.get('userId');
+  const exerciseName = decodeURIComponent(c.req.param('exerciseName'));
+  const prs = await queries.getPRsForExercise(c.env.DB, userId, exerciseName);
+  return c.json(prs);
+});
+
 export default app;

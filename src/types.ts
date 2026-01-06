@@ -30,11 +30,13 @@ export interface Set {
   weight: number;
   reps: number;
   note?: string;
+  isPR?: boolean;
 }
 
 export interface WorkoutExercise {
   name: string;
   sets: Set[];
+  completed?: boolean;
 }
 
 export interface Workout {
@@ -60,6 +62,7 @@ export interface WorkoutExerciseRow {
   workout_id: string;
   exercise_name: string;
   position: number;
+  completed: number;
 }
 
 export interface SetRow {
@@ -79,6 +82,28 @@ export interface CustomExerciseRow {
   category: string;
   unit: string;
   created_at: number;
+}
+
+export interface PersonalRecord {
+  id: string;
+  user_id: string;
+  exercise_name: string;
+  weight: number;
+  reps: number;
+  workout_id: string;
+  set_index: number;
+  achieved_at: number;
+}
+
+export interface PersonalRecordRow {
+  id: string;
+  user_id: string;
+  exercise_name: string;
+  weight: number;
+  reps: number;
+  workout_id: string;
+  set_index: number;
+  achieved_at: number;
 }
 
 // API types

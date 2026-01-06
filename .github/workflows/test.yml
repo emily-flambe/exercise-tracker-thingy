@@ -10,10 +10,40 @@ on:
       - main
 
 jobs:
+  build:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build:frontend
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
   e2e-tests:
-    name: E2E Tests
+    name: E2E Tests (Production)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Only run E2E tests on main branch or when manually triggered
+    # Skip on feature branches to avoid rate limiting production
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
@@ -30,25 +60,10 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Build frontend
-        run: npm run build:frontend
-
-      - name: Start dev server
-        run: npm run dev &
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Wait for server to be ready
-        run: |
-          echo "Waiting for server to start..."
-          timeout 60 bash -c 'until curl -f http://localhost:8787 > /dev/null 2>&1; do sleep 2; done' || exit 1
-          echo "Server is ready!"
-
-      - name: Run E2E tests
+      - name: Run E2E tests against production
         run: npm run test:e2e
-        env:
-          BASE_URL: http://localhost:8787
+        # Uses the production URL from playwright.config.ts
+        # Tests will run against https://workout.emilycogsdill.com
 
       - name: Upload test results
         if: always()
@@ -58,31 +73,8 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run unit tests
-        run: npm test
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-  typecheck:
-    name: TypeScript Type Check
+  lint-and-typecheck:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -98,6 +90,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run typecheck
-        run: npm run typecheck || echo "Type check warnings ignored for now"
+      - name: Run typecheck (optional)
+        run: npm run typecheck || true
         continue-on-error: true

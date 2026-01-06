@@ -42,6 +42,7 @@ const state: AppState = {
 
 let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
+let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -170,6 +171,56 @@ async function finishWorkout(): Promise<void> {
   }
 }
 
+function scheduleAutoSave(): void {
+  // Clear any pending auto-save
+  if (autoSaveTimeout) {
+    clearTimeout(autoSaveTimeout);
+  }
+
+  // Schedule a new auto-save after 1.5 seconds of inactivity
+  autoSaveTimeout = setTimeout(() => {
+    autoSaveWorkout();
+  }, 1500);
+}
+
+async function autoSaveWorkout(): Promise<void> {
+  // Don't auto-save if there's no workout or no exercises yet
+  if (!state.currentWorkout || state.currentWorkout.exercises.length === 0) {
+    return;
+  }
+
+  try {
+    const workoutData = {
+      start_time: state.currentWorkout.startTime,
+      // Keep workout active - don't set end_time for new workouts
+      // For edited workouts, we need to preserve that it was already finished
+      exercises: state.currentWorkout.exercises,
+    };
+
+    if (state.editingWorkoutId) {
+      // Updating an existing workout - need to check if it was already finished
+      const originalWorkout = state.history.find(w => w.id === state.editingWorkoutId);
+      if (originalWorkout?.end_time) {
+        // Preserve the original end_time for finished workouts being edited
+        workoutData.end_time = originalWorkout.end_time;
+      }
+      await api.updateWorkout(state.editingWorkoutId, workoutData);
+    } else {
+      // Creating a new workout - don't set end_time to keep it active
+      const savedWorkout = await api.createWorkout(workoutData);
+      // Set the editingWorkoutId so future auto-saves update this workout
+      state.editingWorkoutId = savedWorkout.id;
+    }
+
+    // Reload data to refresh history, but keep current workout active
+    await loadData();
+    console.log('Workout auto-saved');
+  } catch (error) {
+    console.error('Failed to auto-save workout:', error);
+    // Silently fail - don't interrupt user's workflow with alerts
+  }
+}
+
 function renderWorkout(): void {
   const list = $('exercise-list');
   if (!state.currentWorkout) {
@@ -250,6 +301,7 @@ function removeExercise(index: number): void {
   if (confirm('Remove this exercise?')) {
     state.currentWorkout!.exercises.splice(index, 1);
     renderWorkout();
+    scheduleAutoSave();
   }
 }
 
@@ -281,6 +333,7 @@ function saveSetInline(exerciseIndex: number): void {
 
   state.currentWorkout!.exercises[exerciseIndex].sets.push(set);
   renderWorkout();
+  scheduleAutoSave();
 }
 
 function updateSet(exerciseIndex: number, setIndex: number, field: string, value: string): void {
@@ -296,11 +349,13 @@ function updateSet(exerciseIndex: number, setIndex: number, field: string, value
   } else if (field === 'reps') {
     set.reps = parseInt(value) || 0;
   }
+  scheduleAutoSave();
 }
 
 function deleteSet(exerciseIndex: number, setIndex: number): void {
   state.currentWorkout!.exercises[exerciseIndex].sets.splice(setIndex, 1);
   renderWorkout();
+  scheduleAutoSave();
 }
 
 function copyAllSets(exerciseIndex: number): void {
@@ -309,6 +364,7 @@ function copyAllSets(exerciseIndex: number): void {
   if (prevSets.length > 0) {
     ex.sets = prevSets.map(s => ({ weight: s.weight, reps: s.reps }));
     renderWorkout();
+    scheduleAutoSave();
   }
 }
 
@@ -440,6 +496,7 @@ function addExerciseToWorkout(name: string): void {
   state.currentWorkout!.exercises.push({ name, sets: [] });
   renderWorkout();
   hideAddExercise();
+  scheduleAutoSave();
 }
 
 // ==================== HISTORY ====================

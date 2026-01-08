@@ -30,6 +30,9 @@ npm run dev
 
 ## Deployment
 
+Deployments to Cloudflare are automated via GitHub Actions on push to main.
+
+Manual deployment:
 ```bash
 npm run deploy
 ```

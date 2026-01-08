@@ -1,10 +1,9 @@
-name: Tests
+name: Tests (Full)
 
 on:
   push:
     branches:
       - main
-      - 'claude/**'
   pull_request:
     branches:
       - main
@@ -41,8 +40,6 @@ jobs:
     name: E2E Tests (Production)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Only run E2E tests on PRs to main (not on feature branch pushes)
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
 
     steps:
       - uses: actions/checkout@v4
@@ -76,8 +73,6 @@ jobs:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Only run on PRs, skip on feature branch pushes for speed
-    if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v4

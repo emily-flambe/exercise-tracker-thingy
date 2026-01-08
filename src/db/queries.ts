@@ -23,7 +23,7 @@ function generateId(): string {
 
 export async function getUserByUsername(db: D1Database, username: string): Promise<UserRow | null> {
   return db
-    .prepare('SELECT * FROM users WHERE username = ?')
+    .prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)')
     .bind(username)
     .first<UserRow>();
 }

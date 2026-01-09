@@ -422,8 +422,14 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
     for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
       const set = exercise.sets[setIndex];
 
+      // Skip sets that are not marked as completed
+      if (!set.completed) {
+        continue;
+      }
+
       // Check if this weight+reps combo is a PR
       // A PR is when at this weight, the reps are higher than any previous workout
+      // Only consider previously completed sets
       const previousBest = await db
         .prepare(`
           SELECT MAX(s.reps) as max_reps
@@ -434,6 +440,7 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
             AND we.exercise_name = ?
             AND s.weight = ?
             AND w.start_time < ?
+            AND s.completed = 1
         `)
         .bind(userId, exercise.name, set.weight, startTime)
         .first<{ max_reps: number | null }>();

@@ -45,6 +45,7 @@ const state: AppState = {
 let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -138,6 +139,7 @@ function startWorkout(): void {
     exercises: [],
   };
   state.editingWorkoutId = null;
+  expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
   $('workout-finish-btn').textContent = 'Finish';
   showWorkoutScreen('workout-active');
@@ -148,6 +150,7 @@ async function finishWorkout(): Promise<void> {
   if (!state.currentWorkout || state.currentWorkout.exercises.length === 0) {
     state.currentWorkout = null;
     state.editingWorkoutId = null;
+    expandedNotes.clear();
     showWorkoutScreen('workout-empty');
     return;
   }
@@ -168,6 +171,7 @@ async function finishWorkout(): Promise<void> {
     await loadData();
     state.currentWorkout = null;
     state.editingWorkoutId = null;
+    expandedNotes.clear();
     showWorkoutScreen('workout-empty');
   } catch (error) {
     console.error('Failed to save workout:', error);
@@ -247,6 +251,12 @@ function renderWorkout(): void {
             const setCheckmarkIcon = isSetCompleted
               ? '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>'
               : '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+            const hasNote = !!set.note;
+            const isNoteExpanded = expandedNotes.has(i + '-' + si);
+            const pencilColor = hasNote ? 'text-blue-400' : 'text-gray-500';
+            const noteInput = isNoteExpanded ? `
+              <input type="text" value="${set.note || ''}" onchange="app.updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600 ${isSetCompleted ? 'opacity-50' : ''}">
+              ` : '';
             return `
             <div class="py-1 border-b border-gray-600">
               <div class="flex items-center gap-2">
@@ -258,9 +268,14 @@ function renderWorkout(): void {
                 <span class="text-gray-400 ${isSetCompleted ? 'line-through' : ''}">x</span>
                 <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
                 ${set.isPR ? '<span class="text-yellow-400 text-lg">★</span>' : ''}
+                <button onclick="app.toggleNoteField(${i}, ${si})" class="${pencilColor} text-sm hover:opacity-80 transition-opacity" title="${hasNote ? 'Edit note' : 'Add note'}">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                  </svg>
+                </button>
                 <button onclick="app.deleteSet(${i}, ${si})" class="text-red-400 text-xs px-2 hover:text-red-300">x</button>
               </div>
-              <input type="text" value="${set.note || ''}" onchange="app.updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600 ${isSetCompleted ? 'opacity-50' : ''}">
+              ${noteInput}
             </div>
           `;}).join('')}
         ` : (prevSets.length > 0 ? `
@@ -340,6 +355,16 @@ function toggleSetCompleted(exerciseIndex: number, setIndex: number): void {
   set.completed = !set.completed;
   renderWorkout();
   scheduleAutoSave();
+}
+
+function toggleNoteField(exerciseIndex: number, setIndex: number): void {
+  const key = `${exerciseIndex}-${setIndex}`;
+  if (expandedNotes.has(key)) {
+    expandedNotes.delete(key);
+  } else {
+    expandedNotes.add(key);
+  }
+  renderWorkout();
 }
 
 // ==================== INLINE SET LOGGING ====================
@@ -617,6 +642,7 @@ function editWorkout(id: string): void {
     exercises: JSON.parse(JSON.stringify(source.exercises)),
   };
   state.editingWorkoutId = id;
+  expandedNotes.clear();
   $('workout-title').textContent = formatDate(source.start_time);
   $('workout-finish-btn').textContent = 'Save';
   switchTab('workout');
@@ -637,6 +663,7 @@ function copyWorkout(id: string): void {
     })),
   };
   state.editingWorkoutId = null;
+  expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
   $('workout-finish-btn').textContent = 'Finish';
   switchTab('workout');
@@ -1133,6 +1160,7 @@ async function init(): Promise<void> {
   removeExercise,
   toggleExerciseCompleted,
   toggleSetCompleted,
+  toggleNoteField,
   switchTab,
   editWorkout,
   copyWorkout,

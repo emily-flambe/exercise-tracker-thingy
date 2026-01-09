@@ -99,6 +99,7 @@ export interface Set {
   reps: number;
   note?: string;
   isPR?: boolean;
+  completed?: boolean;
 }
 
 export interface WorkoutExercise {

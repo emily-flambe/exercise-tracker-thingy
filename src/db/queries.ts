@@ -167,6 +167,7 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
         reps: s.reps,
         note: s.note ?? undefined,
         isPR,
+        completed: s.completed === 1,
       };
     });
 
@@ -202,8 +203,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     for (let j = 0; j < ex.sets.length; j++) {
       const set = ex.sets[j];
       await db
-        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position) VALUES (?, ?, ?, ?, ?, ?)')
-        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j)
+        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed ? 1 : 0)
         .run();
     }
   }
@@ -248,8 +249,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
     for (let j = 0; j < ex.sets.length; j++) {
       const set = ex.sets[j];
       await db
-        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position) VALUES (?, ?, ?, ?, ?, ?)')
-        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j)
+        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed ? 1 : 0)
         .run();
     }
   }

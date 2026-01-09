@@ -242,19 +242,27 @@ function renderWorkout(): void {
     let setsHtml = `
       <div class="text-sm">
         ${ex.sets.length > 0 ? `
-          ${ex.sets.map((set, si) => `
+          ${ex.sets.map((set, si) => {
+            const isSetCompleted = set.completed || false;
+            const setCheckmarkIcon = isSetCompleted
+              ? '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>'
+              : '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+            return `
             <div class="py-1 border-b border-gray-600">
               <div class="flex items-center gap-2">
-                <span class="w-6 text-gray-400 text-xs">${si + 1}</span>
-                <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500">
-                <span class="text-gray-400">x</span>
-                <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500">
+                <button onclick="app.toggleSetCompleted(${i}, ${si})" class="flex-shrink-0 hover:opacity-80 transition-opacity">
+                  ${setCheckmarkIcon}
+                </button>
+                <span class="w-6 text-gray-400 text-xs ${isSetCompleted ? 'line-through' : ''}">${si + 1}</span>
+                <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
+                <span class="text-gray-400 ${isSetCompleted ? 'line-through' : ''}">x</span>
+                <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
                 ${set.isPR ? '<span class="text-yellow-400 text-lg">★</span>' : ''}
                 <button onclick="app.deleteSet(${i}, ${si})" class="text-red-400 text-xs px-2 hover:text-red-300">x</button>
               </div>
-              <input type="text" value="${set.note || ''}" onchange="app.updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600">
+              <input type="text" value="${set.note || ''}" onchange="app.updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600 ${isSetCompleted ? 'opacity-50' : ''}">
             </div>
-          `).join('')}
+          `;}).join('')}
         ` : (prevSets.length > 0 ? `
           <div class="mb-3">
             <div class="text-gray-500 text-xs mb-2">Last time: ${prevSets.map(s => s.weight + 'x' + s.reps).join(', ')}</div>
@@ -324,6 +332,14 @@ function toggleExerciseCompleted(index: number): void {
   const exercise = state.currentWorkout!.exercises[index];
   exercise.completed = !exercise.completed;
   renderWorkout();
+  scheduleAutoSave();
+}
+
+function toggleSetCompleted(exerciseIndex: number, setIndex: number): void {
+  const set = state.currentWorkout!.exercises[exerciseIndex].sets[setIndex];
+  set.completed = !set.completed;
+  renderWorkout();
+  scheduleAutoSave();
 }
 
 // ==================== INLINE SET LOGGING ====================
@@ -1116,6 +1132,7 @@ async function init(): Promise<void> {
   copyAllSets,
   removeExercise,
   toggleExerciseCompleted,
+  toggleSetCompleted,
   switchTab,
   editWorkout,
   copyWorkout,

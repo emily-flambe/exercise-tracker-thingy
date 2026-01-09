@@ -405,9 +405,18 @@ export async function getAllPRs(db: D1Database, userId: string): Promise<Persona
 }
 
 async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: string, exercises: WorkoutExercise[], startTime: number): Promise<void> {
+  // Track the best reps at each weight for each exercise within this workout
+  const currentWorkoutBests = new Map<string, Map<number, number>>(); // exerciseName -> (weight -> maxReps)
+
   // For each exercise, check if any sets are PRs
   for (let exerciseIndex = 0; exerciseIndex < exercises.length; exerciseIndex++) {
     const exercise = exercises[exerciseIndex];
+
+    // Initialize tracking for this exercise if not already done
+    if (!currentWorkoutBests.has(exercise.name)) {
+      currentWorkoutBests.set(exercise.name, new Map());
+    }
+    const exerciseBests = currentWorkoutBests.get(exercise.name)!;
 
     for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
       const set = exercise.sets[setIndex];
@@ -428,7 +437,22 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
         .bind(userId, exercise.name, set.weight, startTime)
         .first<{ max_reps: number | null }>();
 
-      const isPR = previousBest?.max_reps === null || set.reps > previousBest.max_reps;
+      // Check current workout best for this weight (from earlier sets in this workout)
+      const currentWorkoutBest = exerciseBests.get(set.weight);
+
+      // Determine the maximum reps to beat
+      const previousMax = previousBest?.max_reps ?? null;
+      let maxToBeat: number | null = null;
+
+      if (previousMax !== null && currentWorkoutBest !== undefined) {
+        maxToBeat = Math.max(previousMax, currentWorkoutBest);
+      } else if (previousMax !== null) {
+        maxToBeat = previousMax;
+      } else if (currentWorkoutBest !== undefined) {
+        maxToBeat = currentWorkoutBest;
+      }
+
+      const isPR = maxToBeat === null || set.reps > maxToBeat;
 
       if (isPR) {
         // Record this as a PR
@@ -436,6 +460,12 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
           .prepare('INSERT INTO personal_records (id, user_id, exercise_name, weight, reps, workout_id, set_index, achieved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
           .bind(generateId(), userId, exercise.name, set.weight, set.reps, workoutId, setIndex, startTime)
           .run();
+      }
+
+      // Update the current workout best for this weight
+      const currentBest = exerciseBests.get(set.weight);
+      if (currentBest === undefined || set.reps > currentBest) {
+        exerciseBests.set(set.weight, set.reps);
       }
     }
   }

@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(npm run db:init:remote*)",
+      "Bash(wrangler d1 execute*--remote*)",
+      "Bash(wrangler deploy*)",
+      "Bash(npx cap open*)",
+      "Read(.dev.vars)",
+      "Read(*.keystore)",
+      "Read(android/release.keystore)",
+      "Edit(.dev.vars)",
+      "Write(.dev.vars)",
+      "Edit(*.keystore)",
+      "Write(*.keystore)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run typecheck 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

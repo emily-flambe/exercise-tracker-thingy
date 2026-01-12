@@ -282,4 +282,39 @@ describe('PR Detection', () => {
     // Should be PR because it beats the completed 8 (ignore incomplete 12)
     expect(result.exercises[0].sets[0].isPR).toBe(true);
   });
+
+  it('should treat sets without completed flag as completed (backward compatibility)', async () => {
+    // First workout without completed flag (simulating old data)
+    const workout1: CreateWorkoutRequest = {
+      startTime: Date.now() - 86400000, // 1 day ago
+      endTime: Date.now() - 86400000 + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 8 }  // No completed flag
+          ]
+        }
+      ]
+    };
+    await createWorkout(env.DB, userId, workout1);
+
+    // Second workout with higher reps
+    const workout2: CreateWorkoutRequest = {
+      startTime: Date.now(),
+      endTime: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 10 }  // No completed flag
+          ]
+        }
+      ]
+    };
+    const result = await createWorkout(env.DB, userId, workout2);
+
+    // Should be PR because sets without completed flag are treated as completed
+    expect(result.exercises[0].sets[0].isPR).toBe(true);
+  });
 });

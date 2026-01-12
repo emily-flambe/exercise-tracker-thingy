@@ -96,6 +96,86 @@ function $select(id: string): HTMLSelectElement {
   return document.getElementById(id) as unknown as HTMLSelectElement;
 }
 
+// Check if a set is a PR based on exercise name, weight, reps, and position
+function calculateIsPR(exerciseName: string, weight: number, reps: number, exerciseIndex: number, setIndex: number): boolean {
+  if (!state.currentWorkout) return false;
+
+  // Find the best reps at this weight in previous workouts (completed sets only)
+  let previousBestReps: number | null = null;
+  for (const workout of state.history) {
+    // Skip the workout being edited if we're editing
+    if (state.editingWorkoutId && workout.id === state.editingWorkoutId) continue;
+
+    // Only look at workouts before the current one's start time
+    if (workout.start_time >= state.currentWorkout.startTime) continue;
+
+    const exercise = workout.exercises.find(e => e.name === exerciseName);
+    if (!exercise) continue;
+
+    for (const set of exercise.sets) {
+      // Only consider completed sets (matching backend logic)
+      if (set.completed === false) continue;
+
+      if (set.weight === weight) {
+        if (previousBestReps === null || set.reps > previousBestReps) {
+          previousBestReps = set.reps;
+        }
+      }
+    }
+  }
+
+  // Find the best reps at this weight in earlier sets of the current workout
+  let currentWorkoutBestReps: number | null = null;
+  const exercises = state.currentWorkout.exercises;
+
+  for (let i = 0; i < exercises.length; i++) {
+    const ex = exercises[i];
+    if (ex.name !== exerciseName) continue;
+
+    // For the same exercise, only look at sets before the current one
+    const maxSetIndex = (i === exerciseIndex) ? setIndex : ex.sets.length;
+
+    for (let j = 0; j < maxSetIndex; j++) {
+      const set = ex.sets[j];
+      // Only consider completed sets
+      if (set.completed === false) continue;
+
+      if (set.weight === weight) {
+        if (currentWorkoutBestReps === null || set.reps > currentWorkoutBestReps) {
+          currentWorkoutBestReps = set.reps;
+        }
+      }
+    }
+  }
+
+  // Determine the maximum reps to beat
+  let maxToBeat: number | null = null;
+
+  if (previousBestReps !== null && currentWorkoutBestReps !== null) {
+    maxToBeat = Math.max(previousBestReps, currentWorkoutBestReps);
+  } else if (previousBestReps !== null) {
+    maxToBeat = previousBestReps;
+  } else if (currentWorkoutBestReps !== null) {
+    maxToBeat = currentWorkoutBestReps;
+  }
+
+  // It's a PR if there's no previous record, or if reps exceed the max to beat
+  return maxToBeat === null || reps > maxToBeat;
+}
+
+// Recalculate PR status for all sets in the current workout
+function recalculateAllPRs(): void {
+  if (!state.currentWorkout) return;
+
+  for (let i = 0; i < state.currentWorkout.exercises.length; i++) {
+    const exercise = state.currentWorkout.exercises[i];
+    for (let j = 0; j < exercise.sets.length; j++) {
+      const set = exercise.sets[j];
+      set.isPR = calculateIsPR(exercise.name, set.weight, set.reps, i, j);
+    }
+  }
+}
+
 // ==================== DATA LOADING ====================
 async function loadData(): Promise<void> {
   try {
@@ -372,6 +452,8 @@ function toggleExerciseCompleted(index: number): void {
 function toggleSetCompleted(exerciseIndex: number, setIndex: number): void {
   const set = state.currentWorkout!.exercises[exerciseIndex].sets[setIndex];
   set.completed = !set.completed;
+  // Recalculate PRs after toggling completion (affects which sets count toward PRs)
+  recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
 }
@@ -413,6 +495,8 @@ function saveSetInline(exerciseIndex: number): void {
   if (note) set.note = note;
 
   state.currentWorkout!.exercises[exerciseIndex].sets.push(set);
+  // Recalculate PRs after adding a new set
+  recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
 }
@@ -427,14 +511,22 @@ function updateSet(exerciseIndex: number, setIndex: number, field: string, value
     }
   } else if (field === 'weight') {
     set.weight = parseInt(value) || 0;
+    // Recalculate PRs when weight changes
+    recalculateAllPRs();
+    renderWorkout();
   } else if (field === 'reps') {
     set.reps = parseInt(value) || 0;
+    // Recalculate PRs when reps change
+    recalculateAllPRs();
+    renderWorkout();
   }
   scheduleAutoSave();
 }
 
 function deleteSet(exerciseIndex: number, setIndex: number): void {
   state.currentWorkout!.exercises[exerciseIndex].sets.splice(setIndex, 1);
+  // Recalculate PRs after deleting a set (affects subsequent sets' PR status)
+  recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
 }
@@ -444,6 +536,8 @@ function copyAllSets(exerciseIndex: number): void {
   const prevSets = getPreviousSets(ex.name);
   if (prevSets.length > 0) {
     ex.sets = prevSets.map(s => ({ weight: s.weight, reps: s.reps }));
+    // Recalculate PRs after copying previous sets
+    recalculateAllPRs();
     renderWorkout();
     scheduleAutoSave();
   }

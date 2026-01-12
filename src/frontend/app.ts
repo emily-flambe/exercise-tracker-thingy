@@ -487,7 +487,7 @@ function hideAddSetForm(exerciseIndex: number): void {
 }
 
 function saveSetInline(exerciseIndex: number): void {
-  const weight = parseInt(($('weight-' + exerciseIndex) as HTMLInputElement).value) || 0;
+  const weight = parseFloat(($('weight-' + exerciseIndex) as HTMLInputElement).value) || 0;
   const reps = parseInt(($('reps-' + exerciseIndex) as HTMLInputElement).value) || 0;
   const note = ($('note-' + exerciseIndex) as HTMLInputElement).value.trim();
 
@@ -510,7 +510,7 @@ function updateSet(exerciseIndex: number, setIndex: number, field: string, value
       delete set.note;
     }
   } else if (field === 'weight') {
-    set.weight = parseInt(value) || 0;
+    set.weight = parseFloat(value) || 0;
     // Recalculate PRs when weight changes
     recalculateAllPRs();
     renderWorkout();

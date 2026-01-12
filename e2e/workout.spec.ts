@@ -77,6 +77,179 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Pull', exact: true }).click();
     await expect(page.locator('#add-exercise-results').getByText('Lat Pulldown')).toBeVisible();
   });
+
+  test('should show pencil icon for notes instead of always-visible field', async ({ page }) => {
+    // Start workout and add exercise
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Should see the pencil icon
+    const pencilIcon = page.locator('button[title="Add note"]').first();
+    await expect(pencilIcon).toBeVisible();
+
+    // Should NOT see the notes input field initially
+    const noteField = page.locator('input[placeholder="note"]').first();
+    await expect(noteField).not.toBeVisible();
+  });
+
+  test('should expand notes field when pencil icon is clicked', async ({ page }) => {
+    // Start workout and add exercise
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Click pencil icon to expand notes
+    await page.locator('button[title="Add note"]').first().click();
+
+    // Should now see the notes input field
+    const noteField = page.locator('input[placeholder="note"]').first();
+    await expect(noteField).toBeVisible();
+  });
+
+  test('should collapse notes field when pencil icon is clicked again', async ({ page }) => {
+    // Start workout and add exercise
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Click pencil icon to expand notes
+    await page.locator('button[title="Add note"]').first().click();
+    await expect(page.locator('input[placeholder="note"]').first()).toBeVisible();
+
+    // Click again to collapse
+    await page.locator('button[title="Add note"]').first().click();
+    await expect(page.locator('input[placeholder="note"]').first()).not.toBeVisible();
+  });
+
+  test('should save note and change pencil icon color to blue', async ({ page }) => {
+    // Start workout and add exercise
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Click pencil icon to expand notes
+    const pencilButton = page.locator('button[title="Add note"]').first();
+    await pencilButton.click();
+
+    // Add a note
+    const noteField = page.locator('input[placeholder="note"]').first();
+    await noteField.fill('felt strong today');
+    await noteField.blur(); // Trigger onchange
+
+    // Wait for the re-render
+    await page.waitForTimeout(500);
+
+    // Pencil icon should now have "Edit note" title and blue color
+    const editButton = page.locator('button[title="Edit note"]').first();
+    await expect(editButton).toBeVisible();
+
+    // Check that the button has the blue color class
+    const hasBlueClass = await editButton.evaluate((el) => {
+      return el.className.includes('text-blue-400');
+    });
+    expect(hasBlueClass).toBe(true);
+  });
+
+  test('should persist note after collapsing and re-expanding', async ({ page }) => {
+    // Start workout and add exercise
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Expand and add note
+    await page.locator('button[title="Add note"]').first().click();
+    const noteField = page.locator('input[placeholder="note"]').first();
+    await noteField.fill('test note');
+    await noteField.blur();
+
+    // Wait for save
+    await page.waitForTimeout(500);
+
+    // Collapse
+    await page.locator('button[title="Edit note"]').first().click();
+    await expect(page.locator('input[placeholder="note"]').first()).not.toBeVisible();
+
+    // Re-expand
+    await page.locator('button[title="Edit note"]').first().click();
+
+    // Note should still be there
+    const noteFieldAgain = page.locator('input[placeholder="note"]').first();
+    await expect(noteFieldAgain).toHaveValue('test note');
+  });
+
+  test('should handle multiple sets with different note states', async ({ page }) => {
+    // Start workout and add exercise
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add first set with note
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    await page.locator('button[title="Add note"]').first().click();
+    await page.locator('input[placeholder="note"]').first().fill('set 1 note');
+    await page.locator('input[placeholder="note"]').first().blur();
+    await page.waitForTimeout(300);
+
+    // Add second set without note
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '8');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // First set should have blue pencil (with note)
+    const firstSetEditButton = page.locator('button[title="Edit note"]').first();
+    await expect(firstSetEditButton).toBeVisible();
+
+    // Second set should have gray pencil (without note)
+    const secondSetAddButton = page.locator('button[title="Add note"]').last();
+    await expect(secondSetAddButton).toBeVisible();
+
+    // Verify color classes
+    const firstHasBlue = await firstSetEditButton.evaluate((el) => {
+      return el.className.includes('text-blue-400');
+    });
+    expect(firstHasBlue).toBe(true);
+
+    const secondHasGray = await secondSetAddButton.evaluate((el) => {
+      return el.className.includes('text-gray-500');
+    });
+    expect(secondHasGray).toBe(true);
+  });
 });
 
 test.describe('Authentication', () => {

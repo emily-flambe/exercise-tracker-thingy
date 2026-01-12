@@ -187,7 +187,7 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
 
   await db
     .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(id, userId, data.start_time, data.end_time ?? null, now)
+    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, now)
     .run();
 
   // Insert exercises and sets

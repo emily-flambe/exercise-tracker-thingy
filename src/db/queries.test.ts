@@ -20,8 +20,8 @@ describe('PR Detection', () => {
   it('should mark first set at a weight as PR when it beats previous best', async () => {
     // First workout: 100 lbs × 8 reps
     const workout1: CreateWorkoutRequest = {
-      startTime: Date.now() - 86400000, // 1 day ago
-      endTime: Date.now() - 86400000 + 3600000,
+      start_time: Date.now() - 86400000, // 1 day ago
+      end_time: Date.now() - 86400000 + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -35,8 +35,8 @@ describe('PR Detection', () => {
 
     // Second workout: 100 lbs × 10 reps (beats previous 8)
     const workout2: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -55,8 +55,8 @@ describe('PR Detection', () => {
   it('should mark second set at same weight as PR when it has more reps than first set', async () => {
     // Workout with two sets at same weight, second has more reps
     const workout: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -77,8 +77,8 @@ describe('PR Detection', () => {
   it('should NOT mark second set as PR when it has same reps as first set', async () => {
     // Workout with two sets at same weight and same reps
     const workout: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -99,8 +99,8 @@ describe('PR Detection', () => {
   it('should NOT mark second set as PR when it has fewer reps than first set', async () => {
     // Workout with two sets at same weight, second has fewer reps
     const workout: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -121,8 +121,8 @@ describe('PR Detection', () => {
   it('should handle multiple PRs at same weight across multiple sets', async () => {
     // Workout with progressive PRs: 10 → 11 → 12 → 11
     const workout: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -147,8 +147,8 @@ describe('PR Detection', () => {
   it('should consider both previous workouts and current workout when detecting PRs', async () => {
     // First workout: 100 lbs × 8 reps
     const workout1: CreateWorkoutRequest = {
-      startTime: Date.now() - 86400000, // 1 day ago
-      endTime: Date.now() - 86400000 + 3600000,
+      start_time: Date.now() - 86400000, // 1 day ago
+      end_time: Date.now() - 86400000 + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -162,8 +162,8 @@ describe('PR Detection', () => {
 
     // Second workout: 100 lbs × 9 reps, then 10 reps
     const workout2: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -184,8 +184,8 @@ describe('PR Detection', () => {
   it('should track PRs independently for different exercises', async () => {
     // Workout with two different exercises, same weight/reps patterns
     const workout: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -215,8 +215,8 @@ describe('PR Detection', () => {
   it('should NOT mark incomplete sets as PRs', async () => {
     // First workout with completed set
     const workout1: CreateWorkoutRequest = {
-      startTime: Date.now() - 86400000, // 1 day ago
-      endTime: Date.now() - 86400000 + 3600000,
+      start_time: Date.now() - 86400000, // 1 day ago
+      end_time: Date.now() - 86400000 + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -230,8 +230,8 @@ describe('PR Detection', () => {
 
     // Second workout with incomplete set that would beat previous PR
     const workout2: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -250,8 +250,8 @@ describe('PR Detection', () => {
   it('should only consider completed sets when comparing against previous workouts', async () => {
     // First workout with one completed and one incomplete set
     const workout1: CreateWorkoutRequest = {
-      startTime: Date.now() - 86400000, // 1 day ago
-      endTime: Date.now() - 86400000 + 3600000,
+      start_time: Date.now() - 86400000, // 1 day ago
+      end_time: Date.now() - 86400000 + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -266,8 +266,8 @@ describe('PR Detection', () => {
 
     // Second workout with 10 reps (more than completed 8, but less than incomplete 12)
     const workout2: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -286,8 +286,8 @@ describe('PR Detection', () => {
   it('should treat sets without completed flag as completed (backward compatibility)', async () => {
     // First workout without completed flag (simulating old data)
     const workout1: CreateWorkoutRequest = {
-      startTime: Date.now() - 86400000, // 1 day ago
-      endTime: Date.now() - 86400000 + 3600000,
+      start_time: Date.now() - 86400000, // 1 day ago
+      end_time: Date.now() - 86400000 + 3600000,
       exercises: [
         {
           name: 'Bench Press',
@@ -301,8 +301,8 @@ describe('PR Detection', () => {
 
     // Second workout with higher reps
     const workout2: CreateWorkoutRequest = {
-      startTime: Date.now(),
-      endTime: Date.now() + 3600000,
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
       exercises: [
         {
           name: 'Bench Press',

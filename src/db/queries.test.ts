@@ -26,7 +26,7 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 8 }
+            { weight: 100, reps: 8, completed: true }
           ]
         }
       ]
@@ -41,7 +41,7 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 10 }
+            { weight: 100, reps: 10, completed: true }
           ]
         }
       ]
@@ -61,8 +61,8 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 10 },
-            { weight: 100, reps: 12 }  // More reps than first set
+            { weight: 100, reps: 10, completed: true },
+            { weight: 100, reps: 12, completed: true }  // More reps than first set
           ]
         }
       ]
@@ -83,8 +83,8 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 10 },
-            { weight: 100, reps: 10 }  // Same reps as first set
+            { weight: 100, reps: 10, completed: true },
+            { weight: 100, reps: 10, completed: true }  // Same reps as first set
           ]
         }
       ]
@@ -105,8 +105,8 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 12 },
-            { weight: 100, reps: 10 }  // Fewer reps than first set
+            { weight: 100, reps: 12, completed: true },
+            { weight: 100, reps: 10, completed: true }  // Fewer reps than first set
           ]
         }
       ]
@@ -127,10 +127,10 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 10 },  // PR
-            { weight: 100, reps: 11 },  // PR (beats previous)
-            { weight: 100, reps: 12 },  // PR (beats previous)
-            { weight: 100, reps: 11 }   // NOT PR (less than 12)
+            { weight: 100, reps: 10, completed: true },  // PR
+            { weight: 100, reps: 11, completed: true },  // PR (beats previous)
+            { weight: 100, reps: 12, completed: true },  // PR (beats previous)
+            { weight: 100, reps: 11, completed: true }   // NOT PR (less than 12)
           ]
         }
       ]
@@ -153,7 +153,7 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 8 }
+            { weight: 100, reps: 8, completed: true }
           ]
         }
       ]
@@ -168,8 +168,8 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 9 },   // PR (beats previous workout's 8)
-            { weight: 100, reps: 10 }   // PR (beats the 9 from this workout)
+            { weight: 100, reps: 9, completed: true },   // PR (beats previous workout's 8)
+            { weight: 100, reps: 10, completed: true }   // PR (beats the 9 from this workout)
           ]
         }
       ]
@@ -190,15 +190,15 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 10 },
-            { weight: 100, reps: 10 }  // Should NOT be PR (same as first)
+            { weight: 100, reps: 10, completed: true },
+            { weight: 100, reps: 10, completed: true }  // Should NOT be PR (same as first)
           ]
         },
         {
           name: 'Squat',
           sets: [
-            { weight: 100, reps: 10 },  // Should be PR (first time for Squat)
-            { weight: 100, reps: 10 }   // Should NOT be PR (same as first)
+            { weight: 100, reps: 10, completed: true },  // Should be PR (first time for Squat)
+            { weight: 100, reps: 10, completed: true }   // Should NOT be PR (same as first)
           ]
         }
       ]
@@ -210,5 +210,111 @@ describe('PR Detection', () => {
     expect(result.exercises[0].sets[1].isPR).toBe(false);
     expect(result.exercises[1].sets[0].isPR).toBe(true);
     expect(result.exercises[1].sets[1].isPR).toBe(false);
+  });
+
+  it('should NOT mark incomplete sets as PRs', async () => {
+    // First workout with completed set
+    const workout1: CreateWorkoutRequest = {
+      startTime: Date.now() - 86400000, // 1 day ago
+      endTime: Date.now() - 86400000 + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 8, completed: true }
+          ]
+        }
+      ]
+    };
+    await createWorkout(env.DB, userId, workout1);
+
+    // Second workout with incomplete set that would beat previous PR
+    const workout2: CreateWorkoutRequest = {
+      startTime: Date.now(),
+      endTime: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 12, completed: false }  // Would be PR if completed
+          ]
+        }
+      ]
+    };
+    const result = await createWorkout(env.DB, userId, workout2);
+
+    // Set should NOT be marked as PR because it's not completed
+    expect(result.exercises[0].sets[0].isPR).toBe(false);
+  });
+
+  it('should only consider completed sets when comparing against previous workouts', async () => {
+    // First workout with one completed and one incomplete set
+    const workout1: CreateWorkoutRequest = {
+      startTime: Date.now() - 86400000, // 1 day ago
+      endTime: Date.now() - 86400000 + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 8, completed: true },
+            { weight: 100, reps: 12, completed: false }  // Higher reps but not completed
+          ]
+        }
+      ]
+    };
+    await createWorkout(env.DB, userId, workout1);
+
+    // Second workout with 10 reps (more than completed 8, but less than incomplete 12)
+    const workout2: CreateWorkoutRequest = {
+      startTime: Date.now(),
+      endTime: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const result = await createWorkout(env.DB, userId, workout2);
+
+    // Should be PR because it beats the completed 8 (ignore incomplete 12)
+    expect(result.exercises[0].sets[0].isPR).toBe(true);
+  });
+
+  it('should treat sets without completed flag as completed (backward compatibility)', async () => {
+    // First workout without completed flag (simulating old data)
+    const workout1: CreateWorkoutRequest = {
+      startTime: Date.now() - 86400000, // 1 day ago
+      endTime: Date.now() - 86400000 + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 8 }  // No completed flag
+          ]
+        }
+      ]
+    };
+    await createWorkout(env.DB, userId, workout1);
+
+    // Second workout with higher reps
+    const workout2: CreateWorkoutRequest = {
+      startTime: Date.now(),
+      endTime: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 10 }  // No completed flag
+          ]
+        }
+      ]
+    };
+    const result = await createWorkout(env.DB, userId, workout2);
+
+    // Should be PR because sets without completed flag are treated as completed
+    expect(result.exercises[0].sets[0].isPR).toBe(true);
   });
 });

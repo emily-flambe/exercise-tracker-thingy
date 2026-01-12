@@ -163,16 +163,35 @@ async function finishWorkout(): Promise<void> {
     };
 
     if (state.editingWorkoutId) {
-      await api.updateWorkout(state.editingWorkoutId, workoutData);
-    } else {
-      await api.createWorkout(workoutData);
-    }
+      // Editing existing workout - save and stay on workout screen
+      const btn = $('workout-finish-btn');
+      const originalText = btn.textContent;
 
-    await loadData();
-    state.currentWorkout = null;
-    state.editingWorkoutId = null;
-    expandedNotes.clear();
-    showWorkoutScreen('workout-empty');
+      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      await loadData();
+
+      // Show "Saved" feedback
+      btn.textContent = 'Saved';
+      btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+      btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+
+      // Restore "Save" text after 2 seconds
+      setTimeout(() => {
+        btn.textContent = 'Save';
+        btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+        btn.classList.add('bg-green-600', 'hover:bg-green-700');
+      }, 2000);
+
+      // Keep user on workout - don't clear state or navigate away
+    } else {
+      // Creating new workout - finish and go to empty screen
+      await api.createWorkout(workoutData);
+      await loadData();
+      state.currentWorkout = null;
+      state.editingWorkoutId = null;
+      expandedNotes.clear();
+      showWorkoutScreen('workout-empty');
+    }
   } catch (error) {
     console.error('Failed to save workout:', error);
     alert('Failed to save workout');

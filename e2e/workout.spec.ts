@@ -250,6 +250,101 @@ test.describe('Workout Tracker', () => {
     });
     expect(secondHasGray).toBe(true);
   });
+
+  test('should show save feedback when adding a set during workout', async ({ page }) => {
+    // Start workout and add exercise
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Wait for auto-save to trigger (1.5s delay)
+    await page.waitForTimeout(1600);
+
+    // Toast should be visible
+    const toast = page.locator('#save-toast');
+    await expect(toast).toBeVisible();
+    await expect(toast).toHaveText('Saved');
+
+    // Toast should fade out after 2 seconds
+    await page.waitForTimeout(2500);
+    await expect(toast).not.toBeVisible();
+  });
+
+  test('should show save feedback when updating a set', async ({ page }) => {
+    // Start workout and add exercise with a set
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Wait for initial auto-save to complete
+    await page.waitForTimeout(2000);
+
+    // Update the weight
+    const weightInput = page.locator('input[type="number"]').first();
+    await weightInput.fill('145');
+    await weightInput.blur();
+
+    // Wait for auto-save to trigger
+    await page.waitForTimeout(1600);
+
+    // Toast should be visible
+    const toast = page.locator('#save-toast');
+    await expect(toast).toBeVisible();
+    await expect(toast).toHaveText('Saved');
+  });
+
+  test('should show save feedback when adding an exercise', async ({ page }) => {
+    // Start workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+
+    // Add an exercise
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Wait for auto-save to trigger
+    await page.waitForTimeout(1600);
+
+    // Toast should be visible
+    const toast = page.locator('#save-toast');
+    await expect(toast).toBeVisible();
+    await expect(toast).toHaveText('Saved');
+  });
+
+  test('should show save feedback when toggling set completion', async ({ page }) => {
+    // Start workout and add exercise with a set
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Wait for initial auto-save to complete and toast to disappear
+    await page.waitForTimeout(4000);
+
+    // Toggle set completion
+    const setCheckbox = page.locator('button').filter({ has: page.locator('svg circle') }).first();
+    await setCheckbox.click();
+
+    // Wait for auto-save to trigger
+    await page.waitForTimeout(1600);
+
+    // Toast should be visible
+    const toast = page.locator('#save-toast');
+    await expect(toast).toBeVisible();
+    await expect(toast).toHaveText('Saved');
+  });
 });
 
 test.describe('Authentication', () => {

@@ -1,5 +1,6 @@
 import * as api from './api';
 import type { Workout, WorkoutExercise, Set, CustomExercise, User, PersonalRecord } from './api';
+import type { CreateWorkoutRequest } from '../types';
 
 // Injected by Vite at build time
 declare const __APP_VERSION__: string;
@@ -297,7 +298,7 @@ async function autoSaveWorkout(): Promise<void> {
   }
 
   try {
-    const workoutData = {
+    const workoutData: CreateWorkoutRequest = {
       start_time: state.currentWorkout.startTime,
       // Keep workout active - don't set end_time for new workouts
       // For edited workouts, we need to preserve that it was already finished

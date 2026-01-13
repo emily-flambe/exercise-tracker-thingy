@@ -419,7 +419,19 @@ function renderWorkout(): void {
               <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
             </div>
           </div>
-          <button onclick="app.removeExercise(${i})" class="text-red-400 text-sm px-2 hover:text-red-300">x</button>
+          <div class="flex items-center gap-2">
+            <button onclick="app.moveExerciseUp(${i})" class="text-gray-400 hover:text-blue-400 transition-colors ${i === 0 ? 'opacity-30 cursor-not-allowed' : ''}" ${i === 0 ? 'disabled' : ''} title="Move up">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+              </svg>
+            </button>
+            <button onclick="app.moveExerciseDown(${i})" class="text-gray-400 hover:text-blue-400 transition-colors ${i === state.currentWorkout.exercises.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}" ${i === state.currentWorkout.exercises.length - 1 ? 'disabled' : ''} title="Move down">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            <button onclick="app.removeExercise(${i})" class="text-red-400 text-sm px-2 hover:text-red-300">x</button>
+          </div>
         </div>
         ${setsHtml}
       </div>
@@ -441,6 +453,24 @@ function removeExercise(index: number): void {
     renderWorkout();
     scheduleAutoSave();
   }
+}
+
+function moveExerciseUp(index: number): void {
+  if (index === 0) return; // Already at the top
+  const exercises = state.currentWorkout!.exercises;
+  // Swap with previous exercise
+  [exercises[index - 1], exercises[index]] = [exercises[index], exercises[index - 1]];
+  renderWorkout();
+  scheduleAutoSave();
+}
+
+function moveExerciseDown(index: number): void {
+  const exercises = state.currentWorkout!.exercises;
+  if (index === exercises.length - 1) return; // Already at the bottom
+  // Swap with next exercise
+  [exercises[index], exercises[index + 1]] = [exercises[index + 1], exercises[index]];
+  renderWorkout();
+  scheduleAutoSave();
 }
 
 function toggleExerciseCompleted(index: number): void {
@@ -1272,6 +1302,8 @@ async function init(): Promise<void> {
   deleteSet,
   copyAllSets,
   removeExercise,
+  moveExerciseUp,
+  moveExerciseDown,
   toggleExerciseCompleted,
   toggleSetCompleted,
   toggleNoteField,

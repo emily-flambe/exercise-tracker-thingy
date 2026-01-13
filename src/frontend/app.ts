@@ -601,6 +601,37 @@ function getLatestPRForExercise(exerciseName: string): PersonalRecord | null {
   return prs[0];
 }
 
+// Get co-occurrence information for an exercise with the current workout's exercises
+function getCoOccurrenceInfo(exerciseName: string, currentExerciseNames: string[]): { hasCoOccurred: boolean; lastCoOccurrence: number | null } {
+  if (currentExerciseNames.length === 0 || currentExerciseNames.includes(exerciseName)) {
+    return { hasCoOccurred: false, lastCoOccurrence: null };
+  }
+
+  let lastCoOccurrenceTime: number | null = null;
+
+  // Look through all past workouts
+  for (const workout of state.history) {
+    const exerciseNamesInWorkout = workout.exercises.map(e => e.name);
+
+    // Check if this workout contains the exercise we're checking
+    const containsTargetExercise = exerciseNamesInWorkout.includes(exerciseName);
+
+    // Check if this workout contains any of the current workout's exercises
+    const containsCurrentExercise = currentExerciseNames.some(name =>
+      exerciseNamesInWorkout.includes(name)
+    );
+
+    // If both conditions are true, this is a co-occurrence
+    if (containsTargetExercise && containsCurrentExercise) {
+      if (lastCoOccurrenceTime === null || workout.start_time > lastCoOccurrenceTime) {
+        lastCoOccurrenceTime = workout.start_time;
+      }
+    }
+  }
+
+  return { hasCoOccurred: lastCoOccurrenceTime !== null, lastCoOccurrence: lastCoOccurrenceTime };
+}
+
 function showAddExercise(): void {
   ($('add-exercise-search') as HTMLInputElement).value = '';
   currentCategoryFilter = 'all';
@@ -679,7 +710,30 @@ function filterAddExercises(): void {
       return currentSort.asc ? cmp : -cmp;
     });
   } else {
+    // Get current workout exercise names for smart ranking
+    const currentExerciseNames = state.currentWorkout?.exercises.map(e => e.name) || [];
+
     filtered.sort((a, b) => {
+      // Get co-occurrence information
+      const aCoOccurrence = getCoOccurrenceInfo(a.name, currentExerciseNames);
+      const bCoOccurrence = getCoOccurrenceInfo(b.name, currentExerciseNames);
+
+      // First priority: exercises that have co-occurred with current workout exercises
+      if (aCoOccurrence.hasCoOccurred && !bCoOccurrence.hasCoOccurred) {
+        return -1; // a comes first
+      }
+      if (!aCoOccurrence.hasCoOccurred && bCoOccurrence.hasCoOccurred) {
+        return 1; // b comes first
+      }
+
+      // If both have co-occurred, sort by most recent co-occurrence
+      if (aCoOccurrence.hasCoOccurred && bCoOccurrence.hasCoOccurred) {
+        const aTime = aCoOccurrence.lastCoOccurrence || 0;
+        const bTime = bCoOccurrence.lastCoOccurrence || 0;
+        return bTime - aTime; // Most recent co-occurrence first
+      }
+
+      // If neither have co-occurred, sort by last logged date
       const aDate = getLastLoggedDate(a.name) || 0;
       const bDate = getLastLoggedDate(b.name) || 0;
       const cmp = bDate - aDate;

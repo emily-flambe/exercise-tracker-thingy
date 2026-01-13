@@ -336,7 +336,10 @@ function renderWorkout(): void {
     return;
   }
 
-  list.innerHTML = state.currentWorkout.exercises.map((ex, i) => {
+  const exercises = state.currentWorkout.exercises;
+  const exerciseCount = exercises.length;
+
+  list.innerHTML = exercises.map((ex, i) => {
     const exercise = getAllExercises().find(e => e.name === ex.name) || { type: 'total', unit: 'lbs' };
     const prevSets = getPreviousSets(ex.name);
 
@@ -425,7 +428,7 @@ function renderWorkout(): void {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
               </svg>
             </button>
-            <button onclick="app.moveExerciseDown(${i})" class="text-gray-400 hover:text-blue-400 transition-colors ${i === state.currentWorkout.exercises.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}" ${i === state.currentWorkout.exercises.length - 1 ? 'disabled' : ''} title="Move down">
+            <button onclick="app.moveExerciseDown(${i})" class="text-gray-400 hover:text-blue-400 transition-colors ${i === exerciseCount - 1 ? 'opacity-30 cursor-not-allowed' : ''}" ${i === exerciseCount - 1 ? 'disabled' : ''} title="Move down">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>

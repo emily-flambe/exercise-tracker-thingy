@@ -47,6 +47,7 @@ let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
+let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -95,6 +96,29 @@ function $input(id: string): HTMLInputElement {
 
 function $select(id: string): HTMLSelectElement {
   return document.getElementById(id) as unknown as HTMLSelectElement;
+}
+
+// Show a temporary toast notification
+function showToast(message: string = 'Saved'): void {
+  const toast = $('save-toast');
+
+  // Clear any existing timeout
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+  }
+
+  // Update message and show toast
+  toast.textContent = message;
+  toast.classList.remove('hidden');
+  toast.style.opacity = '1';
+
+  // Hide after 2 seconds
+  toastTimeout = setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => {
+      toast.classList.add('hidden');
+    }, 300); // Wait for fade transition
+  }, 2000);
 }
 
 // Check if a set is a PR based on exercise name, weight, reps, and position
@@ -323,6 +347,9 @@ async function autoSaveWorkout(): Promise<void> {
     // Reload data to refresh history, but keep current workout active
     await loadData();
     console.log('Workout auto-saved');
+
+    // Show visual feedback
+    showToast('Saved');
   } catch (error) {
     console.error('Failed to auto-save workout:', error);
     // Silently fail - don't interrupt user's workflow with alerts

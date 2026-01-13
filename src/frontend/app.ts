@@ -871,7 +871,6 @@ function renderExerciseCategories(): void {
                 <span class="font-medium">${e.name}</span>
                 <div class="text-right">
                   ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
-                  ${isCustom ? `<span class="text-xs text-blue-400 ml-2">custom</span>` : ''}
                 </div>
               </button>
             `;
@@ -912,14 +911,13 @@ function filterExercises(): void {
 
   const filtered = getAllExercises().filter(e => e.name.toLowerCase().includes(query));
   results.innerHTML = filtered.map(e => {
-    const isCustom = state.customExercises.some(c => c.name === e.name);
     return `
       <button onclick="app.showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
         <div>
           <div class="font-medium">${e.name}</div>
           <div class="text-xs ${getTypeColor(e.type)}">${getTypeLabel(e.type)}</div>
         </div>
-        ${isCustom ? '<span class="text-xs text-blue-400">custom</span>' : '<span class="text-gray-500 text-xs">&#9654;</span>'}
+        <span class="text-gray-500 text-xs">&#9654;</span>
       </button>
     `;
   }).join('');

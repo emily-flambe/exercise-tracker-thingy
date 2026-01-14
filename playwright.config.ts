@@ -19,7 +19,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: process.env.CI
+      ? 'wrangler dev --local --port 8787'
+      : 'npm run dev',
     url: 'http://localhost:8787',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

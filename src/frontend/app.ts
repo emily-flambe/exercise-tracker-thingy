@@ -605,15 +605,6 @@ function copyAllSets(exerciseIndex: number): void {
 }
 
 // ==================== ADD EXERCISE ====================
-const categoryMapping: Record<string, string[]> = {
-  push: ['Chest', 'Shoulders', 'Triceps'],
-  pull: ['Back', 'Biceps'],
-  legs: ['Legs'],
-  core: ['Core'],
-  cardio: ['Cardio'],
-  other: ['Other'],
-};
-
 let currentCategoryFilter = 'all';
 let currentSort = { field: 'recent', asc: true };
 
@@ -731,8 +722,7 @@ function filterAddExercises(): void {
   let filtered = getAllExercises();
 
   if (currentCategoryFilter !== 'all') {
-    const allowedCategories = categoryMapping[currentCategoryFilter] || [];
-    filtered = filtered.filter(e => allowedCategories.includes(e.category));
+    filtered = filtered.filter(e => e.category === currentCategoryFilter);
   }
 
   if (query) {

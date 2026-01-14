@@ -100,10 +100,11 @@ jobs:
       - name: Initialize local D1 database
         run: npx wrangler d1 execute workout-db --local --file=./src/db/schema.sql
 
+      - name: Create local dev vars
+        run: echo "JWT_SECRET=test-secret-for-ci" > .dev.vars
+
       - name: Run E2E tests
         run: npm run test:e2e
-        env:
-          JWT_SECRET: test-secret-for-ci
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4

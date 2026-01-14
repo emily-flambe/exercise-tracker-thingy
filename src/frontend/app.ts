@@ -610,6 +610,8 @@ const categoryMapping: Record<string, string[]> = {
   pull: ['Back', 'Biceps'],
   legs: ['Legs'],
   core: ['Core'],
+  cardio: ['Cardio'],
+  other: ['Other'],
 };
 
 let currentCategoryFilter = 'all';

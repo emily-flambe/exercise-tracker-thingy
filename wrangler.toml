@@ -2,6 +2,8 @@ name = "workout"
 main = "src/index.ts"
 compatibility_date = "2025-12-15"
 account_id = "facf6619808dc039df729531bbb26d1d"
+workers_dev = true
+preview_urls = true
 
 [build]
 command = "npm run build:frontend"

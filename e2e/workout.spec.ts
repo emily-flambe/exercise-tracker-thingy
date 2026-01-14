@@ -69,12 +69,12 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
-    // Filter by Push
-    await page.getByRole('button', { name: 'Push', exact: true }).click();
+    // Filter by Chest
+    await page.getByRole('button', { name: 'Chest', exact: true }).click();
     await expect(page.locator('#add-exercise-results').getByText('Bench Press', { exact: true })).toBeVisible();
 
-    // Filter by Pull
-    await page.getByRole('button', { name: 'Pull', exact: true }).click();
+    // Filter by Back
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(page.locator('#add-exercise-results').getByText('Lat Pulldown')).toBeVisible();
   });
 

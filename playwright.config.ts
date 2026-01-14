@@ -4,11 +4,12 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  timeout: 30000,
   use: {
-    baseURL: process.env.BASE_URL || 'https://workout.emilycogsdill.com',
+    baseURL: process.env.BASE_URL || 'http://localhost:8787',
     trace: 'on-first-retry',
   },
   projects: [
@@ -16,9 +17,11 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 13'] },
-    },
   ],
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:8787',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
 });

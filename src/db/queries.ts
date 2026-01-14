@@ -204,7 +204,7 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
       const set = ex.sets[j];
       await db
         .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === false ? 0 : 1)
+        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0)
         .run();
     }
   }
@@ -250,7 +250,7 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
       const set = ex.sets[j];
       await db
         .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === false ? 0 : 1)
+        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0)
         .run();
     }
   }

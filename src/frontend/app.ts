@@ -567,6 +567,7 @@ function updateSet(exerciseIndex: number, setIndex: number, field: string, value
     } else {
       delete set.note;
     }
+    renderWorkout();
   } else if (field === 'weight') {
     set.weight = parseFloat(value) || 0;
     // Recalculate PRs when weight changes

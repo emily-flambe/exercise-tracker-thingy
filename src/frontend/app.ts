@@ -347,9 +347,6 @@ async function autoSaveWorkout(): Promise<void> {
     // Reload data to refresh history, but keep current workout active
     await loadData();
     console.log('Workout auto-saved');
-
-    // Show visual feedback
-    showToast('Saved');
   } catch (error) {
     console.error('Failed to auto-save workout:', error);
     // Silently fail - don't interrupt user's workflow with alerts

@@ -85,25 +85,14 @@
             <h1 class="text-lg font-semibold">Add Exercise</h1>
             <span class="w-12"></span>
           </header>
-          <div class="flex gap-2 mb-3 overflow-x-auto" id="category-pills">
-            <button onclick="app.filterByCategory('all')" class="category-pill bg-blue-600 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="all">All</button>
-            <button onclick="app.filterByCategory('Chest')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Chest">Chest</button>
-            <button onclick="app.filterByCategory('Shoulders')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Shoulders">Shoulders</button>
-            <button onclick="app.filterByCategory('Triceps')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Triceps">Triceps</button>
-            <button onclick="app.filterByCategory('Back')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Back">Back</button>
-            <button onclick="app.filterByCategory('Biceps')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Biceps">Biceps</button>
-            <button onclick="app.filterByCategory('Legs')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Legs">Legs</button>
-            <button onclick="app.filterByCategory('Core')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Core">Core</button>
-            <button onclick="app.filterByCategory('Cardio')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Cardio">Cardio</button>
-            <button onclick="app.filterByCategory('Other')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Other">Other</button>
-          </div>
-          <div class="flex gap-2 mb-4 text-xs">
+          <div class="flex gap-2 mb-3 text-xs">
             <span class="text-gray-500">Sort:</span>
-            <button onclick="app.toggleSort('alpha')" id="sort-alpha" class="text-gray-400">A-Z</button>
-            <button onclick="app.toggleSort('recent')" id="sort-recent" class="text-blue-400">Recent</button>
+            <button onclick="app.toggleAddExerciseSort('alpha')" id="add-exercise-sort-alpha" class="text-gray-400">A-Z</button>
+            <button onclick="app.toggleAddExerciseSort('recent')" id="add-exercise-sort-recent" class="text-blue-400">Recent</button>
           </div>
-          <input type="text" id="add-exercise-search" placeholder="Search exercises..." oninput="app.filterAddExercises()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-blue-500">
-          <div class="space-y-2" id="add-exercise-results"></div>
+          <input type="text" id="add-exercise-search" placeholder="Search exercises..." oninput="app.filterAddExerciseSearch()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-blue-500">
+          <div id="add-exercise-categories"></div>
+          <div id="add-exercise-search-results" class="space-y-2 hidden"></div>
         </div>
       </div>
 

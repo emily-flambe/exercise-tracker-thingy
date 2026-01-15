@@ -43,7 +43,8 @@ test.describe('Workout Tracker', () => {
   test('should add an exercise to workout', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
     await expect(page.locator('#exercise-list').getByText('+bar weight')).toBeVisible();
   });
@@ -69,19 +70,20 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
-    // Filter by Chest
+    // Expand Chest category
     await page.getByRole('button', { name: 'Chest', exact: true }).click();
-    await expect(page.locator('#add-exercise-results').getByText('Bench Press', { exact: true })).toBeVisible();
+    await expect(page.locator('#add-Chest-exercises').getByText('Bench Press', { exact: true })).toBeVisible();
 
-    // Filter by Back
+    // Expand Back category
     await page.getByRole('button', { name: 'Back', exact: true }).click();
-    await expect(page.locator('#add-exercise-results').getByText('Lat Pulldown')).toBeVisible();
+    await expect(page.locator('#add-Back-exercises').getByText('Lat Pulldown')).toBeVisible();
   });
 
   test('should add a set to an exercise', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -96,7 +98,8 @@ test.describe('Workout Tracker', () => {
   test('should show pencil icon for notes', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -114,7 +117,8 @@ test.describe('Workout Tracker', () => {
   test('should expand notes field when pencil icon is clicked', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -132,7 +136,8 @@ test.describe('Workout Tracker', () => {
   test('should save note and show edit button', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -153,7 +158,8 @@ test.describe('Workout Tracker', () => {
   test('should show dim PR star for unconfirmed sets and bright star when confirmed', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add first set - should be a PR since it's the first at this weight
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -185,7 +191,8 @@ test.describe('Workout Tracker', () => {
     // Start first workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set with 8 reps (will be dim PR)
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -209,7 +216,8 @@ test.describe('Workout Tracker', () => {
     // Start second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set with 10 reps (beats previous 8, should be dim PR initially)
     await page.getByRole('button', { name: '+ Add set' }).click();

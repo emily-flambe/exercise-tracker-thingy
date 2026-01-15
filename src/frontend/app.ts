@@ -603,8 +603,8 @@ function copyAllSets(exerciseIndex: number): void {
 }
 
 // ==================== ADD EXERCISE ====================
-let currentCategoryFilter = 'all';
-let currentSort = { field: 'recent', asc: true };
+let addExerciseSort = { field: 'recent', asc: true };
+const expandedAddExerciseCategories = new Set<string>();
 
 function getLastLoggedDate(exerciseName: string): number | null {
   for (const workout of state.history) {
@@ -656,87 +656,18 @@ function getCoOccurrenceInfo(exerciseName: string, currentExerciseNames: string[
   return { hasCoOccurred: lastCoOccurrenceTime !== null, lastCoOccurrence: lastCoOccurrenceTime };
 }
 
-function showAddExercise(): void {
-  ($('add-exercise-search') as HTMLInputElement).value = '';
-  currentCategoryFilter = 'all';
-  currentSort = { field: 'recent', asc: true };
-  updateCategoryPills();
-  updateSortButtons();
-  filterAddExercises();
-  showWorkoutScreen('workout-add-exercise');
-}
-
-function hideAddExercise(): void {
-  showWorkoutScreen('workout-active');
-}
-
-function filterByCategory(category: string): void {
-  currentCategoryFilter = category;
-  updateCategoryPills();
-  filterAddExercises();
-}
-
-function updateCategoryPills(): void {
-  document.querySelectorAll('.category-pill').forEach(pill => {
-    const el = pill as HTMLElement;
-    if (el.dataset.category === currentCategoryFilter) {
-      el.className = 'category-pill bg-blue-600 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap';
-    } else {
-      el.className = 'category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap hover:bg-gray-600';
-    }
-  });
-}
-
-function toggleSort(field: string): void {
-  if (currentSort.field === field) {
-    currentSort.asc = !currentSort.asc;
-  } else {
-    currentSort.field = field;
-    currentSort.asc = true;
-  }
-  updateSortButtons();
-  filterAddExercises();
-}
-
-function updateSortButtons(): void {
-  const alphaBtn = $('sort-alpha');
-  const recentBtn = $('sort-recent');
-
-  if (currentSort.field === 'alpha') {
-    alphaBtn.className = 'text-blue-400';
-    alphaBtn.textContent = currentSort.asc ? 'A-Z' : 'Z-A';
-    recentBtn.className = 'text-gray-400';
-    recentBtn.textContent = 'Recent';
-  } else {
-    recentBtn.className = 'text-blue-400';
-    recentBtn.textContent = currentSort.asc ? 'Recent' : 'Oldest';
-    alphaBtn.className = 'text-gray-400';
-    alphaBtn.textContent = 'A-Z';
-  }
-}
-
-function filterAddExercises(): void {
-  const query = ($('add-exercise-search') as HTMLInputElement).value.toLowerCase();
-  let filtered = getAllExercises();
-
-  if (currentCategoryFilter !== 'all') {
-    filtered = filtered.filter(e => e.category === currentCategoryFilter);
-  }
-
-  if (query) {
-    filtered = filtered.filter(e => e.name.toLowerCase().includes(query));
-  }
-
-  if (currentSort.field === 'alpha') {
-    filtered.sort((a, b) => {
+function sortAddExercises(exercises: Exercise[]): Exercise[] {
+  const sorted = [...exercises];
+  if (addExerciseSort.field === 'alpha') {
+    sorted.sort((a, b) => {
       const cmp = a.name.localeCompare(b.name);
-      return currentSort.asc ? cmp : -cmp;
+      return addExerciseSort.asc ? cmp : -cmp;
     });
   } else {
     // Get current workout exercise names for smart ranking
     const currentExerciseNames = state.currentWorkout?.exercises.map(e => e.name) || [];
 
-    filtered.sort((a, b) => {
+    sorted.sort((a, b) => {
       // Get co-occurrence information
       const aCoOccurrence = getCoOccurrenceInfo(a.name, currentExerciseNames);
       const bCoOccurrence = getCoOccurrenceInfo(b.name, currentExerciseNames);
@@ -760,16 +691,110 @@ function filterAddExercises(): void {
       const aDate = getLastLoggedDate(a.name) || 0;
       const bDate = getLastLoggedDate(b.name) || 0;
       const cmp = bDate - aDate;
-      return currentSort.asc ? cmp : -cmp;
+      return addExerciseSort.asc ? cmp : -cmp;
     });
   }
-
-  renderAddExerciseList(filtered);
+  return sorted;
 }
 
-function renderAddExerciseList(exercises: Exercise[]): void {
-  const container = $('add-exercise-results');
-  container.innerHTML = exercises.map(e => {
+function toggleAddExerciseSort(field: string): void {
+  if (addExerciseSort.field === field) {
+    addExerciseSort.asc = !addExerciseSort.asc;
+  } else {
+    addExerciseSort.field = field;
+    addExerciseSort.asc = true;
+  }
+  updateAddExerciseSortButtons();
+  renderAddExerciseCategories();
+}
+
+function updateAddExerciseSortButtons(): void {
+  const alphaBtn = $('add-exercise-sort-alpha');
+  const recentBtn = $('add-exercise-sort-recent');
+
+  if (addExerciseSort.field === 'alpha') {
+    alphaBtn.className = 'text-blue-400';
+    alphaBtn.textContent = addExerciseSort.asc ? 'A-Z' : 'Z-A';
+    recentBtn.className = 'text-gray-400';
+    recentBtn.textContent = 'Recent';
+  } else {
+    recentBtn.className = 'text-blue-400';
+    recentBtn.textContent = addExerciseSort.asc ? 'Recent' : 'Oldest';
+    alphaBtn.className = 'text-gray-400';
+    alphaBtn.textContent = 'A-Z';
+  }
+}
+
+function renderAddExerciseCategories(): void {
+  const allExercises = getAllExercises();
+  const container = $('add-exercise-categories');
+
+  container.innerHTML = mainCategories.map(main => {
+    let exercises = allExercises.filter(e => main.subCategories.includes(e.category));
+    if (exercises.length === 0) return '';
+
+    exercises = sortAddExercises(exercises);
+    const isExpanded = expandedAddExerciseCategories.has(main.name);
+
+    return `
+      <div class="mb-4">
+        <button onclick="app.toggleAddExerciseCategory('${main.name}')" class="flex justify-between items-center w-full py-2 text-left">
+          <span class="font-medium text-gray-300">${main.name}</span>
+          <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
+          <span id="add-${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+        </button>
+        <div id="add-${main.name}-exercises" class="space-y-2 mt-2 ${isExpanded ? '' : 'hidden'}">
+          ${exercises.map(e => {
+            const lastLogged = getLastLoggedDate(e.name);
+            const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+            const latestPR = getLatestPRForExercise(e.name);
+            const prText = latestPR ? `★ ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
+            return `
+              <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600">
+                <div class="flex justify-between items-center">
+                  <span class="font-medium">${e.name}</span>
+                  ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+                </div>
+                ${prText ? `<div class="text-xs text-yellow-400 mt-1">${prText}</div>` : ''}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleAddExerciseCategory(category: string): void {
+  const exercises = $('add-' + category + '-exercises');
+  const arrow = $('add-' + category + '-arrow');
+  if (exercises.classList.contains('hidden')) {
+    exercises.classList.remove('hidden');
+    arrow.innerHTML = '&#9660;';
+    expandedAddExerciseCategories.add(category);
+  } else {
+    exercises.classList.add('hidden');
+    arrow.innerHTML = '&#9654;';
+    expandedAddExerciseCategories.delete(category);
+  }
+}
+
+function filterAddExerciseSearch(): void {
+  const query = ($('add-exercise-search') as HTMLInputElement).value.toLowerCase();
+  const categories = $('add-exercise-categories');
+  const results = $('add-exercise-search-results');
+
+  if (query.length === 0) {
+    categories.classList.remove('hidden');
+    results.classList.add('hidden');
+    return;
+  }
+
+  categories.classList.add('hidden');
+  results.classList.remove('hidden');
+
+  const filtered = sortAddExercises(getAllExercises().filter(e => e.name.toLowerCase().includes(query)));
+  results.innerHTML = filtered.map(e => {
     const lastLogged = getLastLoggedDate(e.name);
     const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
     const latestPR = getLatestPRForExercise(e.name);
@@ -785,6 +810,18 @@ function renderAddExerciseList(exercises: Exercise[]): void {
       </button>
     `;
   }).join('');
+}
+
+function showAddExercise(): void {
+  ($('add-exercise-search') as HTMLInputElement).value = '';
+  addExerciseSort = { field: 'recent', asc: true };
+  updateAddExerciseSortButtons();
+  renderAddExerciseCategories();
+  showWorkoutScreen('workout-add-exercise');
+}
+
+function hideAddExercise(): void {
+  showWorkoutScreen('workout-active');
 }
 
 function addExerciseToWorkout(name: string): void {
@@ -891,11 +928,15 @@ function copyWorkout(id: string): void {
 
 // ==================== EXERCISES TAB ====================
 const mainCategories = [
-  { name: 'Push', subCategories: ['Chest', 'Shoulders', 'Triceps'] },
-  { name: 'Pull', subCategories: ['Back', 'Biceps'] },
+  { name: 'Chest', subCategories: ['Chest'] },
+  { name: 'Shoulders', subCategories: ['Shoulders'] },
+  { name: 'Triceps', subCategories: ['Triceps'] },
+  { name: 'Back', subCategories: ['Back'] },
+  { name: 'Biceps', subCategories: ['Biceps'] },
   { name: 'Legs', subCategories: ['Legs'] },
   { name: 'Core', subCategories: ['Core'] },
-  { name: 'Other', subCategories: ['Cardio', 'Other'] },
+  { name: 'Cardio', subCategories: ['Cardio'] },
+  { name: 'Other', subCategories: ['Other'] },
 ];
 
 let exerciseTabSort = { field: 'recent', asc: true };
@@ -1354,7 +1395,6 @@ async function init(): Promise<void> {
     try {
       currentUser = await api.getCurrentUser();
       await loadData();
-      renderAddExerciseList(getAllExercises());
     } catch {
       // Token invalid or expired - switch back to auth screen
       api.logout();
@@ -1371,9 +1411,9 @@ async function init(): Promise<void> {
   finishWorkout,
   showAddExercise,
   hideAddExercise,
-  filterByCategory,
-  toggleSort,
-  filterAddExercises,
+  toggleAddExerciseSort,
+  toggleAddExerciseCategory,
+  filterAddExerciseSearch,
   addExerciseToWorkout,
   showAddSetForm,
   hideAddSetForm,

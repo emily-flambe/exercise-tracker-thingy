@@ -168,6 +168,7 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
         note: s.note ?? undefined,
         isPR,
         completed: s.completed === 1,
+        missed: s.missed === 1,
       };
     });
 
@@ -203,8 +204,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     for (let j = 0; j < ex.sets.length; j++) {
       const set = ex.sets[j];
       await db
-        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0)
+        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed, missed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0, set.missed === true ? 1 : 0)
         .run();
     }
   }
@@ -249,8 +250,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
     for (let j = 0; j < ex.sets.length; j++) {
       const set = ex.sets[j];
       await db
-        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0)
+        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed, missed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0, set.missed === true ? 1 : 0)
         .run();
     }
   }
@@ -422,15 +423,15 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
     for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
       const set = exercise.sets[setIndex];
 
-      // Skip sets that are explicitly marked as incomplete
+      // Skip sets that are explicitly marked as incomplete or missed
       // Treat undefined/null as completed for backward compatibility
-      if (set.completed === false) {
+      if (set.completed === false || set.missed === true) {
         continue;
       }
 
       // Check if this weight+reps combo is a PR
       // A PR is when at this weight, the reps are higher than any previous workout
-      // Only consider previously completed sets (treat NULL as completed for backward compatibility)
+      // Only consider previously completed sets that are not missed (treat NULL as completed for backward compatibility)
       const previousBest = await db
         .prepare(`
           SELECT MAX(s.reps) as max_reps
@@ -442,6 +443,7 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
             AND s.weight = ?
             AND w.start_time < ?
             AND (s.completed = 1 OR s.completed IS NULL)
+            AND (s.missed = 0 OR s.missed IS NULL)
         `)
         .bind(userId, exercise.name, set.weight, startTime)
         .first<{ max_reps: number | null }>();

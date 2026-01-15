@@ -332,10 +332,34 @@ export async function updateCustomExercise(db: D1Database, id: string, userId: s
   const existing = await getCustomExercise(db, id, userId);
   if (!existing) return null;
 
+  const oldName = existing.name;
+  const newName = data.name;
+
+  // Update the custom exercise
   await db
     .prepare('UPDATE custom_exercises SET name = ?, type = ?, category = ?, unit = ? WHERE id = ?')
-    .bind(data.name, data.type, data.category, data.unit, id)
+    .bind(newName, data.type, data.category, data.unit, id)
     .run();
+
+  // If the name changed, sync it across all workout_exercises and personal_records
+  if (oldName !== newName) {
+    // Update all workout_exercises that reference the old name
+    await db
+      .prepare(`
+        UPDATE workout_exercises
+        SET exercise_name = ?
+        WHERE exercise_name = ?
+          AND workout_id IN (SELECT id FROM workouts WHERE user_id = ?)
+      `)
+      .bind(newName, oldName, userId)
+      .run();
+
+    // Update all personal_records that reference the old name
+    await db
+      .prepare('UPDATE personal_records SET exercise_name = ? WHERE exercise_name = ? AND user_id = ?')
+      .bind(newName, oldName, userId)
+      .run();
+  }
 
   return getCustomExercise(db, id, userId);
 }

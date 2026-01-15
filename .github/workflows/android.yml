@@ -29,7 +29,20 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Check if current commit already has a tag
+        id: check_tag
+        run: |
+          # Check if this commit already has a version tag
+          EXISTING_TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -n "$EXISTING_TAG" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Commit already tagged with $EXISTING_TAG, skipping build"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Determine next version
+        if: steps.check_tag.outputs.skip != 'true'
         id: version
         run: |
           # Get the latest tag
@@ -55,18 +68,23 @@ jobs:
           echo "Next version: v$NEW_VERSION"
 
       - name: Set version in package.json
+        if: steps.check_tag.outputs.skip != 'true'
         run: npm pkg set version=${{ steps.version.outputs.version }}
 
       - name: Install dependencies
+        if: steps.check_tag.outputs.skip != 'true'
         run: npm ci
 
       - name: Build web and sync Capacitor
+        if: steps.check_tag.outputs.skip != 'true'
         run: npm run cap:sync
 
       - name: Decode keystore
+        if: steps.check_tag.outputs.skip != 'true'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
 
       - name: Build release APK
+        if: steps.check_tag.outputs.skip != 'true'
         working-directory: android
         env:
           KEYSTORE_FILE: release.keystore
@@ -76,11 +94,13 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: Rename APK with version
+        if: steps.check_tag.outputs.skip != 'true'
         run: |
           VERSION="${{ steps.version.outputs.tag }}"
           mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/workout-tracker-${VERSION}.apk
 
       - name: Create and push tag
+        if: steps.check_tag.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -88,6 +108,7 @@ jobs:
           git push origin ${{ steps.version.outputs.tag }}
 
       - name: Create Release
+        if: steps.check_tag.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

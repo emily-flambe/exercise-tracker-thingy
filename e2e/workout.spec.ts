@@ -232,6 +232,257 @@ test.describe('Workout Tracker', () => {
   });
 });
 
+test.describe('Calendar View', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+
+    // Clear any existing tokens and reload
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    // Generate unique username for each test
+    const testUsername = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Register a new user
+    await page.click('#auth-register-tab');
+    await page.fill('#auth-username', testUsername);
+    await page.fill('#auth-password', testPassword);
+    await page.click('#auth-submit-btn');
+
+    // Wait for main app to be visible
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should show calendar view in history tab after completing workout', async ({ page }) => {
+    // Create a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Finish workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for workout to be saved
+    await page.waitForTimeout(500);
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Should see calendar elements
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+
+    // Should see day headers
+    await expect(page.getByText('Sun', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mon', { exact: true })).toBeVisible();
+    await expect(page.getByText('Tue', { exact: true })).toBeVisible();
+
+    // Should see today highlighted with workout
+    const todayCell = page.locator('.ring-2.ring-green-400');
+    await expect(todayCell).toBeVisible();
+
+    // Should show workout count on today's cell
+    const workoutCount = todayCell.locator('.text-blue-200');
+    await expect(workoutCount).toBeVisible();
+    await expect(workoutCount).toContainText('1');
+  });
+
+  test('should navigate between months in calendar', async ({ page }) => {
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+
+    // Click next month button
+    await page.locator('button').filter({ has: page.locator('path[d*="M9 5l7 7-7 7"]') }).click();
+
+    // Should show next month
+    const nextMonthDate = new Date();
+    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+    const nextMonth = nextMonthDate.toLocaleString('default', { month: 'long' });
+    const nextYear = nextMonthDate.getFullYear();
+    await expect(page.getByText(`${nextMonth} ${nextYear}`)).toBeVisible();
+
+    // Should show "Today" button when not on current month
+    await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
+
+    // Click previous month twice to go back
+    await page.locator('button').filter({ has: page.locator('path[d*="M15 19l-7-7 7-7"]') }).click();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+  });
+
+  test('should navigate to today when clicking Today button', async ({ page }) => {
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Go to next month
+    await page.locator('button').filter({ has: page.locator('path[d*="M9 5l7 7-7 7"]') }).click();
+
+    // Should see Today button
+    await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
+
+    // Click Today button
+    await page.getByRole('button', { name: 'Today' }).click();
+
+    // Should be back to current month
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+
+    // Today button should not be visible on current month
+    await expect(page.getByRole('button', { name: 'Today' })).not.toBeVisible();
+  });
+
+  test('should open workout when clicking on day with workout', async ({ page }) => {
+    // Create a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Finish workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Click on today's workout cell
+    const today = new Date().getDate();
+    await page.locator('.ring-2.ring-green-400').click();
+
+    // Should navigate to workout tab showing the workout
+    await expect(page.locator('#tab-workout.tab-content.active')).toBeVisible();
+    await expect(page.getByText('Bench Press')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+  });
+
+  test('should not show "Copy to new workout" button', async ({ page }) => {
+    // Create a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Finish workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Verify calendar is showing
+    await expect(page.getByText('Sun', { exact: true })).toBeVisible();
+
+    // Should not see "Copy to new workout" button anywhere on page
+    const copyButton = page.getByText('Copy to new workout');
+    await expect(copyButton).toHaveCount(0);
+  });
+
+  test('should show multiple workouts for same day', async ({ page }) => {
+    // Create first workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for save
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Create second workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Squat', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '185');
+    await page.fill('input[placeholder="reps"]', '8');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Should show 2 workouts on today's date (click on today's cell which has green ring)
+    const todayCell = page.locator('.ring-2.ring-green-400');
+    await expect(todayCell).toBeVisible();
+
+    const workoutCount = todayCell.locator('.text-blue-200');
+    await expect(workoutCount).toBeVisible();
+    await expect(workoutCount).toContainText('2');
+
+    // Click on today
+    await page.locator('.ring-2.ring-green-400').click();
+
+    // Should show day view with both workouts
+    await expect(page.getByText('Back to calendar')).toBeVisible();
+    await expect(page.getByText('Bench Press')).toBeVisible();
+    await expect(page.getByText('Squat')).toBeVisible();
+  });
+
+  test('should return to calendar from day view', async ({ page }) => {
+    // Create a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for save
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Create second workout for same day to trigger day view
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Squat', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '185');
+    await page.fill('input[placeholder="reps"]', '8');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Click on today to open day view (today has green ring)
+    await page.locator('.ring-2.ring-green-400').click();
+
+    // Should be in day view
+    await expect(page.getByText('Back to calendar')).toBeVisible();
+
+    // Click back to calendar
+    await page.getByText('Back to calendar').click();
+
+    // Should be back to calendar view
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+  });
+});
+
 test.describe('Authentication', () => {
   test('should show login screen by default', async ({ page }) => {
     await page.goto('/');

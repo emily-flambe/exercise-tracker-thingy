@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS sets (
   note TEXT,
   position INTEGER NOT NULL,
   completed INTEGER NOT NULL DEFAULT 0,
+  missed INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (workout_exercise_id) REFERENCES workout_exercises(id) ON DELETE CASCADE
 );
 

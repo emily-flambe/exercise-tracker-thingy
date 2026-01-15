@@ -100,6 +100,7 @@ export interface Set {
   note?: string;
   isPR?: boolean;
   completed?: boolean;
+  missed?: boolean;
 }
 
 export interface WorkoutExercise {

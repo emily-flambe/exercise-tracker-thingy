@@ -772,8 +772,6 @@ function renderAddExerciseList(exercises: Exercise[]): void {
   container.innerHTML = exercises.map(e => {
     const lastLogged = getLastLoggedDate(e.name);
     const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
-    const latestPR = getLatestPRForExercise(e.name);
-    const prText = latestPR ? `★ ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
 
     return `
       <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600">
@@ -781,7 +779,6 @@ function renderAddExerciseList(exercises: Exercise[]): void {
           <span class="font-medium">${e.name}</span>
           ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
         </div>
-        ${prText ? `<div class="text-xs text-yellow-400 mt-1">${prText}</div>` : ''}
       </button>
     `;
   }).join('');

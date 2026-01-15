@@ -149,6 +149,87 @@ test.describe('Workout Tracker', () => {
     // Wait for the button title to change from "Add note" to "Edit note"
     await expect(page.locator('button[title="Edit note"]').first()).toBeVisible({ timeout: 10000 });
   });
+
+  test('should show dim PR star for unconfirmed sets and bright star when confirmed', async ({ page }) => {
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add first set - should be a PR since it's the first at this weight
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Wait for the set to be added and verify star exists and is dim
+    const dimStar = page.locator('span.opacity-40').filter({ hasText: '★' });
+    await expect(dimStar).toBeVisible();
+
+    // Click the checkmark to confirm the set
+    const checkmarkButton = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
+    await checkmarkButton.click();
+
+    // After clicking, the dim star should not be visible and a bright star should appear
+    await expect(dimStar).not.toBeVisible();
+    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'));
+    await expect(brightStar).toBeVisible();
+
+    // Click checkmark again to unconfirm
+    await checkmarkButton.click();
+
+    // Dim star should be visible again
+    await expect(dimStar).toBeVisible();
+  });
+
+  test('should show bright PR star only when set beats previous record and is confirmed', async ({ page }) => {
+    // Start first workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set with 8 reps (will be dim PR)
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '8');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Verify dim star appears
+    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
+
+    // Confirm the set
+    const firstCheckmark = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
+    await firstCheckmark.click();
+
+    // Finish workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for workout to be saved and navigate back to empty screen
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Start second workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set with 10 reps (beats previous 8, should be dim PR initially)
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Verify star is dim initially
+    const dimStar = page.locator('span.opacity-40').filter({ hasText: '★' });
+    await expect(dimStar).toBeVisible();
+
+    // Confirm the set
+    const secondCheckmark = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
+    await secondCheckmark.click();
+
+    // Dim star should disappear and bright star should appear
+    await expect(dimStar).not.toBeVisible();
+    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' });
+    await expect(brightStar).toBeVisible();
+  });
 });
 
 test.describe('Authentication', () => {

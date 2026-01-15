@@ -131,9 +131,29 @@ JWT_SECRET=your-secret-here
 
 ## CI/CD
 
+### Workflows
 - `.github/workflows/ci-feature.yml` - Runs build check on `claude/**` branches
+- `.github/workflows/pr-tests.yml` - Runs typecheck, unit tests, build, and e2e tests on `claude/**` branches
 - `.github/workflows/android.yml` - Android build workflow
 - `.github/workflows/migrate-db.yml` - Database migration workflow
+
+### CI Monitoring Requirements
+**CRITICAL:** Always verify CI passes before considering work complete:
+
+1. **After pushing changes**, immediately check that all CI workflows pass
+2. **Before amending commits**, ensure previous CI run completed successfully
+3. **For e2e test changes**, verify tests pass in CI environment (not just locally)
+4. **Common CI failures:**
+   - E2E tests with stale element references (re-query elements after re-renders)
+   - Missing `.dev.vars` file (created automatically by pr-tests.yml)
+   - Database not initialized (done by pr-tests.yml)
+   - Playwright browser installation issues (handled by pr-tests.yml)
+
+5. **If CI fails:**
+   - Read the error logs carefully
+   - Fix the issue locally
+   - Amend the commit (don't create new commits for CI fixes)
+   - Push again and verify CI passes
 
 ## Common Patterns
 

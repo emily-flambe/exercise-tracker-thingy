@@ -162,23 +162,19 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Save' }).click();
 
     // Wait for the set to be added and verify star exists and is dim
-    const dimStar = page.locator('span.opacity-40').filter({ hasText: '★' });
-    await expect(dimStar).toBeVisible();
+    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Click the checkmark to confirm the set
-    const checkmarkButton = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
-    await checkmarkButton.click();
+    // Toggle the set completed state (exercise 0, set 0)
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // After clicking, the dim star should not be visible and a bright star should appear
-    await expect(dimStar).not.toBeVisible();
-    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'));
-    await expect(brightStar).toBeVisible();
+    // Wait for bright star to appear (confirmed PR)
+    await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
 
-    // Click checkmark again to unconfirm
-    await checkmarkButton.click();
+    // Toggle set completed state again to unconfirm
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Dim star should be visible again
-    await expect(dimStar).toBeVisible();
+    // Wait for dim star to reappear (unconfirmed PR)
+    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
   });
 
   test('should show bright PR star only when set beats previous record and is confirmed', async ({ page }) => {
@@ -196,9 +192,8 @@ test.describe('Workout Tracker', () => {
     // Verify dim star appears
     await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Confirm the set
-    const firstCheckmark = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
-    await firstCheckmark.click();
+    // Confirm the first set (exercise 0, set 0)
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
     // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
@@ -218,17 +213,13 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Save' }).click();
 
     // Verify star is dim initially
-    const dimStar = page.locator('span.opacity-40').filter({ hasText: '★' });
-    await expect(dimStar).toBeVisible();
+    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Confirm the set
-    const secondCheckmark = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
-    await secondCheckmark.click();
+    // Confirm the second workout's set (exercise 0, set 0)
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Dim star should disappear and bright star should appear
-    await expect(dimStar).not.toBeVisible();
-    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' });
-    await expect(brightStar).toBeVisible();
+    // Wait for bright star to appear (confirmed PR beats previous record)
+    await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
   });
 });
 

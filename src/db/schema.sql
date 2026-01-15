@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS workout_exercises (
 -- Index for looking up exercises in a workout
 CREATE INDEX IF NOT EXISTS idx_workout_exercises_workout ON workout_exercises(workout_id);
 
+-- Index for looking up exercises by name (for updates when exercise is renamed)
+CREATE INDEX IF NOT EXISTS idx_workout_exercises_name ON workout_exercises(exercise_name);
+
 -- Sets (individual sets within a workout exercise)
 CREATE TABLE IF NOT EXISTS sets (
   id TEXT PRIMARY KEY,

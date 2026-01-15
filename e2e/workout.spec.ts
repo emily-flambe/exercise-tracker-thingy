@@ -44,6 +44,7 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
     await expect(page.locator('#exercise-list').getByText('+bar weight')).toBeVisible();
@@ -83,6 +84,7 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
@@ -99,6 +101,7 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
@@ -118,6 +121,7 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
@@ -137,6 +141,7 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
@@ -159,6 +164,7 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add first set - should be a PR since it's the first at this weight
@@ -192,6 +198,7 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set with 8 reps (will be dim PR)
@@ -217,6 +224,7 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set with 10 reps (beats previous 8, should be dim PR initially)

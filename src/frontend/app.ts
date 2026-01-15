@@ -1245,18 +1245,12 @@ async function clearAllData(): Promise<void> {
 }
 
 // ==================== AUTH ====================
-function hideLoadingScreen(): void {
-  $('loading-screen').classList.add('hidden');
-}
-
 function showAuthScreen(): void {
-  hideLoadingScreen();
   $('auth-screen').classList.remove('hidden');
   $('main-app').classList.add('hidden');
 }
 
 function showMainApp(): void {
-  hideLoadingScreen();
   $('auth-screen').classList.add('hidden');
   $('main-app').classList.remove('hidden');
   if (currentUser) {
@@ -1348,15 +1342,13 @@ async function init(): Promise<void> {
 
   // Check if already authenticated
   if (api.isAuthenticated()) {
-    // Show main app immediately to avoid flash, verify token in background
-    showMainApp();
-
     try {
       currentUser = await api.getCurrentUser();
       await loadData();
+      showMainApp();
       renderAddExerciseList(getAllExercises());
     } catch {
-      // Token invalid or expired - switch back to auth screen
+      // Token invalid or expired
       api.logout();
       showAuthScreen();
     }

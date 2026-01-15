@@ -44,6 +44,7 @@ const state: AppState = {
 };
 
 let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
+let workoutExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
@@ -831,6 +832,59 @@ function addExerciseToWorkout(name: string): void {
   scheduleAutoSave();
 }
 
+function showCreateExerciseFromWorkout(): void {
+  $input('workout-exercise-name-input').value = '';
+  $select('workout-exercise-category-input').value = 'Other';
+  document.querySelectorAll('input[name="workout-weight-type"]').forEach(r => {
+    (r as HTMLInputElement).checked = false;
+  });
+  (document.querySelector('input[name="workout-weight-type"][value="total"]') as HTMLInputElement).checked = true;
+  setWorkoutExerciseUnit('lbs');
+  showWorkoutScreen('workout-create-exercise');
+}
+
+function cancelCreateExerciseFromWorkout(): void {
+  showWorkoutScreen('workout-add-exercise');
+}
+
+function setWorkoutExerciseUnit(unit: 'lbs' | 'kg'): void {
+  workoutExerciseUnit = unit;
+  $('workout-exercise-unit-lbs').className = unit === 'lbs' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+  $('workout-exercise-unit-kg').className = unit === 'kg' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+}
+
+async function saveExerciseFromWorkout(): Promise<void> {
+  const name = $input('workout-exercise-name-input').value.trim();
+  const category = $select('workout-exercise-category-input').value;
+  const typeInput = document.querySelector('input[name="workout-weight-type"]:checked') as HTMLInputElement | null;
+  const unit = workoutExerciseUnit;
+
+  if (!name) {
+    alert('Please enter an exercise name');
+    return;
+  }
+  if (!typeInput) {
+    alert('Please select a weight type');
+    return;
+  }
+
+  const type = typeInput.value as 'total' | '/side' | '+bar' | 'bodyweight';
+
+  try {
+    await api.createCustomExercise({ name, type, category, unit });
+    await loadData();
+
+    // Add the newly created exercise to the current workout
+    state.currentWorkout!.exercises.push({ name, sets: [], completed: false });
+    renderWorkout();
+    showWorkoutScreen('workout-active');
+    scheduleAutoSave();
+  } catch (error) {
+    console.error('Failed to save exercise:', error);
+    alert('Failed to save exercise');
+  }
+}
+
 // ==================== HISTORY ====================
 function renderHistory(): void {
   const list = $('history-list');
@@ -1415,6 +1469,10 @@ async function init(): Promise<void> {
   toggleAddExerciseCategory,
   filterAddExerciseSearch,
   addExerciseToWorkout,
+  showCreateExerciseFromWorkout,
+  cancelCreateExerciseFromWorkout,
+  setWorkoutExerciseUnit,
+  saveExerciseFromWorkout,
   showAddSetForm,
   hideAddSetForm,
   saveSetInline,

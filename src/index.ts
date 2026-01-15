@@ -12,7 +12,7 @@ const app = new Hono<{ Bindings: Env }>();
 // Enable CORS for all routes
 app.use('*', cors());
 
-// Health check
+// Health check endpoint
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: Date.now() });
 });

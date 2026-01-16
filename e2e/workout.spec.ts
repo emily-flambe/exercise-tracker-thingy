@@ -264,7 +264,9 @@ test.describe('Calendar View', () => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -353,7 +355,9 @@ test.describe('Calendar View', () => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -381,7 +385,9 @@ test.describe('Calendar View', () => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -407,7 +413,9 @@ test.describe('Calendar View', () => {
     // Create first workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
@@ -420,7 +428,9 @@ test.describe('Calendar View', () => {
     // Create second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Squat', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Squat');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Squat', { exact: true }).click();
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '185');
     await page.fill('input[placeholder="reps"]', '8');
@@ -451,7 +461,9 @@ test.describe('Calendar View', () => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
@@ -464,7 +476,9 @@ test.describe('Calendar View', () => {
     // Create second workout for same day to trigger day view
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Squat', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Squat');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Squat', { exact: true }).click();
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '185');
     await page.fill('input[placeholder="reps"]', '8');

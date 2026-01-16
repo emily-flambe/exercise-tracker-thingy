@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
-import { createUser, createWorkout, getWorkout } from './queries';
+import {
+  createUser,
+  createWorkout,
+  getWorkout,
+  createCustomExercise,
+  updateCustomExercise,
+  getAllCustomExercises,
+  getPRsForExercise
+} from './queries';
 import type { CreateWorkoutRequest } from '../types';
 
 describe('PR Detection', () => {
@@ -316,5 +324,245 @@ describe('PR Detection', () => {
 
     // Should be PR because sets without completed flag are treated as completed
     expect(result.exercises[0].sets[0].isPR).toBe(true);
+  });
+});
+
+describe('Exercise Rename Synchronization', () => {
+  let userId: string;
+  const testUsername = 'testuser_rename';
+  const testPasswordHash = 'hash123';
+
+  beforeEach(async () => {
+    // Clean up any existing test data
+    await env.DB.prepare('DELETE FROM users WHERE username = ?').bind(testUsername).run();
+
+    // Create a test user
+    const user = await createUser(env.DB, testUsername, testPasswordHash);
+    userId = user.id;
+  });
+
+  it('should update workout_exercises when exercise is renamed', async () => {
+    // Create a custom exercise
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Old Exercise Name',
+      type: 'total',
+      category: 'Chest',
+      unit: 'lbs'
+    });
+
+    // Create a workout using this exercise
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Old Exercise Name',
+          sets: [
+            { weight: 100, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const createdWorkout = await createWorkout(env.DB, userId, workout);
+
+    // Verify workout uses old name
+    expect(createdWorkout.exercises[0].name).toBe('Old Exercise Name');
+
+    // Rename the exercise
+    await updateCustomExercise(env.DB, exercise.id, userId, {
+      name: 'New Exercise Name',
+      type: 'total',
+      category: 'Chest',
+      unit: 'lbs'
+    });
+
+    // Fetch the workout again
+    const updatedWorkout = await getWorkout(env.DB, createdWorkout.id, userId);
+
+    // Verify workout now uses new name
+    expect(updatedWorkout?.exercises[0].name).toBe('New Exercise Name');
+  });
+
+  it('should update personal_records when exercise is renamed', async () => {
+    // Create a custom exercise
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Press Exercise',
+      type: 'total',
+      category: 'Shoulders',
+      unit: 'lbs'
+    });
+
+    // Create a workout with a PR
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Press Exercise',
+          sets: [
+            { weight: 100, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    await createWorkout(env.DB, userId, workout);
+
+    // Verify PR exists with old name
+    const oldPRs = await getPRsForExercise(env.DB, userId, 'Press Exercise');
+    expect(oldPRs.length).toBe(1);
+    expect(oldPRs[0].exercise_name).toBe('Press Exercise');
+
+    // Rename the exercise
+    await updateCustomExercise(env.DB, exercise.id, userId, {
+      name: 'Renamed Press',
+      type: 'total',
+      category: 'Shoulders',
+      unit: 'lbs'
+    });
+
+    // Verify PR now uses new name
+    const newPRs = await getPRsForExercise(env.DB, userId, 'Renamed Press');
+    expect(newPRs.length).toBe(1);
+    expect(newPRs[0].exercise_name).toBe('Renamed Press');
+
+    // Verify old name has no PRs
+    const oldNamePRs = await getPRsForExercise(env.DB, userId, 'Press Exercise');
+    expect(oldNamePRs.length).toBe(0);
+  });
+
+  it('should update multiple workouts when exercise is renamed', async () => {
+    // Create a custom exercise
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Multi Workout Exercise',
+      type: 'total',
+      category: 'Back',
+      unit: 'lbs'
+    });
+
+    // Create multiple workouts using this exercise
+    const workout1: CreateWorkoutRequest = {
+      start_time: Date.now() - 86400000,
+      end_time: Date.now() - 86400000 + 3600000,
+      exercises: [
+        {
+          name: 'Multi Workout Exercise',
+          sets: [{ weight: 100, reps: 8, completed: true }]
+        }
+      ]
+    };
+    const workout2: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Multi Workout Exercise',
+          sets: [{ weight: 100, reps: 10, completed: true }]
+        }
+      ]
+    };
+
+    const created1 = await createWorkout(env.DB, userId, workout1);
+    const created2 = await createWorkout(env.DB, userId, workout2);
+
+    // Rename the exercise
+    await updateCustomExercise(env.DB, exercise.id, userId, {
+      name: 'Renamed Multi',
+      type: 'total',
+      category: 'Back',
+      unit: 'lbs'
+    });
+
+    // Verify both workouts now use new name
+    const updated1 = await getWorkout(env.DB, created1.id, userId);
+    const updated2 = await getWorkout(env.DB, created2.id, userId);
+
+    expect(updated1?.exercises[0].name).toBe('Renamed Multi');
+    expect(updated2?.exercises[0].name).toBe('Renamed Multi');
+  });
+
+  it('should not update workout_exercises when only type/category/unit changes', async () => {
+    // Create a custom exercise
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Consistent Name',
+      type: 'total',
+      category: 'Chest',
+      unit: 'lbs'
+    });
+
+    // Create a workout
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Consistent Name',
+          sets: [{ weight: 100, reps: 10, completed: true }]
+        }
+      ]
+    };
+    const createdWorkout = await createWorkout(env.DB, userId, workout);
+
+    // Update only type, category, and unit (not name)
+    await updateCustomExercise(env.DB, exercise.id, userId, {
+      name: 'Consistent Name',
+      type: '+bar',
+      category: 'Shoulders',
+      unit: 'kg'
+    });
+
+    // Verify workout still has same name
+    const updatedWorkout = await getWorkout(env.DB, createdWorkout.id, userId);
+    expect(updatedWorkout?.exercises[0].name).toBe('Consistent Name');
+  });
+
+  it('should only update exercises for the specific user when renamed', async () => {
+    // Create second user
+    const user2 = await createUser(env.DB, 'testuser_rename2', 'hash456');
+
+    // Both users create exercise with same name
+    const exercise1 = await createCustomExercise(env.DB, userId, {
+      name: 'Shared Name',
+      type: 'total',
+      category: 'Chest',
+      unit: 'lbs'
+    });
+
+    const exercise2 = await createCustomExercise(env.DB, user2.id, {
+      name: 'Shared Name',
+      type: 'total',
+      category: 'Back',
+      unit: 'kg'
+    });
+
+    // Both users create workouts
+    const workout1: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Shared Name',
+          sets: [{ weight: 100, reps: 10, completed: true }]
+        }
+      ]
+    };
+
+    const created1 = await createWorkout(env.DB, userId, workout1);
+    const created2 = await createWorkout(env.DB, user2.id, workout1);
+
+    // User 1 renames their exercise
+    await updateCustomExercise(env.DB, exercise1.id, userId, {
+      name: 'User1 Renamed',
+      type: 'total',
+      category: 'Chest',
+      unit: 'lbs'
+    });
+
+    // Verify user 1's workout is updated
+    const updated1 = await getWorkout(env.DB, created1.id, userId);
+    expect(updated1?.exercises[0].name).toBe('User1 Renamed');
+
+    // Verify user 2's workout is NOT updated
+    const updated2 = await getWorkout(env.DB, created2.id, user2.id);
+    expect(updated2?.exercises[0].name).toBe('Shared Name');
   });
 });

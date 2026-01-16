@@ -168,6 +168,7 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
         note: s.note ?? undefined,
         isPR,
         completed: s.completed === 1,
+        missed: s.missed === 1,
       };
     });
 
@@ -203,8 +204,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     for (let j = 0; j < ex.sets.length; j++) {
       const set = ex.sets[j];
       await db
-        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0)
+        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed, missed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0, set.missed === true ? 1 : 0)
         .run();
     }
   }
@@ -249,8 +250,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
     for (let j = 0; j < ex.sets.length; j++) {
       const set = ex.sets[j];
       await db
-        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0)
+        .prepare('INSERT INTO sets (id, workout_exercise_id, weight, reps, note, position, completed, missed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(generateId(), exId, set.weight, set.reps, set.note ?? null, j, set.completed === true ? 1 : 0, set.missed === true ? 1 : 0)
         .run();
     }
   }
@@ -332,10 +333,34 @@ export async function updateCustomExercise(db: D1Database, id: string, userId: s
   const existing = await getCustomExercise(db, id, userId);
   if (!existing) return null;
 
+  const oldName = existing.name;
+  const newName = data.name;
+
+  // Update the custom exercise
   await db
     .prepare('UPDATE custom_exercises SET name = ?, type = ?, category = ?, unit = ? WHERE id = ?')
-    .bind(data.name, data.type, data.category, data.unit, id)
+    .bind(newName, data.type, data.category, data.unit, id)
     .run();
+
+  // If the name changed, sync it across all workout_exercises and personal_records
+  if (oldName !== newName) {
+    // Update all workout_exercises that reference the old name
+    await db
+      .prepare(`
+        UPDATE workout_exercises
+        SET exercise_name = ?
+        WHERE exercise_name = ?
+          AND workout_id IN (SELECT id FROM workouts WHERE user_id = ?)
+      `)
+      .bind(newName, oldName, userId)
+      .run();
+
+    // Update all personal_records that reference the old name
+    await db
+      .prepare('UPDATE personal_records SET exercise_name = ? WHERE exercise_name = ? AND user_id = ?')
+      .bind(newName, oldName, userId)
+      .run();
+  }
 
   return getCustomExercise(db, id, userId);
 }
@@ -422,15 +447,15 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
     for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
       const set = exercise.sets[setIndex];
 
-      // Skip sets that are explicitly marked as incomplete
+      // Skip sets that are explicitly marked as incomplete or missed
       // Treat undefined/null as completed for backward compatibility
-      if (set.completed === false) {
+      if (set.completed === false || set.missed === true) {
         continue;
       }
 
       // Check if this weight+reps combo is a PR
       // A PR is when at this weight, the reps are higher than any previous workout
-      // Only consider previously completed sets (treat NULL as completed for backward compatibility)
+      // Only consider previously completed sets that are not missed (treat NULL as completed for backward compatibility)
       const previousBest = await db
         .prepare(`
           SELECT MAX(s.reps) as max_reps
@@ -442,6 +467,7 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
             AND s.weight = ?
             AND w.start_time < ?
             AND (s.completed = 1 OR s.completed IS NULL)
+            AND (s.missed = 0 OR s.missed IS NULL)
         `)
         .bind(userId, exercise.name, set.weight, startTime)
         .first<{ max_reps: number | null }>();

@@ -32,6 +32,7 @@ export interface Set {
   note?: string;
   isPR?: boolean;
   completed?: boolean;
+  missed?: boolean;
 }
 
 export interface WorkoutExercise {
@@ -74,6 +75,7 @@ export interface SetRow {
   note: string | null;
   position: number;
   completed: number;
+  missed: number;
 }
 
 export interface CustomExerciseRow {

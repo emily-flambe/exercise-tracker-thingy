@@ -75,27 +75,90 @@
           <header class="flex justify-between items-center mb-4 pt-2">
             <button onclick="app.hideAddExercise()" class="text-blue-400">Cancel</button>
             <h1 class="text-lg font-semibold">Add Exercise</h1>
-            <span class="w-12"></span>
+            <button onclick="app.showCreateExerciseFromWorkout()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-3 py-1 rounded text-sm">
+              + New
+            </button>
           </header>
-          <div class="flex gap-2 mb-3 overflow-x-auto" id="category-pills">
-            <button onclick="app.filterByCategory('all')" class="category-pill bg-blue-600 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="all">All</button>
-            <button onclick="app.filterByCategory('Chest')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Chest">Chest</button>
-            <button onclick="app.filterByCategory('Shoulders')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Shoulders">Shoulders</button>
-            <button onclick="app.filterByCategory('Triceps')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Triceps">Triceps</button>
-            <button onclick="app.filterByCategory('Back')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Back">Back</button>
-            <button onclick="app.filterByCategory('Biceps')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Biceps">Biceps</button>
-            <button onclick="app.filterByCategory('Legs')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Legs">Legs</button>
-            <button onclick="app.filterByCategory('Core')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Core">Core</button>
-            <button onclick="app.filterByCategory('Cardio')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Cardio">Cardio</button>
-            <button onclick="app.filterByCategory('Other')" class="category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap" data-category="Other">Other</button>
-          </div>
-          <div class="flex gap-2 mb-4 text-xs">
+          <div class="flex gap-2 mb-3 text-xs">
             <span class="text-gray-500">Sort:</span>
-            <button onclick="app.toggleSort('alpha')" id="sort-alpha" class="text-gray-400">A-Z</button>
-            <button onclick="app.toggleSort('recent')" id="sort-recent" class="text-blue-400">Recent</button>
+            <button onclick="app.toggleAddExerciseSort('alpha')" id="add-exercise-sort-alpha" class="text-gray-400">A-Z</button>
+            <button onclick="app.toggleAddExerciseSort('recent')" id="add-exercise-sort-recent" class="text-blue-400">Recent</button>
           </div>
-          <input type="text" id="add-exercise-search" placeholder="Search exercises..." oninput="app.filterAddExercises()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-blue-500">
-          <div class="space-y-2" id="add-exercise-results"></div>
+          <input type="text" id="add-exercise-search" placeholder="Search exercises..." oninput="app.filterAddExerciseSearch()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-blue-500">
+          <div id="add-exercise-categories"></div>
+          <div id="add-exercise-search-results" class="space-y-2 hidden"></div>
+        </div>
+
+        <div id="workout-create-exercise" class="screen p-4 hidden">
+          <header class="flex justify-between items-center mb-6 pt-2">
+            <button onclick="app.cancelCreateExerciseFromWorkout()" class="text-blue-400">Cancel</button>
+            <h1 class="text-lg font-semibold">New Exercise</h1>
+            <button onclick="app.saveExerciseFromWorkout()" class="text-green-400 font-medium">Save</button>
+          </header>
+
+          <div class="space-y-6">
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Exercise Name</label>
+              <input type="text" id="workout-exercise-name-input" placeholder="e.g., Bicep Curl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Category</label>
+              <select id="workout-exercise-category-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+                <option value="Chest">Chest</option>
+                <option value="Shoulders">Shoulders</option>
+                <option value="Triceps">Triceps</option>
+                <option value="Back">Back</option>
+                <option value="Biceps">Biceps</option>
+                <option value="Legs">Legs</option>
+                <option value="Core">Core</option>
+                <option value="Cardio">Cardio</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Unit</label>
+              <div class="flex gap-2 mb-6">
+                <button type="button" onclick="app.setWorkoutExerciseUnit('lbs')" id="workout-exercise-unit-lbs" class="bg-blue-600 px-4 py-2 rounded-lg text-sm">lbs</button>
+                <button type="button" onclick="app.setWorkoutExerciseUnit('kg')" id="workout-exercise-unit-kg" class="bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500">kg</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-3">Weight Type</label>
+              <div class="space-y-2">
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="workout-weight-type" value="total" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-cyan-400">Total Weight</div>
+                    <div class="text-xs text-gray-400">Log the total weight (e.g., cable machines)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="workout-weight-type" value="/side" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-purple-400">Per Side</div>
+                    <div class="text-xs text-gray-400">Weight on each side (e.g., dumbbells)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="workout-weight-type" value="+bar" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-yellow-500">Added Weight (+bar)</div>
+                    <div class="text-xs text-gray-400">Plates added to bar (e.g., bench press)</div>
+                  </div>
+                </label>
+                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
+                  <input type="radio" name="workout-weight-type" value="bodyweight" class="mr-3 accent-blue-500">
+                  <div>
+                    <div class="font-medium text-green-400">Bodyweight</div>
+                    <div class="text-xs text-gray-400">No external weight (e.g., pull-ups)</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

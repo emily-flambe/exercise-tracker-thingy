@@ -72,11 +72,11 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
     // Expand Chest category
-    await page.getByRole('button', { name: 'Chest', exact: true }).click();
+    await page.getByRole('button', { name: /^Chest/ }).click();
     await expect(page.locator('#add-Chest-exercises').getByText('Bench Press', { exact: true })).toBeVisible();
 
     // Expand Back category
-    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await page.getByRole('button', { name: /^Back/ }).click();
     await expect(page.locator('#add-Back-exercises').getByText('Lat Pulldown')).toBeVisible();
   });
 

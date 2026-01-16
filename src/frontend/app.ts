@@ -126,7 +126,7 @@ function showToast(message: string = 'Saved'): void {
 function calculateIsPR(exerciseName: string, weight: number, reps: number, exerciseIndex: number, setIndex: number): boolean {
   if (!state.currentWorkout) return false;
 
-  // Find the best reps at this weight in previous workouts (completed sets only)
+  // Find the best reps at this weight in previous workouts (completed and not missed sets only)
   let previousBestReps: number | null = null;
   for (const workout of state.history) {
     // Skip the workout being edited if we're editing
@@ -139,8 +139,8 @@ function calculateIsPR(exerciseName: string, weight: number, reps: number, exerc
     if (!exercise) continue;
 
     for (const set of exercise.sets) {
-      // Only consider completed sets (matching backend logic)
-      if (set.completed === false) continue;
+      // Only consider completed sets that are not missed (matching backend logic)
+      if (set.completed === false || set.missed === true) continue;
 
       if (set.weight === weight) {
         if (previousBestReps === null || set.reps > previousBestReps) {
@@ -163,8 +163,8 @@ function calculateIsPR(exerciseName: string, weight: number, reps: number, exerc
 
     for (let j = 0; j < maxSetIndex; j++) {
       const set = ex.sets[j];
-      // Only consider completed sets
-      if (set.completed === false) continue;
+      // Only consider completed sets that are not missed
+      if (set.completed === false || set.missed === true) continue;
 
       if (set.weight === weight) {
         if (currentWorkoutBestReps === null || set.reps > currentWorkoutBestReps) {
@@ -376,9 +376,13 @@ function renderWorkout(): void {
         ${ex.sets.length > 0 ? `
           ${ex.sets.map((set, si) => {
             const isSetCompleted = set.completed || false;
+            const isSetMissed = set.missed || false;
             const setCheckmarkIcon = isSetCompleted
               ? '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>'
               : '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+            const missIcon = isSetMissed
+              ? '<svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>'
+              : '<svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 7v6m0 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
             const hasNote = !!set.note;
             const isNoteExpanded = expandedNotes.has(i + '-' + si);
             const pencilColor = hasNote ? 'text-blue-400' : 'text-gray-500';
@@ -395,13 +399,20 @@ function renderWorkout(): void {
                 <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
                 <span class="text-gray-400 ${isSetCompleted ? 'line-through' : ''}">x</span>
                 <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
-                ${set.isPR ? (set.completed ? '<span class="text-yellow-400 text-lg">★</span>' : '<span class="text-yellow-400 text-lg opacity-40">★</span>') : ''}
+                ${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-yellow-400 text-lg">★</span>' : '<span class="text-yellow-400 text-lg opacity-40">★</span>') : ''}
+                <button onclick="app.toggleSetMissed(${i}, ${si})" class="flex-shrink-0 hover:opacity-80 transition-opacity" title="${isSetMissed ? 'Mark as not missed' : 'Mark as missed'}">
+                  ${missIcon}
+                </button>
                 <button onclick="app.toggleNoteField(${i}, ${si})" class="${pencilColor} text-sm hover:opacity-80 transition-opacity" title="${hasNote ? 'Edit note' : 'Add note'}">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                   </svg>
                 </button>
-                <button onclick="app.deleteSet(${i}, ${si})" class="text-red-400 text-xs px-2 hover:text-red-300">x</button>
+                <button onclick="app.deleteSet(${i}, ${si})" class="text-red-400 hover:opacity-80 transition-opacity" title="Delete set">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
               </div>
               ${noteInput}
             </div>
@@ -512,6 +523,15 @@ function toggleSetCompleted(exerciseIndex: number, setIndex: number): void {
   const set = state.currentWorkout!.exercises[exerciseIndex].sets[setIndex];
   set.completed = !set.completed;
   // Recalculate PRs after toggling completion (affects which sets count toward PRs)
+  recalculateAllPRs();
+  renderWorkout();
+  scheduleAutoSave();
+}
+
+function toggleSetMissed(exerciseIndex: number, setIndex: number): void {
+  const set = state.currentWorkout!.exercises[exerciseIndex].sets[setIndex];
+  set.missed = !set.missed;
+  // Recalculate PRs after toggling missed (affects which sets count toward PRs)
   recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
@@ -1340,18 +1360,12 @@ async function clearAllData(): Promise<void> {
 }
 
 // ==================== AUTH ====================
-function hideLoadingScreen(): void {
-  $('loading-screen').classList.add('hidden');
-}
-
 function showAuthScreen(): void {
-  hideLoadingScreen();
   $('auth-screen').classList.remove('hidden');
   $('main-app').classList.add('hidden');
 }
 
 function showMainApp(): void {
-  hideLoadingScreen();
   $('auth-screen').classList.add('hidden');
   $('main-app').classList.remove('hidden');
   if (currentUser) {
@@ -1443,14 +1457,12 @@ async function init(): Promise<void> {
 
   // Check if already authenticated
   if (api.isAuthenticated()) {
-    // Show main app immediately to avoid flash, verify token in background
-    showMainApp();
-
     try {
       currentUser = await api.getCurrentUser();
       await loadData();
+      showMainApp();
     } catch {
-      // Token invalid or expired - switch back to auth screen
+      // Token invalid or expired
       api.logout();
       showAuthScreen();
     }
@@ -1484,6 +1496,7 @@ async function init(): Promise<void> {
   moveExerciseDown,
   toggleExerciseCompleted,
   toggleSetCompleted,
+  toggleSetMissed,
   toggleNoteField,
   switchTab,
   editWorkout,

@@ -43,12 +43,16 @@ const state: AppState = {
   allPRs: [],
 };
 
+// Track whether we're editing an existing workout from history (vs a new workout that was auto-saved)
+let isEditingFromHistory = false;
+
 let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let workoutExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+let currentCalendarDate = new Date(); // Track current month/year for calendar view
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -245,6 +249,7 @@ function startWorkout(): void {
     exercises: [],
   };
   state.editingWorkoutId = null;
+  isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
   $('workout-finish-btn').textContent = 'Finish';
@@ -268,12 +273,11 @@ async function finishWorkout(): Promise<void> {
       exercises: state.currentWorkout.exercises,
     };
 
-    if (state.editingWorkoutId) {
-      // Editing existing workout - save and stay on workout screen
+    if (isEditingFromHistory) {
+      // Editing existing workout from history - save and stay on workout screen
       const btn = $('workout-finish-btn');
-      const originalText = btn.textContent;
 
-      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      await api.updateWorkout(state.editingWorkoutId!, workoutData);
       await loadData();
 
       // Show "Saved" feedback
@@ -289,12 +293,22 @@ async function finishWorkout(): Promise<void> {
       }, 2000);
 
       // Keep user on workout - don't clear state or navigate away
+    } else if (state.editingWorkoutId) {
+      // New workout that was auto-saved - update it and go to empty screen
+      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      await loadData();
+      state.currentWorkout = null;
+      state.editingWorkoutId = null;
+      isEditingFromHistory = false;
+      expandedNotes.clear();
+      showWorkoutScreen('workout-empty');
     } else {
-      // Creating new workout - finish and go to empty screen
+      // Brand new workout - create and go to empty screen
       await api.createWorkout(workoutData);
       await loadData();
       state.currentWorkout = null;
       state.editingWorkoutId = null;
+      isEditingFromHistory = false;
       expandedNotes.clear();
       showWorkoutScreen('workout-empty');
     }
@@ -906,25 +920,151 @@ async function saveExerciseFromWorkout(): Promise<void> {
 }
 
 // ==================== HISTORY ====================
+function getDaysInMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function getFirstDayOfMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+}
+
+function getWorkoutsForDate(date: Date): Workout[] {
+  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const endOfDay = startOfDay + 86400000 - 1; // 24 hours - 1ms
+  return state.history.filter(w => w.start_time >= startOfDay && w.start_time <= endOfDay);
+}
+
+function changeCalendarMonth(offset: number): void {
+  currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + offset, 1);
+  renderHistory();
+}
+
+function goToToday(): void {
+  currentCalendarDate = new Date();
+  renderHistory();
+}
+
 function renderHistory(): void {
-  const list = $('history-list');
-  if (state.history.length === 0) {
-    list.innerHTML = '<p class="text-gray-500 text-center py-8">No workout history yet</p>';
+  const container = $('history-list');
+
+  const today = new Date();
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+  const daysInMonth = getDaysInMonth(currentCalendarDate);
+  const firstDay = getFirstDayOfMonth(currentCalendarDate);
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+  // Calendar header with navigation
+  let html = `
+    <div class="mb-4 flex items-center justify-between">
+      <button onclick="app.changeCalendarMonth(-1)" class="text-blue-400 hover:text-blue-300 p-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <div class="flex flex-col items-center">
+        <h2 class="text-xl font-bold">${monthNames[month]} ${year}</h2>
+        ${!isCurrentMonth ? '<button onclick="app.goToToday()" class="text-xs text-blue-400 hover:text-blue-300 mt-1">Today</button>' : ''}
+      </div>
+      <button onclick="app.changeCalendarMonth(1)" class="text-blue-400 hover:text-blue-300 p-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+  `;
+
+  // Day headers
+  html += '<div class="grid grid-cols-7 gap-1 mb-2">';
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+    html += `<div class="text-center text-xs text-gray-500 py-1">${day}</div>`;
+  });
+  html += '</div>';
+
+  // Calendar grid
+  html += '<div class="grid grid-cols-7 gap-1">';
+
+  // Empty cells for days before the first of the month
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="aspect-square"></div>';
+  }
+
+  // Days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const workouts = getWorkoutsForDate(date);
+    const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+    const hasWorkouts = workouts.length > 0;
+
+    let cellClass = 'aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative';
+
+    if (hasWorkouts) {
+      cellClass += ' bg-blue-600 hover:bg-blue-700 cursor-pointer';
+    } else {
+      cellClass += ' bg-gray-800';
+    }
+
+    if (isToday) {
+      cellClass += ' ring-2 ring-green-400';
+    }
+
+    const onclick = hasWorkouts ? `onclick="app.showDayWorkouts('${date.toISOString()}')"` : '';
+
+    html += `
+      <div class="${cellClass}" ${onclick}>
+        <div class="${isToday ? 'font-bold' : ''}">${day}</div>
+        ${hasWorkouts ? `<div class="text-xs text-blue-200 mt-0.5">${workouts.length}</div>` : ''}
+      </div>
+    `;
+  }
+
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function showDayWorkouts(dateStr: string): void {
+  const date = new Date(dateStr);
+  const workouts = getWorkoutsForDate(date);
+
+  if (workouts.length === 0) return;
+
+  // If only one workout, go straight to edit
+  if (workouts.length === 1) {
+    editWorkout(workouts[0].id);
     return;
   }
 
-  list.innerHTML = state.history.map((w) => {
+  // Show a modal/view to choose which workout to view (for multiple workouts in one day)
+  const container = $('history-list');
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  let html = `
+    <div>
+      <button onclick="app.renderHistory()" class="text-blue-400 hover:text-blue-300 mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to calendar
+      </button>
+      <h2 class="text-xl font-bold mb-4">${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}</h2>
+      <div class="space-y-3">
+  `;
+
+  workouts.forEach(w => {
     const exerciseNames = w.exercises.map(e => e.name).slice(0, 3).join(', ');
     const more = w.exercises.length > 3 ? ` +${w.exercises.length - 3} more` : '';
     const isDeleting = pendingDeleteWorkoutId === w.id;
+    const time = new Date(w.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-    return `
+    html += `
       <div class="bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600" onclick="app.editWorkout('${w.id}')">
-        <div class="font-medium">${formatDate(w.start_time)}</div>
+        <div class="font-medium">${time}</div>
         <div class="text-sm text-gray-400">${w.exercises.length} exercises</div>
         <div class="text-xs text-gray-500 mt-1">${exerciseNames}${more}</div>
-        <div class="mt-3 pt-3 border-t border-gray-600 flex justify-between items-center">
-          <button onclick="event.stopPropagation(); app.copyWorkout('${w.id}')" class="text-gray-400 text-sm hover:text-blue-400">Copy to new workout</button>
+        <div class="mt-3 pt-3 border-t border-gray-600 flex justify-end">
           ${isDeleting ? `
             <div class="flex items-center gap-2" onclick="event.stopPropagation()">
               <span class="text-red-400 text-sm">Delete?</span>
@@ -937,25 +1077,46 @@ function renderHistory(): void {
         </div>
       </div>
     `;
-  }).join('');
+  });
+
+  html += '</div></div>';
+  container.innerHTML = html;
 }
 
 function showDeleteWorkoutConfirm(id: string): void {
   pendingDeleteWorkoutId = id;
-  renderHistory();
+  showDayWorkouts(new Date(state.history.find(w => w.id === id)!.start_time).toISOString());
 }
 
 function cancelDeleteWorkout(): void {
+  const workoutId = pendingDeleteWorkoutId;
   pendingDeleteWorkoutId = null;
-  renderHistory();
+  const workout = state.history.find(w => w.id === workoutId);
+  if (workout) {
+    showDayWorkouts(new Date(workout.start_time).toISOString());
+  } else {
+    renderHistory();
+  }
 }
 
 async function confirmDeleteWorkout(id: string): Promise<void> {
   try {
+    const workout = state.history.find(w => w.id === id);
     await api.deleteWorkout(id);
     pendingDeleteWorkoutId = null;
     await loadData();
-    renderHistory();
+
+    // If there are still workouts on this day, show the day view, otherwise show calendar
+    if (workout) {
+      const workoutsOnDay = getWorkoutsForDate(new Date(workout.start_time));
+      if (workoutsOnDay.length > 0) {
+        showDayWorkouts(new Date(workout.start_time).toISOString());
+      } else {
+        renderHistory();
+      }
+    } else {
+      renderHistory();
+    }
   } catch (error) {
     console.error('Failed to delete workout:', error);
     alert('Failed to delete workout');
@@ -971,30 +1132,10 @@ function editWorkout(id: string): void {
     exercises: JSON.parse(JSON.stringify(source.exercises)),
   };
   state.editingWorkoutId = id;
+  isEditingFromHistory = true;
   expandedNotes.clear();
   $('workout-title').textContent = formatDate(source.start_time);
   $('workout-finish-btn').textContent = 'Save';
-  switchTab('workout');
-  showWorkoutScreen('workout-active');
-  renderWorkout();
-}
-
-function copyWorkout(id: string): void {
-  const source = state.history.find(w => w.id === id);
-  if (!source) return;
-
-  state.currentWorkout = {
-    startTime: Date.now(),
-    exercises: source.exercises.map(e => ({
-      name: e.name,
-      sets: [],
-      completed: false,
-    })),
-  };
-  state.editingWorkoutId = null;
-  expandedNotes.clear();
-  $('workout-title').textContent = "Today's Workout";
-  $('workout-finish-btn').textContent = 'Finish';
   switchTab('workout');
   showWorkoutScreen('workout-active');
   renderWorkout();
@@ -1500,10 +1641,13 @@ async function init(): Promise<void> {
   toggleNoteField,
   switchTab,
   editWorkout,
-  copyWorkout,
   showDeleteWorkoutConfirm,
   cancelDeleteWorkout,
   confirmDeleteWorkout,
+  changeCalendarMonth,
+  goToToday,
+  showDayWorkouts,
+  renderHistory,
   toggleExerciseTabSort,
   toggleCategory,
   filterExercises,

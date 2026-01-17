@@ -43,11 +43,16 @@ const state: AppState = {
   allPRs: [],
 };
 
+// Track whether we're editing an existing workout from history (vs a new workout that was auto-saved)
+let isEditingFromHistory = false;
+
 let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
+let workoutExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+let currentCalendarDate = new Date(); // Track current month/year for calendar view
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -125,7 +130,7 @@ function showToast(message: string = 'Saved'): void {
 function calculateIsPR(exerciseName: string, weight: number, reps: number, exerciseIndex: number, setIndex: number): boolean {
   if (!state.currentWorkout) return false;
 
-  // Find the best reps at this weight in previous workouts (completed sets only)
+  // Find the best reps at this weight in previous workouts (completed and not missed sets only)
   let previousBestReps: number | null = null;
   for (const workout of state.history) {
     // Skip the workout being edited if we're editing
@@ -138,8 +143,8 @@ function calculateIsPR(exerciseName: string, weight: number, reps: number, exerc
     if (!exercise) continue;
 
     for (const set of exercise.sets) {
-      // Only consider completed sets (matching backend logic)
-      if (set.completed === false) continue;
+      // Only consider completed sets that are not missed (matching backend logic)
+      if (set.completed === false || set.missed === true) continue;
 
       if (set.weight === weight) {
         if (previousBestReps === null || set.reps > previousBestReps) {
@@ -162,8 +167,8 @@ function calculateIsPR(exerciseName: string, weight: number, reps: number, exerc
 
     for (let j = 0; j < maxSetIndex; j++) {
       const set = ex.sets[j];
-      // Only consider completed sets
-      if (set.completed === false) continue;
+      // Only consider completed sets that are not missed
+      if (set.completed === false || set.missed === true) continue;
 
       if (set.weight === weight) {
         if (currentWorkoutBestReps === null || set.reps > currentWorkoutBestReps) {
@@ -244,6 +249,7 @@ function startWorkout(): void {
     exercises: [],
   };
   state.editingWorkoutId = null;
+  isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
   $('workout-finish-btn').textContent = 'Finish';
@@ -267,12 +273,11 @@ async function finishWorkout(): Promise<void> {
       exercises: state.currentWorkout.exercises,
     };
 
-    if (state.editingWorkoutId) {
-      // Editing existing workout - save and stay on workout screen
+    if (isEditingFromHistory) {
+      // Editing existing workout from history - save and stay on workout screen
       const btn = $('workout-finish-btn');
-      const originalText = btn.textContent;
 
-      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      await api.updateWorkout(state.editingWorkoutId!, workoutData);
       await loadData();
 
       // Show "Saved" feedback
@@ -288,12 +293,22 @@ async function finishWorkout(): Promise<void> {
       }, 2000);
 
       // Keep user on workout - don't clear state or navigate away
+    } else if (state.editingWorkoutId) {
+      // New workout that was auto-saved - update it and go to empty screen
+      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      await loadData();
+      state.currentWorkout = null;
+      state.editingWorkoutId = null;
+      isEditingFromHistory = false;
+      expandedNotes.clear();
+      showWorkoutScreen('workout-empty');
     } else {
-      // Creating new workout - finish and go to empty screen
+      // Brand new workout - create and go to empty screen
       await api.createWorkout(workoutData);
       await loadData();
       state.currentWorkout = null;
       state.editingWorkoutId = null;
+      isEditingFromHistory = false;
       expandedNotes.clear();
       showWorkoutScreen('workout-empty');
     }
@@ -375,9 +390,13 @@ function renderWorkout(): void {
         ${ex.sets.length > 0 ? `
           ${ex.sets.map((set, si) => {
             const isSetCompleted = set.completed || false;
+            const isSetMissed = set.missed || false;
             const setCheckmarkIcon = isSetCompleted
               ? '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>'
               : '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+            const missIcon = isSetMissed
+              ? '<svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>'
+              : '<svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 7v6m0 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
             const hasNote = !!set.note;
             const isNoteExpanded = expandedNotes.has(i + '-' + si);
             const pencilColor = hasNote ? 'text-blue-400' : 'text-gray-500';
@@ -394,13 +413,20 @@ function renderWorkout(): void {
                 <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
                 <span class="text-gray-400 ${isSetCompleted ? 'line-through' : ''}">x</span>
                 <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
-                ${set.isPR ? (set.completed ? '<span class="text-yellow-400 text-lg">★</span>' : '<span class="text-yellow-400 text-lg opacity-40">★</span>') : ''}
+                ${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-yellow-400 text-lg">★</span>' : '<span class="text-yellow-400 text-lg opacity-40">★</span>') : ''}
+                <button onclick="app.toggleSetMissed(${i}, ${si})" class="flex-shrink-0 hover:opacity-80 transition-opacity" title="${isSetMissed ? 'Mark as not missed' : 'Mark as missed'}">
+                  ${missIcon}
+                </button>
                 <button onclick="app.toggleNoteField(${i}, ${si})" class="${pencilColor} text-sm hover:opacity-80 transition-opacity" title="${hasNote ? 'Edit note' : 'Add note'}">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                   </svg>
                 </button>
-                <button onclick="app.deleteSet(${i}, ${si})" class="text-red-400 text-xs px-2 hover:text-red-300">x</button>
+                <button onclick="app.deleteSet(${i}, ${si})" class="text-red-400 hover:opacity-80 transition-opacity" title="Delete set">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
               </div>
               ${noteInput}
             </div>
@@ -516,6 +542,15 @@ function toggleSetCompleted(exerciseIndex: number, setIndex: number): void {
   scheduleAutoSave();
 }
 
+function toggleSetMissed(exerciseIndex: number, setIndex: number): void {
+  const set = state.currentWorkout!.exercises[exerciseIndex].sets[setIndex];
+  set.missed = !set.missed;
+  // Recalculate PRs after toggling missed (affects which sets count toward PRs)
+  recalculateAllPRs();
+  renderWorkout();
+  scheduleAutoSave();
+}
+
 function toggleNoteField(exerciseIndex: number, setIndex: number): void {
   const key = `${exerciseIndex}-${setIndex}`;
   if (expandedNotes.has(key)) {
@@ -603,8 +638,8 @@ function copyAllSets(exerciseIndex: number): void {
 }
 
 // ==================== ADD EXERCISE ====================
-let currentCategoryFilter = 'all';
-let currentSort = { field: 'recent', asc: true };
+let addExerciseSort = { field: 'recent', asc: true };
+const expandedAddExerciseCategories = new Set<string>();
 
 function getLastLoggedDate(exerciseName: string): number | null {
   for (const workout of state.history) {
@@ -656,87 +691,18 @@ function getCoOccurrenceInfo(exerciseName: string, currentExerciseNames: string[
   return { hasCoOccurred: lastCoOccurrenceTime !== null, lastCoOccurrence: lastCoOccurrenceTime };
 }
 
-function showAddExercise(): void {
-  ($('add-exercise-search') as HTMLInputElement).value = '';
-  currentCategoryFilter = 'all';
-  currentSort = { field: 'recent', asc: true };
-  updateCategoryPills();
-  updateSortButtons();
-  filterAddExercises();
-  showWorkoutScreen('workout-add-exercise');
-}
-
-function hideAddExercise(): void {
-  showWorkoutScreen('workout-active');
-}
-
-function filterByCategory(category: string): void {
-  currentCategoryFilter = category;
-  updateCategoryPills();
-  filterAddExercises();
-}
-
-function updateCategoryPills(): void {
-  document.querySelectorAll('.category-pill').forEach(pill => {
-    const el = pill as HTMLElement;
-    if (el.dataset.category === currentCategoryFilter) {
-      el.className = 'category-pill bg-blue-600 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap';
-    } else {
-      el.className = 'category-pill bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm whitespace-nowrap hover:bg-gray-600';
-    }
-  });
-}
-
-function toggleSort(field: string): void {
-  if (currentSort.field === field) {
-    currentSort.asc = !currentSort.asc;
-  } else {
-    currentSort.field = field;
-    currentSort.asc = true;
-  }
-  updateSortButtons();
-  filterAddExercises();
-}
-
-function updateSortButtons(): void {
-  const alphaBtn = $('sort-alpha');
-  const recentBtn = $('sort-recent');
-
-  if (currentSort.field === 'alpha') {
-    alphaBtn.className = 'text-blue-400';
-    alphaBtn.textContent = currentSort.asc ? 'A-Z' : 'Z-A';
-    recentBtn.className = 'text-gray-400';
-    recentBtn.textContent = 'Recent';
-  } else {
-    recentBtn.className = 'text-blue-400';
-    recentBtn.textContent = currentSort.asc ? 'Recent' : 'Oldest';
-    alphaBtn.className = 'text-gray-400';
-    alphaBtn.textContent = 'A-Z';
-  }
-}
-
-function filterAddExercises(): void {
-  const query = ($('add-exercise-search') as HTMLInputElement).value.toLowerCase();
-  let filtered = getAllExercises();
-
-  if (currentCategoryFilter !== 'all') {
-    filtered = filtered.filter(e => e.category === currentCategoryFilter);
-  }
-
-  if (query) {
-    filtered = filtered.filter(e => e.name.toLowerCase().includes(query));
-  }
-
-  if (currentSort.field === 'alpha') {
-    filtered.sort((a, b) => {
+function sortAddExercises(exercises: Exercise[]): Exercise[] {
+  const sorted = [...exercises];
+  if (addExerciseSort.field === 'alpha') {
+    sorted.sort((a, b) => {
       const cmp = a.name.localeCompare(b.name);
-      return currentSort.asc ? cmp : -cmp;
+      return addExerciseSort.asc ? cmp : -cmp;
     });
   } else {
     // Get current workout exercise names for smart ranking
     const currentExerciseNames = state.currentWorkout?.exercises.map(e => e.name) || [];
 
-    filtered.sort((a, b) => {
+    sorted.sort((a, b) => {
       // Get co-occurrence information
       const aCoOccurrence = getCoOccurrenceInfo(a.name, currentExerciseNames);
       const bCoOccurrence = getCoOccurrenceInfo(b.name, currentExerciseNames);
@@ -760,16 +726,110 @@ function filterAddExercises(): void {
       const aDate = getLastLoggedDate(a.name) || 0;
       const bDate = getLastLoggedDate(b.name) || 0;
       const cmp = bDate - aDate;
-      return currentSort.asc ? cmp : -cmp;
+      return addExerciseSort.asc ? cmp : -cmp;
     });
   }
-
-  renderAddExerciseList(filtered);
+  return sorted;
 }
 
-function renderAddExerciseList(exercises: Exercise[]): void {
-  const container = $('add-exercise-results');
-  container.innerHTML = exercises.map(e => {
+function toggleAddExerciseSort(field: string): void {
+  if (addExerciseSort.field === field) {
+    addExerciseSort.asc = !addExerciseSort.asc;
+  } else {
+    addExerciseSort.field = field;
+    addExerciseSort.asc = true;
+  }
+  updateAddExerciseSortButtons();
+  renderAddExerciseCategories();
+}
+
+function updateAddExerciseSortButtons(): void {
+  const alphaBtn = $('add-exercise-sort-alpha');
+  const recentBtn = $('add-exercise-sort-recent');
+
+  if (addExerciseSort.field === 'alpha') {
+    alphaBtn.className = 'text-blue-400';
+    alphaBtn.textContent = addExerciseSort.asc ? 'A-Z' : 'Z-A';
+    recentBtn.className = 'text-gray-400';
+    recentBtn.textContent = 'Recent';
+  } else {
+    recentBtn.className = 'text-blue-400';
+    recentBtn.textContent = addExerciseSort.asc ? 'Recent' : 'Oldest';
+    alphaBtn.className = 'text-gray-400';
+    alphaBtn.textContent = 'A-Z';
+  }
+}
+
+function renderAddExerciseCategories(): void {
+  const allExercises = getAllExercises();
+  const container = $('add-exercise-categories');
+
+  container.innerHTML = mainCategories.map(main => {
+    let exercises = allExercises.filter(e => main.subCategories.includes(e.category));
+    if (exercises.length === 0) return '';
+
+    exercises = sortAddExercises(exercises);
+    const isExpanded = expandedAddExerciseCategories.has(main.name);
+
+    return `
+      <div class="mb-4">
+        <button onclick="app.toggleAddExerciseCategory('${main.name}')" class="flex justify-between items-center w-full py-2 text-left">
+          <span class="font-medium text-gray-300">${main.name}</span>
+          <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
+          <span id="add-${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+        </button>
+        <div id="add-${main.name}-exercises" class="space-y-2 mt-2 ${isExpanded ? '' : 'hidden'}">
+          ${exercises.map(e => {
+            const lastLogged = getLastLoggedDate(e.name);
+            const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+            const latestPR = getLatestPRForExercise(e.name);
+            const prText = latestPR ? `★ ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
+            return `
+              <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600">
+                <div class="flex justify-between items-center">
+                  <span class="font-medium">${e.name}</span>
+                  ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+                </div>
+                ${prText ? `<div class="text-xs text-yellow-400 mt-1">${prText}</div>` : ''}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleAddExerciseCategory(category: string): void {
+  const exercises = $('add-' + category + '-exercises');
+  const arrow = $('add-' + category + '-arrow');
+  if (exercises.classList.contains('hidden')) {
+    exercises.classList.remove('hidden');
+    arrow.innerHTML = '&#9660;';
+    expandedAddExerciseCategories.add(category);
+  } else {
+    exercises.classList.add('hidden');
+    arrow.innerHTML = '&#9654;';
+    expandedAddExerciseCategories.delete(category);
+  }
+}
+
+function filterAddExerciseSearch(): void {
+  const query = ($('add-exercise-search') as HTMLInputElement).value.toLowerCase();
+  const categories = $('add-exercise-categories');
+  const results = $('add-exercise-search-results');
+
+  if (query.length === 0) {
+    categories.classList.remove('hidden');
+    results.classList.add('hidden');
+    return;
+  }
+
+  categories.classList.add('hidden');
+  results.classList.remove('hidden');
+
+  const filtered = sortAddExercises(getAllExercises().filter(e => e.name.toLowerCase().includes(query)));
+  results.innerHTML = filtered.map(e => {
     const lastLogged = getLastLoggedDate(e.name);
     const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
 
@@ -784,6 +844,18 @@ function renderAddExerciseList(exercises: Exercise[]): void {
   }).join('');
 }
 
+function showAddExercise(): void {
+  ($('add-exercise-search') as HTMLInputElement).value = '';
+  addExerciseSort = { field: 'recent', asc: true };
+  updateAddExerciseSortButtons();
+  renderAddExerciseCategories();
+  showWorkoutScreen('workout-add-exercise');
+}
+
+function hideAddExercise(): void {
+  showWorkoutScreen('workout-active');
+}
+
 function addExerciseToWorkout(name: string): void {
   state.currentWorkout!.exercises.push({ name, sets: [], completed: false });
   renderWorkout();
@@ -791,26 +863,205 @@ function addExerciseToWorkout(name: string): void {
   scheduleAutoSave();
 }
 
-// ==================== HISTORY ====================
-function renderHistory(): void {
-  const list = $('history-list');
-  if (state.history.length === 0) {
-    list.innerHTML = '<p class="text-gray-500 text-center py-8">No workout history yet</p>';
+function showCreateExerciseFromWorkout(): void {
+  $input('workout-exercise-name-input').value = '';
+  $select('workout-exercise-category-input').value = 'Other';
+  document.querySelectorAll('input[name="workout-weight-type"]').forEach(r => {
+    (r as HTMLInputElement).checked = false;
+  });
+  (document.querySelector('input[name="workout-weight-type"][value="total"]') as HTMLInputElement).checked = true;
+  setWorkoutExerciseUnit('lbs');
+  showWorkoutScreen('workout-create-exercise');
+}
+
+function cancelCreateExerciseFromWorkout(): void {
+  showWorkoutScreen('workout-add-exercise');
+}
+
+function setWorkoutExerciseUnit(unit: 'lbs' | 'kg'): void {
+  workoutExerciseUnit = unit;
+  $('workout-exercise-unit-lbs').className = unit === 'lbs' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+  $('workout-exercise-unit-kg').className = unit === 'kg' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+}
+
+async function saveExerciseFromWorkout(): Promise<void> {
+  const name = $input('workout-exercise-name-input').value.trim();
+  const category = $select('workout-exercise-category-input').value;
+  const typeInput = document.querySelector('input[name="workout-weight-type"]:checked') as HTMLInputElement | null;
+  const unit = workoutExerciseUnit;
+
+  if (!name) {
+    alert('Please enter an exercise name');
+    return;
+  }
+  if (!typeInput) {
+    alert('Please select a weight type');
     return;
   }
 
-  list.innerHTML = state.history.map((w) => {
+  const type = typeInput.value as 'total' | '/side' | '+bar' | 'bodyweight';
+
+  try {
+    await api.createCustomExercise({ name, type, category, unit });
+    await loadData();
+
+    // Add the newly created exercise to the current workout
+    state.currentWorkout!.exercises.push({ name, sets: [], completed: false });
+    renderWorkout();
+    showWorkoutScreen('workout-active');
+    scheduleAutoSave();
+  } catch (error) {
+    console.error('Failed to save exercise:', error);
+    alert('Failed to save exercise');
+  }
+}
+
+// ==================== HISTORY ====================
+function getDaysInMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function getFirstDayOfMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+}
+
+function getWorkoutsForDate(date: Date): Workout[] {
+  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const endOfDay = startOfDay + 86400000 - 1; // 24 hours - 1ms
+  return state.history.filter(w => w.start_time >= startOfDay && w.start_time <= endOfDay);
+}
+
+function changeCalendarMonth(offset: number): void {
+  currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + offset, 1);
+  renderHistory();
+}
+
+function goToToday(): void {
+  currentCalendarDate = new Date();
+  renderHistory();
+}
+
+function renderHistory(): void {
+  const container = $('history-list');
+
+  const today = new Date();
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+  const daysInMonth = getDaysInMonth(currentCalendarDate);
+  const firstDay = getFirstDayOfMonth(currentCalendarDate);
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+  // Calendar header with navigation
+  let html = `
+    <div class="mb-4 flex items-center justify-between">
+      <button onclick="app.changeCalendarMonth(-1)" class="text-blue-400 hover:text-blue-300 p-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <div class="flex flex-col items-center">
+        <h2 class="text-xl font-bold">${monthNames[month]} ${year}</h2>
+        ${!isCurrentMonth ? '<button onclick="app.goToToday()" class="text-xs text-blue-400 hover:text-blue-300 mt-1">Today</button>' : ''}
+      </div>
+      <button onclick="app.changeCalendarMonth(1)" class="text-blue-400 hover:text-blue-300 p-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+  `;
+
+  // Day headers
+  html += '<div class="grid grid-cols-7 gap-1 mb-2">';
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+    html += `<div class="text-center text-xs text-gray-500 py-1">${day}</div>`;
+  });
+  html += '</div>';
+
+  // Calendar grid
+  html += '<div class="grid grid-cols-7 gap-1">';
+
+  // Empty cells for days before the first of the month
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="aspect-square"></div>';
+  }
+
+  // Days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const workouts = getWorkoutsForDate(date);
+    const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+    const hasWorkouts = workouts.length > 0;
+
+    let cellClass = 'aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative';
+
+    if (hasWorkouts) {
+      cellClass += ' bg-blue-600 hover:bg-blue-700 cursor-pointer';
+    } else {
+      cellClass += ' bg-gray-800';
+    }
+
+    if (isToday) {
+      cellClass += ' ring-2 ring-green-400';
+    }
+
+    const onclick = hasWorkouts ? `onclick="app.showDayWorkouts('${date.toISOString()}')"` : '';
+
+    html += `
+      <div class="${cellClass}" ${onclick}>
+        <div class="${isToday ? 'font-bold' : ''}">${day}</div>
+        ${hasWorkouts ? `<div class="text-xs text-blue-200 mt-0.5">${workouts.length}</div>` : ''}
+      </div>
+    `;
+  }
+
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function showDayWorkouts(dateStr: string): void {
+  const date = new Date(dateStr);
+  const workouts = getWorkoutsForDate(date);
+
+  if (workouts.length === 0) return;
+
+  // If only one workout, go straight to edit
+  if (workouts.length === 1) {
+    editWorkout(workouts[0].id);
+    return;
+  }
+
+  // Show a modal/view to choose which workout to view (for multiple workouts in one day)
+  const container = $('history-list');
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  let html = `
+    <div>
+      <button onclick="app.renderHistory()" class="text-blue-400 hover:text-blue-300 mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to calendar
+      </button>
+      <h2 class="text-xl font-bold mb-4">${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}</h2>
+      <div class="space-y-3">
+  `;
+
+  workouts.forEach(w => {
     const exerciseNames = w.exercises.map(e => e.name).slice(0, 3).join(', ');
     const more = w.exercises.length > 3 ? ` +${w.exercises.length - 3} more` : '';
     const isDeleting = pendingDeleteWorkoutId === w.id;
+    const time = new Date(w.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-    return `
+    html += `
       <div class="bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600" onclick="app.editWorkout('${w.id}')">
-        <div class="font-medium">${formatDate(w.start_time)}</div>
+        <div class="font-medium">${time}</div>
         <div class="text-sm text-gray-400">${w.exercises.length} exercises</div>
         <div class="text-xs text-gray-500 mt-1">${exerciseNames}${more}</div>
-        <div class="mt-3 pt-3 border-t border-gray-600 flex justify-between items-center">
-          <button onclick="event.stopPropagation(); app.copyWorkout('${w.id}')" class="text-gray-400 text-sm hover:text-blue-400">Copy to new workout</button>
+        <div class="mt-3 pt-3 border-t border-gray-600 flex justify-end">
           ${isDeleting ? `
             <div class="flex items-center gap-2" onclick="event.stopPropagation()">
               <span class="text-red-400 text-sm">Delete?</span>
@@ -823,25 +1074,46 @@ function renderHistory(): void {
         </div>
       </div>
     `;
-  }).join('');
+  });
+
+  html += '</div></div>';
+  container.innerHTML = html;
 }
 
 function showDeleteWorkoutConfirm(id: string): void {
   pendingDeleteWorkoutId = id;
-  renderHistory();
+  showDayWorkouts(new Date(state.history.find(w => w.id === id)!.start_time).toISOString());
 }
 
 function cancelDeleteWorkout(): void {
+  const workoutId = pendingDeleteWorkoutId;
   pendingDeleteWorkoutId = null;
-  renderHistory();
+  const workout = state.history.find(w => w.id === workoutId);
+  if (workout) {
+    showDayWorkouts(new Date(workout.start_time).toISOString());
+  } else {
+    renderHistory();
+  }
 }
 
 async function confirmDeleteWorkout(id: string): Promise<void> {
   try {
+    const workout = state.history.find(w => w.id === id);
     await api.deleteWorkout(id);
     pendingDeleteWorkoutId = null;
     await loadData();
-    renderHistory();
+
+    // If there are still workouts on this day, show the day view, otherwise show calendar
+    if (workout) {
+      const workoutsOnDay = getWorkoutsForDate(new Date(workout.start_time));
+      if (workoutsOnDay.length > 0) {
+        showDayWorkouts(new Date(workout.start_time).toISOString());
+      } else {
+        renderHistory();
+      }
+    } else {
+      renderHistory();
+    }
   } catch (error) {
     console.error('Failed to delete workout:', error);
     alert('Failed to delete workout');
@@ -857,6 +1129,7 @@ function editWorkout(id: string): void {
     exercises: JSON.parse(JSON.stringify(source.exercises)),
   };
   state.editingWorkoutId = id;
+  isEditingFromHistory = true;
   expandedNotes.clear();
   $('workout-title').textContent = formatDate(source.start_time);
   $('workout-finish-btn').textContent = 'Save';
@@ -865,34 +1138,17 @@ function editWorkout(id: string): void {
   renderWorkout();
 }
 
-function copyWorkout(id: string): void {
-  const source = state.history.find(w => w.id === id);
-  if (!source) return;
-
-  state.currentWorkout = {
-    startTime: Date.now(),
-    exercises: source.exercises.map(e => ({
-      name: e.name,
-      sets: [],
-      completed: false,
-    })),
-  };
-  state.editingWorkoutId = null;
-  expandedNotes.clear();
-  $('workout-title').textContent = "Today's Workout";
-  $('workout-finish-btn').textContent = 'Finish';
-  switchTab('workout');
-  showWorkoutScreen('workout-active');
-  renderWorkout();
-}
-
 // ==================== EXERCISES TAB ====================
 const mainCategories = [
-  { name: 'Push', subCategories: ['Chest', 'Shoulders', 'Triceps'] },
-  { name: 'Pull', subCategories: ['Back', 'Biceps'] },
+  { name: 'Chest', subCategories: ['Chest'] },
+  { name: 'Shoulders', subCategories: ['Shoulders'] },
+  { name: 'Triceps', subCategories: ['Triceps'] },
+  { name: 'Back', subCategories: ['Back'] },
+  { name: 'Biceps', subCategories: ['Biceps'] },
   { name: 'Legs', subCategories: ['Legs'] },
   { name: 'Core', subCategories: ['Core'] },
-  { name: 'Other', subCategories: ['Cardio', 'Other'] },
+  { name: 'Cardio', subCategories: ['Cardio'] },
+  { name: 'Other', subCategories: ['Other'] },
 ];
 
 let exerciseTabSort = { field: 'recent', asc: true };
@@ -1242,18 +1498,12 @@ async function clearAllData(): Promise<void> {
 }
 
 // ==================== AUTH ====================
-function hideLoadingScreen(): void {
-  $('loading-screen').classList.add('hidden');
-}
-
 function showAuthScreen(): void {
-  hideLoadingScreen();
   $('auth-screen').classList.remove('hidden');
   $('main-app').classList.add('hidden');
 }
 
 function showMainApp(): void {
-  hideLoadingScreen();
   $('auth-screen').classList.add('hidden');
   $('main-app').classList.remove('hidden');
   if (currentUser) {
@@ -1345,15 +1595,12 @@ async function init(): Promise<void> {
 
   // Check if already authenticated
   if (api.isAuthenticated()) {
-    // Show main app immediately to avoid flash, verify token in background
-    showMainApp();
-
     try {
       currentUser = await api.getCurrentUser();
       await loadData();
-      renderAddExerciseList(getAllExercises());
+      showMainApp();
     } catch {
-      // Token invalid or expired - switch back to auth screen
+      // Token invalid or expired
       api.logout();
       showAuthScreen();
     }
@@ -1368,10 +1615,14 @@ async function init(): Promise<void> {
   finishWorkout,
   showAddExercise,
   hideAddExercise,
-  filterByCategory,
-  toggleSort,
-  filterAddExercises,
+  toggleAddExerciseSort,
+  toggleAddExerciseCategory,
+  filterAddExerciseSearch,
   addExerciseToWorkout,
+  showCreateExerciseFromWorkout,
+  cancelCreateExerciseFromWorkout,
+  setWorkoutExerciseUnit,
+  saveExerciseFromWorkout,
   showAddSetForm,
   hideAddSetForm,
   saveSetInline,
@@ -1383,13 +1634,17 @@ async function init(): Promise<void> {
   moveExerciseDown,
   toggleExerciseCompleted,
   toggleSetCompleted,
+  toggleSetMissed,
   toggleNoteField,
   switchTab,
   editWorkout,
-  copyWorkout,
   showDeleteWorkoutConfirm,
   cancelDeleteWorkout,
   confirmDeleteWorkout,
+  changeCalendarMonth,
+  goToToday,
+  showDayWorkouts,
+  renderHistory,
   toggleExerciseTabSort,
   toggleCategory,
   filterExercises,

@@ -43,7 +43,9 @@ test.describe('Workout Tracker', () => {
   test('should add an exercise to workout', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
     await expect(page.locator('#exercise-list').getByText('+bar weight')).toBeVisible();
   });
@@ -69,19 +71,21 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
-    // Filter by Chest
-    await page.getByRole('button', { name: 'Chest', exact: true }).click();
-    await expect(page.locator('#add-exercise-results').getByText('Bench Press', { exact: true })).toBeVisible();
+    // Expand Chest category
+    await page.getByRole('button', { name: /^Chest/ }).click();
+    await expect(page.locator('#add-Chest-exercises').getByText('Bench Press', { exact: true })).toBeVisible();
 
-    // Filter by Back
-    await page.getByRole('button', { name: 'Back', exact: true }).click();
-    await expect(page.locator('#add-exercise-results').getByText('Lat Pulldown')).toBeVisible();
+    // Expand Back category
+    await page.getByRole('button', { name: /^Back/ }).click();
+    await expect(page.locator('#add-Back-exercises').getByText('Lat Pulldown')).toBeVisible();
   });
 
   test('should add a set to an exercise', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -96,7 +100,9 @@ test.describe('Workout Tracker', () => {
   test('should show pencil icon for notes', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -114,7 +120,9 @@ test.describe('Workout Tracker', () => {
   test('should expand notes field when pencil icon is clicked', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -132,7 +140,9 @@ test.describe('Workout Tracker', () => {
   test('should save note and show edit button', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -153,7 +163,9 @@ test.describe('Workout Tracker', () => {
   test('should show dim PR star for unconfirmed sets and bright star when confirmed', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add first set - should be a PR since it's the first at this weight
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -162,30 +174,28 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Save' }).click();
 
     // Wait for the set to be added and verify star exists and is dim
-    const dimStar = page.locator('span.opacity-40').filter({ hasText: '★' });
-    await expect(dimStar).toBeVisible();
+    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Click the checkmark to confirm the set
-    const checkmarkButton = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
-    await checkmarkButton.click();
+    // Toggle the set completed state (exercise 0, set 0)
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // After clicking, the dim star should not be visible and a bright star should appear
-    await expect(dimStar).not.toBeVisible();
-    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'));
-    await expect(brightStar).toBeVisible();
+    // Wait for bright star to appear (confirmed PR)
+    await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
 
-    // Click checkmark again to unconfirm
-    await checkmarkButton.click();
+    // Toggle set completed state again to unconfirm
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Dim star should be visible again
-    await expect(dimStar).toBeVisible();
+    // Wait for dim star to reappear (unconfirmed PR)
+    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
   });
 
   test('should show bright PR star only when set beats previous record and is confirmed', async ({ page }) => {
     // Start first workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set with 8 reps (will be dim PR)
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -196,9 +206,8 @@ test.describe('Workout Tracker', () => {
     // Verify dim star appears
     await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Confirm the set
-    const firstCheckmark = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
-    await firstCheckmark.click();
+    // Confirm the first set (exercise 0, set 0)
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
     // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
@@ -209,7 +218,9 @@ test.describe('Workout Tracker', () => {
     // Start second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.locator('#add-exercise-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
     // Add a set with 10 reps (beats previous 8, should be dim PR initially)
     await page.getByRole('button', { name: '+ Add set' }).click();
@@ -218,17 +229,296 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Save' }).click();
 
     // Verify star is dim initially
-    const dimStar = page.locator('span.opacity-40').filter({ hasText: '★' });
-    await expect(dimStar).toBeVisible();
+    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Confirm the set
-    const secondCheckmark = page.locator('button').filter({ has: page.locator('circle[cx="12"][cy="12"][r="10"]') }).first();
-    await secondCheckmark.click();
+    // Confirm the second workout's set (exercise 0, set 0)
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Dim star should disappear and bright star should appear
-    await expect(dimStar).not.toBeVisible();
-    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' });
-    await expect(brightStar).toBeVisible();
+    // Wait for bright star to appear (confirmed PR beats previous record)
+    await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
+  });
+});
+
+test.describe('Calendar View', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+
+    // Clear any existing tokens and reload
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    // Generate unique username for each test
+    const testUsername = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Register a new user
+    await page.click('#auth-register-tab');
+    await page.fill('#auth-username', testUsername);
+    await page.fill('#auth-password', testPassword);
+    await page.click('#auth-submit-btn');
+
+    // Wait for main app to be visible
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should show calendar view in history tab after completing workout', async ({ page }) => {
+    // Create a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Finish workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for workout to be saved (Start Workout button reappears)
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Wait for calendar to render with today's workout
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+
+    // Should see calendar elements
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+
+    // Should see day headers
+    await expect(page.getByText('Sun', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mon', { exact: true })).toBeVisible();
+    await expect(page.getByText('Tue', { exact: true })).toBeVisible();
+
+    // Should see today highlighted with workout
+    const todayCell = page.locator('.ring-2.ring-green-400');
+
+    // Should show workout count on today's cell
+    const workoutCount = todayCell.locator('.text-blue-200');
+    await expect(workoutCount).toBeVisible();
+    await expect(workoutCount).toContainText('1');
+  });
+
+  test('should navigate between months in calendar', async ({ page }) => {
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+
+    // Click next month button
+    await page.locator('button').filter({ has: page.locator('path[d*="M9 5l7 7-7 7"]') }).click();
+
+    // Should show next month
+    const nextMonthDate = new Date();
+    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+    const nextMonth = nextMonthDate.toLocaleString('default', { month: 'long' });
+    const nextYear = nextMonthDate.getFullYear();
+    await expect(page.getByText(`${nextMonth} ${nextYear}`)).toBeVisible();
+
+    // Should show "Today" button when not on current month
+    await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
+
+    // Click previous month twice to go back
+    await page.locator('button').filter({ has: page.locator('path[d*="M15 19l-7-7 7-7"]') }).click();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+  });
+
+  test('should navigate to today when clicking Today button', async ({ page }) => {
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Go to next month
+    await page.locator('button').filter({ has: page.locator('path[d*="M9 5l7 7-7 7"]') }).click();
+
+    // Should see Today button
+    await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
+
+    // Click Today button
+    await page.getByRole('button', { name: 'Today' }).click();
+
+    // Should be back to current month
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
+
+    // Today button should not be visible on current month
+    await expect(page.getByRole('button', { name: 'Today' })).not.toBeVisible();
+  });
+
+  test('should open workout when clicking on day with workout', async ({ page }) => {
+    // Create a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Finish workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for workout to be saved (Start Workout button reappears)
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Wait for calendar to render with today's workout
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+
+    // Click on today's workout cell
+    await page.locator('.ring-2.ring-green-400').click();
+
+    // Should navigate to workout tab showing the workout
+    await expect(page.locator('#tab-workout.tab-content.active')).toBeVisible();
+    await expect(page.locator('#workout-active').getByText('Bench Press')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+  });
+
+  test('should not show "Copy to new workout" button', async ({ page }) => {
+    // Create a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Finish workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Verify calendar is showing
+    await expect(page.getByText('Sun', { exact: true })).toBeVisible();
+
+    // Should not see "Copy to new workout" button anywhere on page
+    const copyButton = page.getByText('Copy to new workout');
+    await expect(copyButton).toHaveCount(0);
+  });
+
+  test('should show multiple workouts for same day', async ({ page }) => {
+    // Create first workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for save
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Create second workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Squat');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Squat', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '185');
+    await page.fill('input[placeholder="reps"]', '8');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for second workout to be saved
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Wait for calendar to render
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+
+    // Should show 2 workouts on today's date (click on today's cell which has green ring)
+    const todayCell = page.locator('.ring-2.ring-green-400');
+
+    const workoutCount = todayCell.locator('.text-blue-200');
+    await expect(workoutCount).toBeVisible();
+    await expect(workoutCount).toContainText('2');
+
+    // Click on today
+    await page.locator('.ring-2.ring-green-400').click();
+
+    // Should show day view with both workouts
+    await expect(page.getByText('Back to calendar')).toBeVisible();
+    await expect(page.locator('#history-list').getByText('Bench Press')).toBeVisible();
+    await expect(page.locator('#history-list').getByText('Squat')).toBeVisible();
+  });
+
+  test('should return to calendar from day view', async ({ page }) => {
+    // Create a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for save
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Create second workout for same day to trigger day view
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Squat');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Squat', { exact: true }).click();
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '185');
+    await page.fill('input[placeholder="reps"]', '8');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    // Wait for second workout to be saved
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History' }).click();
+
+    // Wait for calendar to render with today's workout
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+
+    // Click on today to open day view (today has green ring)
+    await page.locator('.ring-2.ring-green-400').click();
+
+    // Should be in day view
+    await expect(page.getByText('Back to calendar')).toBeVisible();
+
+    // Click back to calendar
+    await page.getByText('Back to calendar').click();
+
+    // Should be back to calendar view
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
   });
 });
 

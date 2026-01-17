@@ -277,11 +277,14 @@ test.describe('Calendar View', () => {
     // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Wait for workout to be saved
-    await page.waitForTimeout(500);
+    // Wait for workout to be saved (Start Workout button reappears)
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
     // Navigate to history tab
     await page.getByRole('button', { name: 'History' }).click();
+
+    // Wait for calendar to render with today's workout
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
     // Should see calendar elements
     const currentMonth = new Date().toLocaleString('default', { month: 'long' });
@@ -295,7 +298,6 @@ test.describe('Calendar View', () => {
 
     // Should see today highlighted with workout
     const todayCell = page.locator('.ring-2.ring-green-400');
-    await expect(todayCell).toBeVisible();
 
     // Should show workout count on today's cell
     const workoutCount = todayCell.locator('.text-blue-200');
@@ -368,16 +370,21 @@ test.describe('Calendar View', () => {
     // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
 
+    // Wait for workout to be saved (Start Workout button reappears)
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
     // Navigate to history tab
     await page.getByRole('button', { name: 'History' }).click();
 
+    // Wait for calendar to render with today's workout
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+
     // Click on today's workout cell
-    const today = new Date().getDate();
     await page.locator('.ring-2.ring-green-400').click();
 
     // Should navigate to workout tab showing the workout
     await expect(page.locator('#tab-workout.tab-content.active')).toBeVisible();
-    await expect(page.getByText('Bench Press')).toBeVisible();
+    await expect(page.locator('#workout-active').getByText('Bench Press')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
   });
 
@@ -437,12 +444,17 @@ test.describe('Calendar View', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Finish' }).click();
 
+    // Wait for second workout to be saved
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
     // Navigate to history tab
     await page.getByRole('button', { name: 'History' }).click();
 
+    // Wait for calendar to render
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+
     // Should show 2 workouts on today's date (click on today's cell which has green ring)
     const todayCell = page.locator('.ring-2.ring-green-400');
-    await expect(todayCell).toBeVisible();
 
     const workoutCount = todayCell.locator('.text-blue-200');
     await expect(workoutCount).toBeVisible();
@@ -453,8 +465,8 @@ test.describe('Calendar View', () => {
 
     // Should show day view with both workouts
     await expect(page.getByText('Back to calendar')).toBeVisible();
-    await expect(page.getByText('Bench Press')).toBeVisible();
-    await expect(page.getByText('Squat')).toBeVisible();
+    await expect(page.locator('#history-list').getByText('Bench Press')).toBeVisible();
+    await expect(page.locator('#history-list').getByText('Squat')).toBeVisible();
   });
 
   test('should return to calendar from day view', async ({ page }) => {
@@ -485,8 +497,14 @@ test.describe('Calendar View', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Finish' }).click();
 
+    // Wait for second workout to be saved
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
     // Navigate to history tab
     await page.getByRole('button', { name: 'History' }).click();
+
+    // Wait for calendar to render with today's workout
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
     // Click on today to open day view (today has green ring)
     await page.locator('.ring-2.ring-green-400').click();

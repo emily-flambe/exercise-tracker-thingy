@@ -43,6 +43,9 @@ const state: AppState = {
   allPRs: [],
 };
 
+// Track whether we're editing an existing workout from history (vs a new workout that was auto-saved)
+let isEditingFromHistory = false;
+
 let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let workoutExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
@@ -246,6 +249,7 @@ function startWorkout(): void {
     exercises: [],
   };
   state.editingWorkoutId = null;
+  isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
   $('workout-finish-btn').textContent = 'Finish';
@@ -269,12 +273,11 @@ async function finishWorkout(): Promise<void> {
       exercises: state.currentWorkout.exercises,
     };
 
-    if (state.editingWorkoutId) {
-      // Editing existing workout - save and stay on workout screen
+    if (isEditingFromHistory) {
+      // Editing existing workout from history - save and stay on workout screen
       const btn = $('workout-finish-btn');
-      const originalText = btn.textContent;
 
-      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      await api.updateWorkout(state.editingWorkoutId!, workoutData);
       await loadData();
 
       // Show "Saved" feedback
@@ -290,12 +293,22 @@ async function finishWorkout(): Promise<void> {
       }, 2000);
 
       // Keep user on workout - don't clear state or navigate away
+    } else if (state.editingWorkoutId) {
+      // New workout that was auto-saved - update it and go to empty screen
+      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      await loadData();
+      state.currentWorkout = null;
+      state.editingWorkoutId = null;
+      isEditingFromHistory = false;
+      expandedNotes.clear();
+      showWorkoutScreen('workout-empty');
     } else {
-      // Creating new workout - finish and go to empty screen
+      // Brand new workout - create and go to empty screen
       await api.createWorkout(workoutData);
       await loadData();
       state.currentWorkout = null;
       state.editingWorkoutId = null;
+      isEditingFromHistory = false;
       expandedNotes.clear();
       showWorkoutScreen('workout-empty');
     }
@@ -934,11 +947,6 @@ function goToToday(): void {
 function renderHistory(): void {
   const container = $('history-list');
 
-  if (state.history.length === 0) {
-    container.innerHTML = '<p class="text-gray-500 text-center py-8">No workout history yet</p>';
-    return;
-  }
-
   const today = new Date();
   const year = currentCalendarDate.getFullYear();
   const month = currentCalendarDate.getMonth();
@@ -1124,6 +1132,7 @@ function editWorkout(id: string): void {
     exercises: JSON.parse(JSON.stringify(source.exercises)),
   };
   state.editingWorkoutId = id;
+  isEditingFromHistory = true;
   expandedNotes.clear();
   $('workout-title').textContent = formatDate(source.start_time);
   $('workout-finish-btn').textContent = 'Save';

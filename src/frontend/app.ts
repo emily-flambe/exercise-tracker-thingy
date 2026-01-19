@@ -431,12 +431,7 @@ function renderWorkout(): void {
               ${noteInput}
             </div>
           `;}).join('')}
-        ` : (prevSets.length > 0 ? `
-          <div class="mb-3">
-            <div class="text-gray-500 text-xs mb-2">Last time: ${prevSets.map(s => s.weight + 'x' + s.reps).join(', ')}</div>
-            <button onclick="app.copyAllSets(${i})" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm">Copy all ${prevSets.length} sets</button>
-          </div>
-        ` : '')}
+        ` : ''}
 
         <div id="add-set-collapsed-${i}" class="mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-gray-600' : ''}">
           <button onclick="app.showAddSetForm(${i})" class="text-blue-400 text-sm">+ Add set</button>
@@ -623,18 +618,6 @@ function deleteSet(exerciseIndex: number, setIndex: number): void {
   recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
-}
-
-function copyAllSets(exerciseIndex: number): void {
-  const ex = state.currentWorkout!.exercises[exerciseIndex];
-  const prevSets = getPreviousSets(ex.name);
-  if (prevSets.length > 0) {
-    ex.sets = prevSets.map(s => ({ weight: s.weight, reps: s.reps }));
-    // Recalculate PRs after copying previous sets
-    recalculateAllPRs();
-    renderWorkout();
-    scheduleAutoSave();
-  }
 }
 
 // ==================== ADD EXERCISE ====================
@@ -1631,7 +1614,6 @@ async function init(): Promise<void> {
   saveSetInline,
   updateSet,
   deleteSet,
-  copyAllSets,
   removeExercise,
   moveExerciseUp,
   moveExerciseDown,

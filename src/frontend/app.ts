@@ -1325,6 +1325,10 @@ function showEditExercise(exerciseName: string): void {
   const historyList = $('exercise-history-list');
   $('exercise-history-section').classList.remove('hidden');
 
+  // Render weight progress chart
+  const chartData = getMaxWeightPerWorkout(exerciseName);
+  renderWeightChart(chartData, exercise.unit, 'exercise-weight-chart');
+
   let historyHTML = '';
 
   // Show PRs first if any
@@ -1400,6 +1404,82 @@ function getRecentSetsForExercise(exerciseName: string, limit: number): Array<{ 
     }
   }
   return sets.slice(0, limit);
+}
+
+function getMaxWeightPerWorkout(exerciseName: string): Array<{ date: number; maxWeight: number }> {
+  const workoutMaxes: Array<{ date: number; maxWeight: number }> = [];
+  for (const workout of state.history) {
+    const ex = workout.exercises.find(e => e.name === exerciseName);
+    if (ex && ex.sets.length > 0) {
+      const maxWeight = Math.max(...ex.sets.map(s => s.weight));
+      workoutMaxes.push({ date: workout.start_time, maxWeight });
+    }
+  }
+  // Sort by date ascending (oldest first)
+  return workoutMaxes.sort((a, b) => a.date - b.date);
+}
+
+function renderWeightChart(data: Array<{ date: number; maxWeight: number }>, unit: string, containerId: string): void {
+  const container = $(containerId);
+  if (!container) return;
+  if (data.length < 2) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const width = 280;
+  const height = 120;
+  const padding = { top: 10, right: 10, bottom: 25, left: 35 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const weights = data.map(d => d.maxWeight);
+  const minWeight = Math.min(...weights);
+  const maxWeight = Math.max(...weights);
+  const weightRange = maxWeight - minWeight || 1;
+  const weightPadding = weightRange * 0.1;
+
+  const yMin = minWeight - weightPadding;
+  const yMax = maxWeight + weightPadding;
+  const yRange = yMax - yMin;
+
+  const xScale = (i: number) => padding.left + (i / (data.length - 1)) * chartWidth;
+  const yScale = (w: number) => padding.top + chartHeight - ((w - yMin) / yRange) * chartHeight;
+
+  // Build path
+  const pathPoints = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.maxWeight).toFixed(1)}`).join(' ');
+
+  // Y-axis labels (3 values)
+  const yLabels = [yMin, (yMin + yMax) / 2, yMax].map(v => Math.round(v));
+
+  // X-axis labels (first and last date)
+  const formatShortDate = (ts: number) => {
+    const d = new Date(ts);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
+  const svg = `
+    <svg width="${width}" height="${height}" class="w-full">
+      <!-- Grid lines -->
+      ${yLabels.map(v => `<line x1="${padding.left}" y1="${yScale(v)}" x2="${width - padding.right}" y2="${yScale(v)}" stroke="#374151" stroke-width="1"/>`).join('')}
+
+      <!-- Y-axis labels -->
+      ${yLabels.map(v => `<text x="${padding.left - 5}" y="${yScale(v) + 4}" text-anchor="end" fill="#9CA3AF" font-size="10">${v}</text>`).join('')}
+
+      <!-- X-axis labels -->
+      <text x="${padding.left}" y="${height - 5}" text-anchor="start" fill="#9CA3AF" font-size="10">${formatShortDate(data[0].date)}</text>
+      <text x="${width - padding.right}" y="${height - 5}" text-anchor="end" fill="#9CA3AF" font-size="10">${formatShortDate(data[data.length - 1].date)}</text>
+
+      <!-- Line -->
+      <path d="${pathPoints}" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Points -->
+      ${data.map((d, i) => `<circle cx="${xScale(i)}" cy="${yScale(d.maxWeight)}" r="3" fill="#3B82F6"/>`).join('')}
+    </svg>
+    <div class="text-center text-xs text-gray-500 mt-1">Max weight (${unit}) over time</div>
+  `;
+
+  container.innerHTML = svg;
 }
 
 function hideEditExercise(): void {

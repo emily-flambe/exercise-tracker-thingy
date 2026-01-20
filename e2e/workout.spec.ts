@@ -565,6 +565,7 @@ test.describe('Exercise Rename During Active Workout', () => {
   test('should update current workout when exercise is renamed', async ({ page }) => {
     // Start a workout and add an exercise
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -602,6 +603,7 @@ test.describe('Exercise Rename During Active Workout', () => {
   test('should calculate PRs correctly after renaming exercise during active workout', async ({ page }) => {
     // First, create a completed workout with "Bench Press" to establish history
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -622,6 +624,7 @@ test.describe('Exercise Rename During Active Workout', () => {
 
     // Start second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();

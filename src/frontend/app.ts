@@ -1421,7 +1421,8 @@ function getMaxWeightPerWorkout(exerciseName: string): Array<{ date: number; max
 
 function renderWeightChart(data: Array<{ date: number; maxWeight: number }>, unit: string, containerId: string): void {
   const container = $(containerId);
-  if (!container || data.length < 2) {
+  if (!container) return;
+  if (data.length < 2) {
     container.innerHTML = '';
     return;
   }

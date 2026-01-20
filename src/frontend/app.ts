@@ -1516,12 +1516,27 @@ async function saveExercise(): Promise<void> {
   const type = typeInput.value as 'total' | '/side' | '+bar' | 'bodyweight';
 
   try {
+    const oldName = state.editingExercise?.name;
     if (state.editingExercise?.id) {
       await api.updateCustomExercise(state.editingExercise.id, { name, type, category, unit });
     } else {
       await api.createCustomExercise({ name, type, category, unit });
     }
     await loadData();
+
+    // If the exercise was renamed and there's an active workout, update the exercise name
+    // in the current workout to match. This prevents PR detection issues where the backend
+    // has renamed historical data but the frontend still has the old name.
+    if (oldName && oldName !== name && state.currentWorkout) {
+      for (const exercise of state.currentWorkout.exercises) {
+        if (exercise.name === oldName) {
+          exercise.name = name;
+        }
+      }
+      // Re-render workout if we made changes
+      renderWorkout();
+    }
+
     hideEditExercise();
   } catch (error) {
     console.error('Failed to save exercise:', error);

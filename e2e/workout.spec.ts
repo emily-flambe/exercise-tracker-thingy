@@ -541,6 +541,132 @@ test.describe('Calendar View', () => {
   });
 });
 
+test.describe('Exercise Rename During Active Workout', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+
+    // Clear any existing tokens and reload
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    // Generate unique username for each test
+    const testUsername = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Register a new user
+    await page.click('#auth-register-tab');
+    await page.fill('#auth-username', testUsername);
+    await page.fill('#auth-password', testPassword);
+    await page.click('#auth-submit-btn');
+
+    // Wait for main app to be visible
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should update current workout when exercise is renamed', async ({ page }) => {
+    // Start a workout and add an exercise
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Verify exercise is in workout
+    await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
+
+    // Go to Exercises tab and rename the exercise
+    await page.getByRole('button', { name: 'Exercises' }).click();
+    await page.fill('#exercise-search', 'Bench Press');
+    await page.locator('#exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Change the name
+    await page.fill('#exercise-name-input', 'Barbell Bench Press');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Wait for save to complete and return to exercise list
+    await expect(page.locator('#exercises-list-view')).toBeVisible({ timeout: 5000 });
+
+    // Go back to workout tab
+    await page.getByRole('button', { name: 'Workout' }).click();
+
+    // Verify the exercise name was updated in the current workout
+    await expect(page.locator('#exercise-list').getByText('Barbell Bench Press')).toBeVisible();
+    await expect(page.locator('#exercise-list').getByText('Bench Press', { exact: true })).not.toBeVisible();
+  });
+
+  test('should calculate PRs correctly after renaming exercise during active workout', async ({ page }) => {
+    // First, create a completed workout with "Bench Press" to establish history
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set with 8 reps at 135 lbs
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '8');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Confirm the set
+    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
+
+    // Finish first workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Start second workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set with 8 reps at 135 lbs (same as before - should NOT be a PR)
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '8');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // The set should NOT show a PR star (8 reps doesn't beat previous 8 reps)
+    // First verify there's no star visible
+    const prStars = page.locator('#exercise-list span').filter({ hasText: '★' });
+    await expect(prStars).toHaveCount(0);
+
+    // Now rename the exercise while the workout is active
+    await page.getByRole('button', { name: 'Exercises' }).click();
+    await page.fill('#exercise-search', 'Bench Press');
+    await page.locator('#exercise-search-results').getByText('Bench Press', { exact: true }).click();
+    await page.fill('#exercise-name-input', 'Barbell Bench Press');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.locator('#exercises-list-view')).toBeVisible({ timeout: 5000 });
+
+    // Go back to workout
+    await page.getByRole('button', { name: 'Workout' }).click();
+
+    // Verify exercise was renamed
+    await expect(page.locator('#exercise-list').getByText('Barbell Bench Press')).toBeVisible();
+
+    // The set should still NOT show a PR star (the history was preserved under the new name)
+    const prStarsAfterRename = page.locator('#exercise-list span').filter({ hasText: '★' });
+    await expect(prStarsAfterRename).toHaveCount(0);
+
+    // Now add a set that DOES beat the record (10 reps vs previous 8)
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // This set should show a PR star (10 reps beats previous 8 reps)
+    await expect(page.locator('#exercise-list span.opacity-40').filter({ hasText: '★' })).toBeVisible();
+  });
+});
+
 test.describe('Authentication', () => {
   test('should show login screen by default', async ({ page }) => {
     await page.goto('/');

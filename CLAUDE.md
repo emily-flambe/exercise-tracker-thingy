@@ -133,7 +133,7 @@ JWT_SECRET=your-secret-here
 
 ### Workflows
 - `.github/workflows/ci-feature.yml` - Runs build check on `claude/**` branches
-- `.github/workflows/pr-tests.yml` - Runs typecheck, unit tests, build, and e2e tests on `claude/**` branches
+- `.github/workflows/ci.yml` - Runs typecheck, unit tests, build, and e2e tests on `claude/**` branches
 - `.github/workflows/android.yml` - Android build workflow
 - `.github/workflows/migrate-db.yml` - Database migration workflow
 
@@ -145,9 +145,9 @@ JWT_SECRET=your-secret-here
 3. **For e2e test changes**, verify tests pass in CI environment (not just locally)
 4. **Common CI failures:**
    - E2E tests with stale element references (re-query elements after re-renders)
-   - Missing `.dev.vars` file (created automatically by pr-tests.yml)
-   - Database not initialized (done by pr-tests.yml)
-   - Playwright browser installation issues (handled by pr-tests.yml)
+   - Missing `.dev.vars` file (created automatically by ci.yml)
+   - Database not initialized (done by ci.yml)
+   - Playwright browser installation issues (handled by ci.yml)
 
 5. **If CI fails:**
    - Read the error logs carefully

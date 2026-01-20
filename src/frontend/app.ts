@@ -55,6 +55,7 @@ let expandedNotes = new Set<string>(); // Track which notes are expanded (format
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
 let selectedTargetCategories = new Set<Category>(); // Track selected categories for new workout
+let isEditingCategories = false; // Track if we're editing categories of an existing workout
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -249,8 +250,52 @@ const ALL_CATEGORIES: Category[] = ['Chest', 'Shoulders', 'Triceps', 'Back', 'Bi
 
 function showCategorySelection(): void {
   selectedTargetCategories.clear();
+  isEditingCategories = false;
+  $('category-select-title').textContent = 'What are you training today?';
+  $('category-select-subtitle').textContent = 'Select muscle groups to focus on (optional)';
+  $('category-select-new-buttons').classList.remove('hidden');
+  $('category-select-edit-buttons').classList.add('hidden');
   renderCategorySelectionGrid();
   showWorkoutScreen('workout-category-select');
+}
+
+function showEditCategories(): void {
+  if (!state.currentWorkout) return;
+
+  // Pre-select current categories
+  selectedTargetCategories.clear();
+  if (state.currentWorkout.targetCategories) {
+    state.currentWorkout.targetCategories.forEach(cat => selectedTargetCategories.add(cat));
+  }
+
+  isEditingCategories = true;
+  $('category-select-title').textContent = 'Edit Focus Areas';
+  $('category-select-subtitle').textContent = 'Change the muscle groups for this workout';
+  $('category-select-new-buttons').classList.add('hidden');
+  $('category-select-edit-buttons').classList.remove('hidden');
+  renderCategorySelectionGrid();
+  showWorkoutScreen('workout-category-select');
+}
+
+function saveEditedCategories(): void {
+  if (!state.currentWorkout) return;
+
+  const newCategories = selectedTargetCategories.size > 0
+    ? Array.from(selectedTargetCategories)
+    : undefined;
+
+  state.currentWorkout.targetCategories = newCategories;
+  updateWorkoutTitle();
+  selectedTargetCategories.clear();
+  isEditingCategories = false;
+  showWorkoutScreen('workout-active');
+  scheduleAutoSave();
+}
+
+function cancelEditCategories(): void {
+  selectedTargetCategories.clear();
+  isEditingCategories = false;
+  showWorkoutScreen('workout-active');
 }
 
 function renderCategorySelectionGrid(): void {
@@ -305,15 +350,27 @@ function startWorkoutInternal(targetCategories?: Category[]): void {
 }
 
 function updateWorkoutTitle(): void {
-  if (state.currentWorkout?.targetCategories && state.currentWorkout.targetCategories.length > 0) {
-    const categories = state.currentWorkout.targetCategories;
+  if (!state.currentWorkout) return;
+
+  const categories = state.currentWorkout.targetCategories;
+  const hasCategories = categories && categories.length > 0;
+
+  let categoryText = '';
+  if (hasCategories) {
     if (categories.length <= 2) {
-      $('workout-title').textContent = categories.join(' & ');
+      categoryText = categories.join(' & ');
     } else {
-      $('workout-title').textContent = `${categories.slice(0, 2).join(', ')} +${categories.length - 2}`;
+      categoryText = `${categories.slice(0, 2).join(', ')} +${categories.length - 2}`;
     }
+  }
+
+  if (isEditingFromHistory) {
+    // Editing from history - include date
+    const dateText = formatDate(state.currentWorkout.startTime);
+    $('workout-title').textContent = hasCategories ? `${dateText} - ${categoryText}` : dateText;
   } else {
-    $('workout-title').textContent = "Today's Workout";
+    // New workout
+    $('workout-title').textContent = hasCategories ? categoryText : "Today's Workout";
   }
 }
 
@@ -1224,17 +1281,7 @@ function editWorkout(id: string): void {
   state.editingWorkoutId = id;
   isEditingFromHistory = true;
   expandedNotes.clear();
-  // Show categories in title if available, otherwise show date
-  if (source.target_categories && source.target_categories.length > 0) {
-    const categories = source.target_categories;
-    if (categories.length <= 2) {
-      $('workout-title').textContent = `${formatDate(source.start_time)} - ${categories.join(' & ')}`;
-    } else {
-      $('workout-title').textContent = `${formatDate(source.start_time)} - ${categories.slice(0, 2).join(', ')} +${categories.length - 2}`;
-    }
-  } else {
-    $('workout-title').textContent = formatDate(source.start_time);
-  }
+  updateWorkoutTitle();
   $('workout-finish-btn').textContent = 'Save';
   switchTab('workout');
   showWorkoutScreen('workout-active');
@@ -1717,6 +1764,9 @@ async function init(): Promise<void> {
   startWorkout,
   finishWorkout,
   showCategorySelection,
+  showEditCategories,
+  saveEditedCategories,
+  cancelEditCategories,
   toggleTargetCategory,
   startWorkoutWithCategories,
   skipCategorySelection,

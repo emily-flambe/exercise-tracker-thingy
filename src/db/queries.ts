@@ -13,6 +13,7 @@ import type {
   User,
   PersonalRecord,
   PersonalRecordRow,
+  Category,
 } from '../types';
 
 function generateId(): string {
@@ -103,11 +104,15 @@ export async function getAllWorkouts(db: D1Database, userId: string): Promise<Wo
 
   for (const row of workoutRows.results) {
     const exercises = await getWorkoutExercises(db, row.id);
+    const targetCategories = row.target_categories
+      ? (JSON.parse(row.target_categories) as Category[])
+      : undefined;
     workouts.push({
       id: row.id,
       user_id: row.user_id,
       start_time: row.start_time,
       end_time: row.end_time ?? undefined,
+      target_categories: targetCategories,
       exercises,
       created_at: row.created_at,
     });
@@ -125,12 +130,16 @@ export async function getWorkout(db: D1Database, id: string, userId: string): Pr
   if (!row) return null;
 
   const exercises = await getWorkoutExercises(db, id);
+  const targetCategories = row.target_categories
+    ? (JSON.parse(row.target_categories) as Category[])
+    : undefined;
 
   return {
     id: row.id,
     user_id: row.user_id,
     start_time: row.start_time,
     end_time: row.end_time ?? undefined,
+    target_categories: targetCategories,
     exercises,
     created_at: row.created_at,
   };
@@ -185,10 +194,13 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
 export async function createWorkout(db: D1Database, userId: string, data: CreateWorkoutRequest): Promise<Workout> {
   const id = generateId();
   const now = Date.now();
+  const targetCategoriesJson = data.target_categories
+    ? JSON.stringify(data.target_categories)
+    : null;
 
   await db
-    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, now)
+    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now)
     .run();
 
   // Insert exercises and sets
@@ -220,10 +232,14 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
   const existing = await getWorkout(db, id, userId);
   if (!existing) return null;
 
+  const targetCategoriesJson = data.target_categories
+    ? JSON.stringify(data.target_categories)
+    : null;
+
   // Update workout row
   await db
-    .prepare('UPDATE workouts SET start_time = ?, end_time = ? WHERE id = ?')
-    .bind(data.start_time, data.end_time ?? null, id)
+    .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ? WHERE id = ?')
+    .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, id)
     .run();
 
   // Delete existing exercises, sets, and PRs for this workout

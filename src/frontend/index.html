@@ -52,8 +52,24 @@
       <div id="tab-workout" class="tab-content active">
         <div id="workout-empty" class="screen active p-4">
           <div class="flex flex-col items-center justify-center py-24">
-            <button onclick="app.startWorkout()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-lg">
+            <button onclick="app.showCategorySelection()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-lg">
               Start Workout
+            </button>
+          </div>
+        </div>
+
+        <div id="workout-category-select" class="screen p-4">
+          <header class="mb-4 pt-2">
+            <h1 class="text-xl font-bold">What are you training today?</h1>
+            <p class="text-sm text-gray-400 mt-1">Select muscle groups to focus on (optional)</p>
+          </header>
+          <div id="category-select-grid" class="grid grid-cols-3 gap-2 mb-6"></div>
+          <div class="space-y-3">
+            <button onclick="app.startWorkoutWithCategories()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg">
+              Start Workout
+            </button>
+            <button onclick="app.skipCategorySelection()" class="w-full text-gray-400 hover:text-gray-300 py-2 text-sm">
+              Skip
             </button>
           </div>
         </div>

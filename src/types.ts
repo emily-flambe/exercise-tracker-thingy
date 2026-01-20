@@ -46,6 +46,7 @@ export interface Workout {
   user_id: string;
   start_time: number;
   end_time?: number;
+  target_categories?: Category[];
   exercises: WorkoutExercise[];
   created_at: number;
 }
@@ -56,6 +57,7 @@ export interface WorkoutRow {
   user_id: string;
   start_time: number;
   end_time: number | null;
+  target_categories: string | null;
   created_at: number;
 }
 
@@ -114,12 +116,14 @@ export interface PersonalRecordRow {
 export interface CreateWorkoutRequest {
   start_time: number;
   end_time?: number;
+  target_categories?: Category[];
   exercises: WorkoutExercise[];
 }
 
 export interface UpdateWorkoutRequest {
   start_time?: number;
   end_time?: number;
+  target_categories?: Category[];
   exercises?: WorkoutExercise[];
 }
 

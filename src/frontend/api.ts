@@ -120,11 +120,23 @@ export interface PersonalRecord {
   achieved_at: number;
 }
 
+export type Category =
+  | 'Chest'
+  | 'Shoulders'
+  | 'Triceps'
+  | 'Back'
+  | 'Biceps'
+  | 'Legs'
+  | 'Core'
+  | 'Cardio'
+  | 'Other';
+
 export interface Workout {
   id: string;
   user_id: string;
   start_time: number;
   end_time?: number;
+  target_categories?: Category[];
   exercises: WorkoutExercise[];
   created_at: number;
 }
@@ -151,6 +163,7 @@ export async function getWorkout(id: string): Promise<Workout> {
 export async function createWorkout(data: {
   start_time: number;
   end_time?: number;
+  target_categories?: Category[];
   exercises: WorkoutExercise[];
 }): Promise<Workout> {
   return apiFetch<Workout>('/workouts', {
@@ -162,6 +175,7 @@ export async function createWorkout(data: {
 export async function updateWorkout(id: string, data: {
   start_time: number;
   end_time?: number;
+  target_categories?: Category[];
   exercises: WorkoutExercise[];
 }): Promise<Workout> {
   return apiFetch<Workout>(`/workouts/${id}`, {

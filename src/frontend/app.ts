@@ -1,5 +1,5 @@
 import * as api from './api';
-import type { Workout, WorkoutExercise, Set, CustomExercise, User, PersonalRecord } from './api';
+import type { Workout, WorkoutExercise, Set, CustomExercise, User, PersonalRecord, Category } from './api';
 import type { CreateWorkoutRequest } from '../types';
 
 // Injected by Vite at build time
@@ -21,6 +21,7 @@ interface Exercise {
 interface AppState {
   currentWorkout: {
     startTime: number;
+    targetCategories?: Category[];
     exercises: WorkoutExercise[];
   } | null;
   editingWorkoutId: string | null;
@@ -53,6 +54,7 @@ let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
+let selectedTargetCategories = new Set<Category>(); // Track selected categories for new workout
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -243,6 +245,78 @@ function showWorkoutScreen(screenId: string): void {
 }
 
 // ==================== WORKOUT ====================
+const ALL_CATEGORIES: Category[] = ['Chest', 'Shoulders', 'Triceps', 'Back', 'Biceps', 'Legs', 'Core', 'Cardio', 'Other'];
+
+function showCategorySelection(): void {
+  selectedTargetCategories.clear();
+  renderCategorySelectionGrid();
+  showWorkoutScreen('workout-category-select');
+}
+
+function renderCategorySelectionGrid(): void {
+  const grid = $('category-select-grid');
+  grid.innerHTML = ALL_CATEGORIES.map(category => {
+    const isSelected = selectedTargetCategories.has(category);
+    const selectedClass = isSelected
+      ? 'bg-blue-600 border-blue-500 text-white'
+      : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600';
+    return `
+      <button onclick="app.toggleTargetCategory('${category}')" class="p-3 rounded-lg border-2 text-sm font-medium transition-colors ${selectedClass}">
+        ${category}
+      </button>
+    `;
+  }).join('');
+}
+
+function toggleTargetCategory(category: Category): void {
+  if (selectedTargetCategories.has(category)) {
+    selectedTargetCategories.delete(category);
+  } else {
+    selectedTargetCategories.add(category);
+  }
+  renderCategorySelectionGrid();
+}
+
+function startWorkoutWithCategories(): void {
+  const targetCategories = selectedTargetCategories.size > 0
+    ? Array.from(selectedTargetCategories)
+    : undefined;
+  startWorkoutInternal(targetCategories);
+}
+
+function skipCategorySelection(): void {
+  startWorkoutInternal(undefined);
+}
+
+function startWorkoutInternal(targetCategories?: Category[]): void {
+  state.currentWorkout = {
+    startTime: Date.now(),
+    targetCategories,
+    exercises: [],
+  };
+  state.editingWorkoutId = null;
+  isEditingFromHistory = false;
+  expandedNotes.clear();
+  selectedTargetCategories.clear();
+  updateWorkoutTitle();
+  $('workout-finish-btn').textContent = 'Finish';
+  showWorkoutScreen('workout-active');
+  renderWorkout();
+}
+
+function updateWorkoutTitle(): void {
+  if (state.currentWorkout?.targetCategories && state.currentWorkout.targetCategories.length > 0) {
+    const categories = state.currentWorkout.targetCategories;
+    if (categories.length <= 2) {
+      $('workout-title').textContent = categories.join(' & ');
+    } else {
+      $('workout-title').textContent = `${categories.slice(0, 2).join(', ')} +${categories.length - 2}`;
+    }
+  } else {
+    $('workout-title').textContent = "Today's Workout";
+  }
+}
+
 function startWorkout(): void {
   state.currentWorkout = {
     startTime: Date.now(),
@@ -270,6 +344,7 @@ async function finishWorkout(): Promise<void> {
     const workoutData = {
       start_time: state.currentWorkout.startTime,
       end_time: Date.now(),
+      target_categories: state.currentWorkout.targetCategories,
       exercises: state.currentWorkout.exercises,
     };
 
@@ -341,6 +416,7 @@ async function autoSaveWorkout(): Promise<void> {
       start_time: state.currentWorkout.startTime,
       // Keep workout active - don't set end_time for new workouts
       // For edited workouts, we need to preserve that it was already finished
+      target_categories: state.currentWorkout.targetCategories,
       exercises: state.currentWorkout.exercises,
     };
 
@@ -684,13 +760,30 @@ function sortAddExercises(exercises: Exercise[]): Exercise[] {
   } else {
     // Get current workout exercise names for smart ranking
     const currentExerciseNames = state.currentWorkout?.exercises.map(e => e.name) || [];
+    // Get target categories for the current workout
+    const targetCategories = state.currentWorkout?.targetCategories || [];
+    const hasTargetCategories = targetCategories.length > 0;
 
     sorted.sort((a, b) => {
+      // First priority: if target categories are set, prioritize exercises in those categories
+      if (hasTargetCategories) {
+        const aInTarget = targetCategories.includes(a.category as Category);
+        const bInTarget = targetCategories.includes(b.category as Category);
+
+        if (aInTarget && !bInTarget) {
+          return -1; // a comes first (it's in target category)
+        }
+        if (!aInTarget && bInTarget) {
+          return 1; // b comes first (it's in target category)
+        }
+        // If both are in target categories or both are not, continue with other criteria
+      }
+
       // Get co-occurrence information
       const aCoOccurrence = getCoOccurrenceInfo(a.name, currentExerciseNames);
       const bCoOccurrence = getCoOccurrenceInfo(b.name, currentExerciseNames);
 
-      // First priority: exercises that have co-occurred with current workout exercises
+      // Second priority: exercises that have co-occurred with current workout exercises
       if (aCoOccurrence.hasCoOccurred && !bCoOccurrence.hasCoOccurred) {
         return -1; // a comes first
       }
@@ -746,20 +839,36 @@ function updateAddExerciseSortButtons(): void {
 function renderAddExerciseCategories(): void {
   const allExercises = getAllExercises();
   const container = $('add-exercise-categories');
+  const targetCategories = state.currentWorkout?.targetCategories || [];
 
   container.innerHTML = mainCategories.map(main => {
     let exercises = allExercises.filter(e => main.subCategories.includes(e.category));
     if (exercises.length === 0) return '';
 
     exercises = sortAddExercises(exercises);
-    const isExpanded = expandedAddExerciseCategories.has(main.name);
+    // Auto-expand if this is a target category
+    const isTargetCategory = targetCategories.includes(main.name as Category);
+    const isExpanded = expandedAddExerciseCategories.has(main.name) || isTargetCategory;
+
+    // Highlight target categories
+    const categoryLabelClass = isTargetCategory
+      ? 'font-medium text-blue-400'
+      : 'font-medium text-gray-300';
+    const targetBadge = isTargetCategory
+      ? '<span class="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Target</span>'
+      : '';
 
     return `
       <div class="mb-4">
         <button onclick="app.toggleAddExerciseCategory('${main.name}')" class="flex justify-between items-center w-full py-2 text-left">
-          <span class="font-medium text-gray-300">${main.name}</span>
-          <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
-          <span id="add-${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+          <div class="flex items-center">
+            <span class="${categoryLabelClass}">${main.name}</span>
+            ${targetBadge}
+          </div>
+          <div class="flex items-center">
+            <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
+            <span id="add-${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+          </div>
         </button>
         <div id="add-${main.name}-exercises" class="space-y-2 mt-2 ${isExpanded ? '' : 'hidden'}">
           ${exercises.map(e => {
@@ -1109,12 +1218,23 @@ function editWorkout(id: string): void {
 
   state.currentWorkout = {
     startTime: source.start_time,
+    targetCategories: source.target_categories,
     exercises: JSON.parse(JSON.stringify(source.exercises)),
   };
   state.editingWorkoutId = id;
   isEditingFromHistory = true;
   expandedNotes.clear();
-  $('workout-title').textContent = formatDate(source.start_time);
+  // Show categories in title if available, otherwise show date
+  if (source.target_categories && source.target_categories.length > 0) {
+    const categories = source.target_categories;
+    if (categories.length <= 2) {
+      $('workout-title').textContent = `${formatDate(source.start_time)} - ${categories.join(' & ')}`;
+    } else {
+      $('workout-title').textContent = `${formatDate(source.start_time)} - ${categories.slice(0, 2).join(', ')} +${categories.length - 2}`;
+    }
+  } else {
+    $('workout-title').textContent = formatDate(source.start_time);
+  }
   $('workout-finish-btn').textContent = 'Save';
   switchTab('workout');
   showWorkoutScreen('workout-active');
@@ -1596,6 +1716,10 @@ async function init(): Promise<void> {
 (window as unknown as Record<string, unknown>).app = {
   startWorkout,
   finishWorkout,
+  showCategorySelection,
+  toggleTargetCategory,
+  startWorkoutWithCategories,
+  skipCategorySelection,
   showAddExercise,
   hideAddExercise,
   toggleAddExerciseSort,

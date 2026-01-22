@@ -29,12 +29,15 @@ test.describe('Workout Tracker', () => {
 
   test('should start a workout when clicking the button', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    // Skip category selection
+    await page.getByRole('button', { name: 'Skip' }).click();
     await expect(page.getByText("Today's Workout")).toBeVisible();
     await expect(page.getByRole('button', { name: 'Finish' })).toBeVisible();
   });
 
   test('should show add exercise screen', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await expect(page.getByRole('heading', { name: 'Add Exercise' })).toBeVisible();
     await expect(page.locator('#add-exercise-search')).toBeVisible();
@@ -42,6 +45,7 @@ test.describe('Workout Tracker', () => {
 
   test('should add an exercise to workout', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -69,6 +73,7 @@ test.describe('Workout Tracker', () => {
 
   test('should filter exercises by category', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
     // Expand Chest category
@@ -82,6 +87,7 @@ test.describe('Workout Tracker', () => {
 
   test('should add a set to an exercise', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -99,6 +105,7 @@ test.describe('Workout Tracker', () => {
 
   test('should show pencil icon for notes', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -119,6 +126,7 @@ test.describe('Workout Tracker', () => {
 
   test('should expand notes field when pencil icon is clicked', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -139,6 +147,7 @@ test.describe('Workout Tracker', () => {
 
   test('should save note and show edit button', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -162,6 +171,7 @@ test.describe('Workout Tracker', () => {
 
   test('should show dim PR star for unconfirmed sets and bright star when confirmed', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -192,6 +202,7 @@ test.describe('Workout Tracker', () => {
   test('should show bright PR star only when set beats previous record and is confirmed', async ({ page }) => {
     // Start first workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -217,6 +228,7 @@ test.describe('Workout Tracker', () => {
 
     // Start second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -263,6 +275,7 @@ test.describe('Calendar View', () => {
   test('should show calendar view in history tab after completing workout', async ({ page }) => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -356,6 +369,7 @@ test.describe('Calendar View', () => {
   test('should open workout when clicking on day with workout', async ({ page }) => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -391,6 +405,7 @@ test.describe('Calendar View', () => {
   test('should not show "Copy to new workout" button', async ({ page }) => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -419,6 +434,7 @@ test.describe('Calendar View', () => {
   test('should show multiple workouts for same day', async ({ page }) => {
     // Create first workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -434,6 +450,7 @@ test.describe('Calendar View', () => {
 
     // Create second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Squat');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -472,6 +489,7 @@ test.describe('Calendar View', () => {
   test('should return to calendar from day view', async ({ page }) => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -487,6 +505,7 @@ test.describe('Calendar View', () => {
 
     // Create second workout for same day to trigger day view
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Squat');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -546,6 +565,7 @@ test.describe('Exercise Rename During Active Workout', () => {
   test('should update current workout when exercise is renamed', async ({ page }) => {
     // Start a workout and add an exercise
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -583,6 +603,7 @@ test.describe('Exercise Rename During Active Workout', () => {
   test('should calculate PRs correctly after renaming exercise during active workout', async ({ page }) => {
     // First, create a completed workout with "Bench Press" to establish history
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
@@ -603,6 +624,7 @@ test.describe('Exercise Rename During Active Workout', () => {
 
     // Start second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();

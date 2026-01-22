@@ -776,37 +776,6 @@ function getLatestPRForExercise(exerciseName: string): PersonalRecord | null {
   return prs[0];
 }
 
-// Get co-occurrence information for an exercise with the current workout's exercises
-function getCoOccurrenceInfo(exerciseName: string, currentExerciseNames: string[]): { hasCoOccurred: boolean; lastCoOccurrence: number | null } {
-  if (currentExerciseNames.length === 0 || currentExerciseNames.includes(exerciseName)) {
-    return { hasCoOccurred: false, lastCoOccurrence: null };
-  }
-
-  let lastCoOccurrenceTime: number | null = null;
-
-  // Look through all past workouts
-  for (const workout of state.history) {
-    const exerciseNamesInWorkout = workout.exercises.map(e => e.name);
-
-    // Check if this workout contains the exercise we're checking
-    const containsTargetExercise = exerciseNamesInWorkout.includes(exerciseName);
-
-    // Check if this workout contains any of the current workout's exercises
-    const containsCurrentExercise = currentExerciseNames.some(name =>
-      exerciseNamesInWorkout.includes(name)
-    );
-
-    // If both conditions are true, this is a co-occurrence
-    if (containsTargetExercise && containsCurrentExercise) {
-      if (lastCoOccurrenceTime === null || workout.start_time > lastCoOccurrenceTime) {
-        lastCoOccurrenceTime = workout.start_time;
-      }
-    }
-  }
-
-  return { hasCoOccurred: lastCoOccurrenceTime !== null, lastCoOccurrence: lastCoOccurrenceTime };
-}
-
 function sortAddExercises(exercises: Exercise[]): Exercise[] {
   const sorted = [...exercises];
   if (addExerciseSort.field === 'alpha') {
@@ -815,47 +784,8 @@ function sortAddExercises(exercises: Exercise[]): Exercise[] {
       return addExerciseSort.asc ? cmp : -cmp;
     });
   } else {
-    // Get current workout exercise names for smart ranking
-    const currentExerciseNames = state.currentWorkout?.exercises.map(e => e.name) || [];
-    // Get target categories for the current workout
-    const targetCategories = state.currentWorkout?.targetCategories || [];
-    const hasTargetCategories = targetCategories.length > 0;
-
+    // Sort by last logged date (most recent first when asc is true)
     sorted.sort((a, b) => {
-      // First priority: if target categories are set, prioritize exercises in those categories
-      if (hasTargetCategories) {
-        const aInTarget = targetCategories.includes(a.category as Category);
-        const bInTarget = targetCategories.includes(b.category as Category);
-
-        if (aInTarget && !bInTarget) {
-          return -1; // a comes first (it's in target category)
-        }
-        if (!aInTarget && bInTarget) {
-          return 1; // b comes first (it's in target category)
-        }
-        // If both are in target categories or both are not, continue with other criteria
-      }
-
-      // Get co-occurrence information
-      const aCoOccurrence = getCoOccurrenceInfo(a.name, currentExerciseNames);
-      const bCoOccurrence = getCoOccurrenceInfo(b.name, currentExerciseNames);
-
-      // Second priority: exercises that have co-occurred with current workout exercises
-      if (aCoOccurrence.hasCoOccurred && !bCoOccurrence.hasCoOccurred) {
-        return -1; // a comes first
-      }
-      if (!aCoOccurrence.hasCoOccurred && bCoOccurrence.hasCoOccurred) {
-        return 1; // b comes first
-      }
-
-      // If both have co-occurred, sort by most recent co-occurrence
-      if (aCoOccurrence.hasCoOccurred && bCoOccurrence.hasCoOccurred) {
-        const aTime = aCoOccurrence.lastCoOccurrence || 0;
-        const bTime = bCoOccurrence.lastCoOccurrence || 0;
-        return bTime - aTime; // Most recent co-occurrence first
-      }
-
-      // If neither have co-occurred, sort by last logged date
       const aDate = getLastLoggedDate(a.name) || 0;
       const bDate = getLastLoggedDate(b.name) || 0;
       const cmp = bDate - aDate;

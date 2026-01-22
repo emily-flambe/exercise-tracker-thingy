@@ -903,9 +903,8 @@ function renderAddExerciseCategories(): void {
     if (exercises.length === 0) return '';
 
     exercises = sortAddExercises(exercises);
-    // Auto-expand if this is a target category
     const isTargetCategory = targetCategories.includes(main.name as Category);
-    const isExpanded = expandedAddExerciseCategories.has(main.name) || isTargetCategory;
+    const isExpanded = expandedAddExerciseCategories.has(main.name);
 
     // Highlight target categories
     const categoryLabelClass = isTargetCategory

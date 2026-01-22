@@ -309,13 +309,9 @@ test.describe('Calendar View', () => {
     await expect(page.getByText('Mon', { exact: true })).toBeVisible();
     await expect(page.getByText('Tue', { exact: true })).toBeVisible();
 
-    // Should see today highlighted with workout
+    // Should see today highlighted with workout (blue background indicates workout exists)
     const todayCell = page.locator('.ring-2.ring-green-400');
-
-    // Should show workout count on today's cell
-    const workoutCount = todayCell.locator('.text-blue-200');
-    await expect(workoutCount).toBeVisible();
-    await expect(workoutCount).toContainText('1');
+    await expect(todayCell).toHaveClass(/bg-blue-600/);
   });
 
   test('should navigate between months in calendar', async ({ page }) => {
@@ -470,14 +466,7 @@ test.describe('Calendar View', () => {
     // Wait for calendar to render
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
-    // Should show 2 workouts on today's date (click on today's cell which has green ring)
-    const todayCell = page.locator('.ring-2.ring-green-400');
-
-    const workoutCount = todayCell.locator('.text-blue-200');
-    await expect(workoutCount).toBeVisible();
-    await expect(workoutCount).toContainText('2');
-
-    // Click on today
+    // Click on today's cell (has green ring and blue background for workout)
     await page.locator('.ring-2.ring-green-400').click();
 
     // Should show day view with both workouts

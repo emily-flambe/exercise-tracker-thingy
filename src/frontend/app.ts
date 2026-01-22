@@ -1161,7 +1161,6 @@ function renderHistory(): void {
     html += `
       <div class="${cellClass}" ${onclick}>
         <div class="${isToday ? 'font-bold' : ''}">${day}</div>
-        ${hasWorkouts ? `<div class="text-xs text-blue-200 mt-0.5">${workouts.length}</div>` : ''}
       </div>
     `;
   }

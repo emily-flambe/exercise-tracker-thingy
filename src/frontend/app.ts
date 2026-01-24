@@ -129,6 +129,84 @@ function showToast(message: string = 'Saved'): void {
   }, 2000);
 }
 
+// Show PR history modal for an exercise
+function showPRHistory(exerciseName: string): void {
+  const modal = $('pr-modal');
+  const title = $('pr-modal-title');
+  const content = $('pr-modal-content');
+
+  // Get PRs for this exercise from state
+  const prs = state.allPRs
+    .filter(pr => pr.exercise_name === exerciseName)
+    .sort((a, b) => b.achieved_at - a.achieved_at);
+
+  title.textContent = `${exerciseName} PRs`;
+
+  if (prs.length === 0) {
+    content.innerHTML = `
+      <div class="text-center text-gray-400 py-8">
+        <p>No PRs recorded yet.</p>
+        <p class="text-sm mt-2">PRs are tracked when you beat your best reps at a given weight.</p>
+      </div>
+    `;
+  } else {
+    // Group PRs by weight to show best reps at each weight
+    const prsByWeight = new Map<number, { reps: number; achieved_at: number }[]>();
+    for (const pr of prs) {
+      if (!prsByWeight.has(pr.weight)) {
+        prsByWeight.set(pr.weight, []);
+      }
+      prsByWeight.get(pr.weight)!.push({ reps: pr.reps, achieved_at: pr.achieved_at });
+    }
+
+    // Sort weights descending
+    const sortedWeights = [...prsByWeight.keys()].sort((a, b) => b - a);
+
+    // Get the exercise unit
+    const unit = getExerciseUnit(exerciseName);
+
+    content.innerHTML = `
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-gray-400 text-left">
+            <th class="pb-2">Weight</th>
+            <th class="pb-2">Best Reps</th>
+            <th class="pb-2">Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+          ${sortedWeights.map(weight => {
+            // Get the best reps for this weight (most recent PR)
+            const entries = prsByWeight.get(weight)!;
+            const best = entries.reduce((best, curr) =>
+              curr.reps > best.reps || (curr.reps === best.reps && curr.achieved_at > best.achieved_at) ? curr : best
+            );
+            const date = new Date(best.achieved_at);
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+            return `
+              <tr>
+                <td class="py-2 font-medium">${weight} ${unit}</td>
+                <td class="py-2">${best.reps}</td>
+                <td class="py-2 text-gray-400">${dateStr}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+// Hide PR history modal
+function hidePRHistory(): void {
+  const modal = $('pr-modal');
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
 // Check if a set is a PR based on exercise name, weight, reps, and position
 function calculateIsPR(exerciseName: string, weight: number, reps: number, exerciseIndex: number, setIndex: number): boolean {
   if (!state.currentWorkout) return false;
@@ -596,7 +674,14 @@ function renderWorkout(): void {
               ${checkmarkIcon}
             </button>
             <div>
-              <div class="font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}">${ex.name}</div>
+              <div class="flex items-center gap-2">
+                <span class="font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}">${ex.name}</span>
+                <button onclick="app.showPRHistory('${ex.name.replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-yellow-400 transition-colors" title="View PR history">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                </button>
+              </div>
               <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
             </div>
           </div>
@@ -1812,6 +1897,8 @@ async function init(): Promise<void> {
   moveExerciseUp,
   moveExerciseDown,
   toggleExerciseCompleted,
+  showPRHistory,
+  hidePRHistory,
   toggleSetCompleted,
   toggleSetMissed,
   toggleNoteField,

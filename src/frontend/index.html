@@ -46,6 +46,22 @@
       Saved
     </div>
 
+    <!-- PR History Modal -->
+    <div id="pr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
+      <div class="absolute inset-0 bg-black/70" onclick="app.hidePRHistory()"></div>
+      <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-sm w-full mx-4 max-h-[80vh] overflow-hidden">
+        <div class="flex justify-between items-center p-4 border-b border-gray-700">
+          <h2 class="text-lg font-semibold" id="pr-modal-title">PR History</h2>
+          <button onclick="app.hidePRHistory()" class="text-gray-400 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div id="pr-modal-content" class="p-4 overflow-y-auto max-h-[60vh]"></div>
+      </div>
+    </div>
+
     <div class="main-content">
 
       <!-- TAB: WORKOUT -->

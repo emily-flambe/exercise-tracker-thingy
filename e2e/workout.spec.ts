@@ -59,7 +59,7 @@ test.describe('Workout Tracker', () => {
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible();
 
     // Go to history
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
 
     // Go to exercises
@@ -294,7 +294,7 @@ test.describe('Calendar View', () => {
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
     // Navigate to history tab
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
 
     // Wait for calendar to render with today's workout
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
@@ -316,7 +316,7 @@ test.describe('Calendar View', () => {
 
   test('should navigate between months in calendar', async ({ page }) => {
     // Navigate to history tab
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
 
     const currentMonth = new Date().toLocaleString('default', { month: 'long' });
     const currentYear = new Date().getFullYear();
@@ -342,7 +342,7 @@ test.describe('Calendar View', () => {
 
   test('should navigate to today when clicking Today button', async ({ page }) => {
     // Navigate to history tab
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
 
     // Go to next month
     await page.locator('button').filter({ has: page.locator('path[d*="M9 5l7 7-7 7"]') }).click();
@@ -384,7 +384,7 @@ test.describe('Calendar View', () => {
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
     // Navigate to history tab
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
 
     // Wait for calendar to render with today's workout
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
@@ -417,7 +417,7 @@ test.describe('Calendar View', () => {
     await page.getByRole('button', { name: 'Finish' }).click();
 
     // Navigate to history tab
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
 
     // Verify calendar is showing
     await expect(page.getByText('Sun', { exact: true })).toBeVisible();
@@ -461,7 +461,7 @@ test.describe('Calendar View', () => {
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
     // Navigate to history tab
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
 
     // Wait for calendar to render
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
@@ -509,7 +509,7 @@ test.describe('Calendar View', () => {
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
     // Navigate to history tab
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
 
     // Wait for calendar to render with today's workout
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });

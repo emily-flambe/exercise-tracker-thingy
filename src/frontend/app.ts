@@ -528,6 +528,30 @@ async function finishWorkout(): Promise<void> {
   }
 }
 
+async function deleteCurrentWorkout(): Promise<void> {
+  if (!confirm('Delete this workout?')) {
+    return;
+  }
+
+  try {
+    // If workout was saved to server, delete it
+    if (state.editingWorkoutId) {
+      await api.deleteWorkout(state.editingWorkoutId);
+      await loadData();
+    }
+
+    // Clear local state
+    state.currentWorkout = null;
+    state.editingWorkoutId = null;
+    isEditingFromHistory = false;
+    expandedNotes.clear();
+    showWorkoutScreen('workout-empty');
+  } catch (error) {
+    console.error('Failed to delete workout:', error);
+    alert('Failed to delete workout');
+  }
+}
+
 function scheduleAutoSave(): void {
   // Clear any pending auto-save
   if (autoSaveTimeout) {
@@ -674,14 +698,7 @@ function renderWorkout(): void {
               ${checkmarkIcon}
             </button>
             <div>
-              <div class="flex items-center gap-2">
-                <span class="font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}">${ex.name}</span>
-                <button onclick="app.showPRHistory('${ex.name.replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-yellow-400 transition-colors" title="View PR history">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                  </svg>
-                </button>
-              </div>
+              <span class="font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}">${ex.name}</span>
               <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
             </div>
           </div>
@@ -700,6 +717,13 @@ function renderWorkout(): void {
           </div>
         </div>
         ${setsHtml}
+        <div class="flex justify-end mt-2">
+          <button onclick="app.showPRHistory('${ex.name.replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-yellow-400 transition-colors" title="View PR history">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+          </button>
+        </div>
       </div>
     `;
   }).join('');
@@ -1871,6 +1895,7 @@ async function init(): Promise<void> {
 (window as unknown as Record<string, unknown>).app = {
   startWorkout,
   finishWorkout,
+  deleteCurrentWorkout,
   showCategorySelection,
   showEditCategories,
   saveEditedCategories,

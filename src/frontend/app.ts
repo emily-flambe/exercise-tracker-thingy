@@ -182,7 +182,7 @@ function showPRHistory(exerciseName: string): void {
               curr.reps > best.reps || (curr.reps === best.reps && curr.achieved_at > best.achieved_at) ? curr : best
             );
             const date = new Date(best.achieved_at);
-            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+            const dateStr = date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
             return `
               <tr>
                 <td class="py-2 font-medium">${weight} ${unit}</td>

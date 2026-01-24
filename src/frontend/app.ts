@@ -528,11 +528,17 @@ async function finishWorkout(): Promise<void> {
   }
 }
 
-async function deleteCurrentWorkout(): Promise<void> {
-  if (!confirm('Delete this workout?')) {
-    return;
-  }
+function showDeleteCurrentWorkoutConfirm(): void {
+  $('delete-workout-btn').classList.add('hidden');
+  $('delete-workout-confirm').classList.remove('hidden');
+}
 
+function cancelDeleteCurrentWorkout(): void {
+  $('delete-workout-confirm').classList.add('hidden');
+  $('delete-workout-btn').classList.remove('hidden');
+}
+
+async function confirmDeleteCurrentWorkout(): Promise<void> {
   try {
     // If workout was saved to server, delete it
     if (state.editingWorkoutId) {
@@ -545,6 +551,11 @@ async function deleteCurrentWorkout(): Promise<void> {
     state.editingWorkoutId = null;
     isEditingFromHistory = false;
     expandedNotes.clear();
+
+    // Reset delete confirmation UI
+    $('delete-workout-confirm').classList.add('hidden');
+    $('delete-workout-btn').classList.remove('hidden');
+
     showWorkoutScreen('workout-empty');
   } catch (error) {
     console.error('Failed to delete workout:', error);
@@ -1895,7 +1906,9 @@ async function init(): Promise<void> {
 (window as unknown as Record<string, unknown>).app = {
   startWorkout,
   finishWorkout,
-  deleteCurrentWorkout,
+  showDeleteCurrentWorkoutConfirm,
+  cancelDeleteCurrentWorkout,
+  confirmDeleteCurrentWorkout,
   showCategorySelection,
   showEditCategories,
   saveEditedCategories,

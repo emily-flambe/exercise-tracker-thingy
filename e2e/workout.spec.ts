@@ -475,6 +475,63 @@ test.describe('Calendar View', () => {
     await expect(page.locator('#history-list').getByText('Squat')).toBeVisible();
   });
 
+  test('should show filter pills below calendar and highlight matching dates yellow', async ({ page }) => {
+    // Create a workout with a Chest exercise (Bench Press)
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Finish workout
+    await page.getByRole('button', { name: 'Finish' }).click();
+    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+
+    // Navigate to history tab
+    await page.getByRole('button', { name: 'History', exact: true }).click();
+
+    // Wait for calendar to render with today's workout
+    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+
+    // Verify filter pills are displayed below the calendar
+    await expect(page.getByRole('button', { name: 'Chest' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Back' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Legs' })).toBeVisible();
+
+    // Verify today's workout cell has blue background initially (no filter active)
+    const todayCell = page.locator('.ring-2.ring-green-400');
+    await expect(todayCell).toHaveClass(/bg-blue-600/);
+
+    // Click on Chest filter (Bench Press is a Chest exercise)
+    await page.getByRole('button', { name: 'Chest' }).click();
+
+    // Verify the Chest filter pill is now highlighted (yellow background)
+    await expect(page.getByRole('button', { name: 'Chest' })).toHaveClass(/bg-yellow-500/);
+
+    // Verify today's workout cell is now yellow (matches filter)
+    await expect(todayCell).toHaveClass(/bg-yellow-500/);
+
+    // Click on Legs filter (deselect Chest, select Legs)
+    await page.getByRole('button', { name: 'Chest' }).click(); // deselect Chest
+    await page.getByRole('button', { name: 'Legs' }).click();  // select Legs
+
+    // Verify today's workout cell is back to blue (doesn't match Legs filter)
+    await expect(todayCell).toHaveClass(/bg-blue-600/);
+
+    // Deselect Legs filter
+    await page.getByRole('button', { name: 'Legs' }).click();
+
+    // Verify today's workout cell is still blue (no filter active)
+    await expect(todayCell).toHaveClass(/bg-blue-600/);
+  });
+
   test('should return to calendar from day view', async ({ page }) => {
     // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();

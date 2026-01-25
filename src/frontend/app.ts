@@ -1134,24 +1134,31 @@ function getCategoriesForWorkouts(workouts: Workout[]): Set<Category> {
   const categories = new Set<Category>();
   const allExercises = getAllExercises();
 
+  console.log('getCategoriesForWorkouts called with', workouts.length, 'workouts');
+  console.log('allExercises count:', allExercises.length);
+
   for (const workout of workouts) {
     for (const exercise of workout.exercises) {
       const exerciseData = allExercises.find(e => e.name === exercise.name);
+      console.log('Looking for exercise:', exercise.name, 'found:', exerciseData?.name, 'category:', exerciseData?.category);
       if (exerciseData && exerciseData.category) {
         categories.add(exerciseData.category as Category);
       }
     }
   }
 
+  console.log('Found categories:', Array.from(categories));
   return categories;
 }
 
 function toggleCalendarFilter(category: Category): void {
+  console.log('toggleCalendarFilter called with:', category);
   if (selectedCalendarFilters.has(category)) {
     selectedCalendarFilters.delete(category);
   } else {
     selectedCalendarFilters.add(category);
   }
+  console.log('selectedCalendarFilters:', Array.from(selectedCalendarFilters));
   renderHistory();
 }
 

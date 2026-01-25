@@ -1228,13 +1228,11 @@ function renderHistory(): void {
     let cellClass = 'aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative';
 
     if (hasWorkouts) {
-      if (hasActiveFilter) {
-        if (matchesFilter) {
-          cellClass += ' bg-yellow-500 hover:bg-yellow-600 cursor-pointer';
-        } else {
-          cellClass += ' bg-gray-800';
-        }
+      // Check if this workout matches an active filter - if so, highlight yellow
+      if (hasActiveFilter && matchesFilter) {
+        cellClass += ' bg-yellow-500 hover:bg-yellow-600 cursor-pointer';
       } else {
+        // Default blue for workouts (whether no filter active, or filter doesn't match)
         cellClass += ' bg-blue-600 hover:bg-blue-700 cursor-pointer';
       }
     } else {

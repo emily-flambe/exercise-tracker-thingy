@@ -1046,6 +1046,11 @@ function showAddExercise(): void {
   ($('add-exercise-search') as HTMLInputElement).value = '';
   addExerciseSort = { field: 'recent', asc: true };
   updateAddExerciseSortButtons();
+  // Reset category expansion state so all start collapsed
+  expandedAddExerciseCategories.clear();
+  // Reset search/categories visibility
+  $('add-exercise-categories').classList.remove('hidden');
+  $('add-exercise-search-results').classList.add('hidden');
   renderAddExerciseCategories();
   showWorkoutScreen('workout-add-exercise');
 }

@@ -1,5 +1,5 @@
 import * as api from './api';
-import type { Workout, WorkoutExercise, Set, CustomExercise, User, PersonalRecord, Category } from './api';
+import type { Workout, WorkoutExercise, Set as WorkoutSet, CustomExercise, User, PersonalRecord, Category } from './api';
 import type { CreateWorkoutRequest } from '../types';
 
 // Injected by Vite at build time
@@ -56,6 +56,7 @@ let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
 let selectedTargetCategories = new Set<Category>(); // Track selected categories for new workout
 let isEditingCategories = false; // Track if we're editing categories of an existing workout
+let selectedCalendarFilters = new Set<Category>(); // Track selected category filters for calendar view
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -740,7 +741,7 @@ function renderWorkout(): void {
   }).join('');
 }
 
-function getPreviousSets(exerciseName: string): Set[] {
+function getPreviousSets(exerciseName: string): WorkoutSet[] {
   for (const workout of state.history) {
     const ex = workout.exercises.find(e => e.name === exerciseName);
     if (ex && ex.sets.length > 0) return ex.sets;
@@ -832,7 +833,7 @@ function saveSetInline(exerciseIndex: number): void {
   const reps = parseInt(($('reps-' + exerciseIndex) as HTMLInputElement).value) || 0;
   const note = ($('note-' + exerciseIndex) as HTMLInputElement).value.trim();
 
-  const set: Set = { weight, reps };
+  const set: WorkoutSet = { weight, reps };
   if (note) set.note = note;
 
   state.currentWorkout!.exercises[exerciseIndex].sets.push(set);
@@ -1129,6 +1130,31 @@ function getWorkoutsForDate(date: Date): Workout[] {
   return state.history.filter(w => w.start_time >= startOfDay && w.start_time <= endOfDay);
 }
 
+function getCategoriesForWorkouts(workouts: Workout[]): Set<Category> {
+  const categories = new Set<Category>();
+  const allExercises = getAllExercises();
+
+  for (const workout of workouts) {
+    for (const exercise of workout.exercises) {
+      const exerciseData = allExercises.find(e => e.name === exercise.name);
+      if (exerciseData && exerciseData.category) {
+        categories.add(exerciseData.category as Category);
+      }
+    }
+  }
+
+  return categories;
+}
+
+function toggleCalendarFilter(category: Category): void {
+  if (selectedCalendarFilters.has(category)) {
+    selectedCalendarFilters.delete(category);
+  } else {
+    selectedCalendarFilters.add(category);
+  }
+  renderHistory();
+}
+
 function changeCalendarMonth(offset: number): void {
   currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + offset, 1);
   renderHistory();
@@ -1187,16 +1213,30 @@ function renderHistory(): void {
   }
 
   // Days of the month
+  const hasActiveFilter = selectedCalendarFilters.size > 0;
+
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day);
     const workouts = getWorkoutsForDate(date);
     const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
     const hasWorkouts = workouts.length > 0;
 
+    // Check if this day's workouts match any selected filter
+    const dayCategories = hasWorkouts ? getCategoriesForWorkouts(workouts) : new Set<Category>();
+    const matchesFilter = hasActiveFilter && Array.from(selectedCalendarFilters).some(cat => dayCategories.has(cat));
+
     let cellClass = 'aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative';
 
     if (hasWorkouts) {
-      cellClass += ' bg-blue-600 hover:bg-blue-700 cursor-pointer';
+      if (hasActiveFilter) {
+        if (matchesFilter) {
+          cellClass += ' bg-yellow-500 hover:bg-yellow-600 cursor-pointer';
+        } else {
+          cellClass += ' bg-gray-800';
+        }
+      } else {
+        cellClass += ' bg-blue-600 hover:bg-blue-700 cursor-pointer';
+      }
     } else {
       cellClass += ' bg-gray-800';
     }
@@ -1214,6 +1254,17 @@ function renderHistory(): void {
     `;
   }
 
+  html += '</div>';
+
+  // Filter pills
+  html += '<div class="mt-4 flex flex-wrap gap-2">';
+  ALL_CATEGORIES.forEach(category => {
+    const isSelected = selectedCalendarFilters.has(category);
+    const pillClass = isSelected
+      ? 'bg-yellow-500 text-black'
+      : 'bg-gray-700 text-gray-300 hover:bg-gray-600';
+    html += `<button onclick="app.toggleCalendarFilter('${category}')" class="px-3 py-1 rounded-full text-xs font-medium transition-colors ${pillClass}">${category}</button>`;
+  });
   html += '</div>';
 
   container.innerHTML = html;
@@ -1949,6 +2000,7 @@ async function init(): Promise<void> {
   goToToday,
   showDayWorkouts,
   renderHistory,
+  toggleCalendarFilter,
   toggleExerciseTabSort,
   toggleCategory,
   filterExercises,

@@ -53,43 +53,11 @@ export async function createUser(db: D1Database, username: string, passwordHash:
     .bind(id, username, passwordHash, now)
     .run();
 
-  // Seed default exercises for the new user
-  await seedDefaultExercises(db, id);
-
   return {
     id,
     username,
     created_at: now,
   };
-}
-
-// Default exercises to seed for new users (sparse but covers main movements)
-const DEFAULT_EXERCISES: Array<{ name: string; type: string; category: string; muscle_group: string; unit: string }> = [
-  // Push - Upper
-  { name: 'Bench Press', type: '+bar', category: 'Chest', muscle_group: 'Upper', unit: 'lbs' },
-  { name: 'Overhead Press', type: '+bar', category: 'Shoulders', muscle_group: 'Upper', unit: 'lbs' },
-  { name: 'Tricep Pushdown', type: 'total', category: 'Triceps', muscle_group: 'Upper', unit: 'lbs' },
-  // Pull - Upper
-  { name: 'Barbell Row', type: '+bar', category: 'Back', muscle_group: 'Upper', unit: 'lbs' },
-  { name: 'Lat Pulldown', type: 'total', category: 'Back', muscle_group: 'Upper', unit: 'lbs' },
-  { name: 'Pull-ups', type: 'bodyweight', category: 'Back', muscle_group: 'Upper', unit: 'lbs' },
-  { name: 'Barbell Curl', type: 'total', category: 'Biceps', muscle_group: 'Upper', unit: 'lbs' },
-  // Legs - Lower
-  { name: 'Deadlift', type: '+bar', category: 'Back', muscle_group: 'Lower', unit: 'lbs' },
-  { name: 'Squat', type: '+bar', category: 'Legs', muscle_group: 'Lower', unit: 'lbs' },
-  { name: 'Leg Press', type: 'total', category: 'Legs', muscle_group: 'Lower', unit: 'lbs' },
-  { name: 'Romanian Deadlift', type: '+bar', category: 'Legs', muscle_group: 'Lower', unit: 'lbs' },
-];
-
-async function seedDefaultExercises(db: D1Database, userId: string): Promise<void> {
-  const now = Date.now();
-
-  for (const exercise of DEFAULT_EXERCISES) {
-    await db
-      .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, muscle_group, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(generateId(), userId, exercise.name, exercise.type, exercise.category, exercise.muscle_group, exercise.unit, now)
-      .run();
-  }
 }
 
 // ==================== WORKOUTS ====================

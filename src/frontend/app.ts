@@ -73,6 +73,11 @@ function getExerciseUnit(exerciseName: string): 'lbs' | 'kg' {
   return exercise?.unit || 'lbs';
 }
 
+function isExerciseInWorkout(exerciseName: string): boolean {
+  if (!state.currentWorkout) return false;
+  return state.currentWorkout.exercises.some(e => e.name === exerciseName);
+}
+
 function getTypeColor(type: string): string {
   if (type === '+bar') return 'text-yellow-500';
   if (type === '/side') return 'text-purple-400';
@@ -983,10 +988,17 @@ function renderAddExerciseCategories(): void {
             const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
             const latestPR = getLatestPRForExercise(e.name);
             const prText = latestPR ? `★ ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
+            const inWorkout = isExerciseInWorkout(e.name);
+            const buttonClass = inWorkout
+              ? 'w-full bg-gray-800 rounded-lg p-3 text-left opacity-50 cursor-not-allowed'
+              : 'w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600';
+            const inWorkoutBadge = inWorkout
+              ? '<span class="text-xs bg-gray-600 text-gray-400 px-2 py-0.5 rounded ml-2">In workout</span>'
+              : '';
             return `
-              <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600">
+              <button ${inWorkout ? 'disabled' : `onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')"`} class="${buttonClass}" data-exercise-in-workout="${inWorkout}">
                 <div class="flex justify-between items-center">
-                  <span class="font-medium">${e.name}</span>
+                  <span class="font-medium">${e.name}${inWorkoutBadge}</span>
                   ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
                 </div>
                 ${prText ? `<div class="text-xs text-yellow-400 mt-1">${prText}</div>` : ''}
@@ -1031,11 +1043,18 @@ function filterAddExerciseSearch(): void {
   results.innerHTML = filtered.map(e => {
     const lastLogged = getLastLoggedDate(e.name);
     const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+    const inWorkout = isExerciseInWorkout(e.name);
+    const buttonClass = inWorkout
+      ? 'w-full bg-gray-800 rounded-lg p-3 text-left opacity-50 cursor-not-allowed'
+      : 'w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600';
+    const inWorkoutBadge = inWorkout
+      ? '<span class="text-xs bg-gray-600 text-gray-400 px-2 py-0.5 rounded ml-2">In workout</span>'
+      : '';
 
     return `
-      <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600">
+      <button ${inWorkout ? 'disabled' : `onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')"`} class="${buttonClass}" data-exercise-in-workout="${inWorkout}">
         <div class="flex justify-between items-center">
-          <span class="font-medium">${e.name}</span>
+          <span class="font-medium">${e.name}${inWorkoutBadge}</span>
           ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
         </div>
       </button>

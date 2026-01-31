@@ -85,6 +85,65 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#add-Back-exercises').getByText('Lat Pulldown')).toBeVisible();
   });
 
+  test('should gray out exercises already in workout in category view', async ({ page }) => {
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+
+    // Add Bench Press via search
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Verify Bench Press is in workout
+    await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
+
+    // Go back to add exercise screen
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+
+    // Expand Chest category
+    await page.getByRole('button', { name: /^Chest/ }).click();
+
+    // Verify Bench Press is grayed out with "In workout" badge
+    const benchPressButton = page.locator('#add-Chest-exercises button[data-exercise-in-workout="true"]').filter({ hasText: 'Bench Press' });
+    await expect(benchPressButton).toBeVisible();
+    await expect(benchPressButton).toHaveClass(/opacity-50/);
+    await expect(benchPressButton).toBeDisabled();
+    await expect(benchPressButton.getByText('In workout')).toBeVisible();
+  });
+
+  test('should gray out exercises already in workout in search results', async ({ page }) => {
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+
+    // Add Bench Press via search
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Verify Bench Press is in workout
+    await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
+
+    // Go back to add exercise screen and search for "Press"
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+
+    // Verify Bench Press is grayed out in search results
+    const benchPressButton = page.locator('#add-exercise-search-results button[data-exercise-in-workout="true"]').filter({ hasText: 'Bench Press' });
+    await expect(benchPressButton).toBeVisible();
+    await expect(benchPressButton).toHaveClass(/opacity-50/);
+    await expect(benchPressButton).toBeDisabled();
+    await expect(benchPressButton.getByText('In workout')).toBeVisible();
+
+    // Verify Overhead Press is NOT grayed out (contains "Press" but not in workout)
+    const overheadPressButton = page.locator('#add-exercise-search-results button[data-exercise-in-workout="false"]').filter({ hasText: 'Overhead Press' });
+    await expect(overheadPressButton).toBeVisible();
+    await expect(overheadPressButton).not.toHaveClass(/opacity-50/);
+    await expect(overheadPressButton).not.toBeDisabled();
+  });
+
   test('should add a set to an exercise', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
@@ -325,8 +384,9 @@ test.describe('Calendar View', () => {
     // Click next month button
     await page.locator('button').filter({ has: page.locator('path[d*="M9 5l7 7-7 7"]') }).click();
 
-    // Should show next month
+    // Should show next month (use day 1 to avoid month overflow issues like Jan 31 -> March)
     const nextMonthDate = new Date();
+    nextMonthDate.setDate(1);
     nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
     const nextMonth = nextMonthDate.toLocaleString('default', { month: 'long' });
     const nextYear = nextMonthDate.getFullYear();

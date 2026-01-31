@@ -1957,52 +1957,29 @@ function updateTimerDisplay(): void {
   }
 }
 
-function updateTimerButtonIndicator(): void {
-  const btn = $('rest-timer-btn');
-  if (!btn) return;
+function updateTimerButtons(): void {
+  const playBtn = $('rest-timer-play-btn');
+  const pauseBtn = $('rest-timer-pause-btn');
+  const stopBtn = $('rest-timer-stop-btn');
 
-  const indicator = btn.querySelector('.timer-running-indicator');
-  const icon = $('rest-timer-icon');
-  const btnTime = $('rest-timer-btn-time');
+  if (!playBtn || !pauseBtn || !stopBtn) return;
 
-  // Show time on button when timer has elapsed time (running or paused)
-  if (restTimerSeconds > 0) {
-    if (icon) icon.classList.add('hidden');
-    if (btnTime) {
-      btnTime.textContent = formatTimerDisplay(restTimerSeconds);
-      btnTime.classList.remove('hidden');
-    }
-  } else {
-    // Show icon when timer is at 00:00
-    if (icon) icon.classList.remove('hidden');
-    if (btnTime) btnTime.classList.add('hidden');
-  }
-
-  // Running indicator (green dot)
   if (restTimerRunning) {
-    btn.setAttribute('data-running', 'true');
-    btn.classList.add('timer-running');
-    if (indicator) indicator.classList.remove('hidden');
+    // Running: show pause and stop
+    playBtn.classList.add('hidden');
+    pauseBtn.classList.remove('hidden');
+    stopBtn.classList.remove('hidden');
+  } else if (restTimerSeconds > 0) {
+    // Paused (has time but not running): show play and stop
+    playBtn.classList.remove('hidden');
+    pauseBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
   } else {
-    btn.setAttribute('data-running', 'false');
-    btn.classList.remove('timer-running');
-    if (indicator) indicator.classList.add('hidden');
+    // Stopped (no time): show only play
+    playBtn.classList.remove('hidden');
+    pauseBtn.classList.add('hidden');
+    stopBtn.classList.add('hidden');
   }
-}
-
-function openRestTimer(): void {
-  const modal = $('rest-timer-modal');
-  modal.classList.remove('hidden');
-  modal.setAttribute('aria-hidden', 'false');
-  updateTimerDisplay();
-}
-
-function closeRestTimer(): void {
-  const modal = $('rest-timer-modal');
-  modal.classList.add('hidden');
-  modal.setAttribute('aria-hidden', 'true');
-  // Timer keeps running in background - just update the button indicator
-  updateTimerButtonIndicator();
 }
 
 function startRestTimer(): void {
@@ -2012,9 +1989,8 @@ function startRestTimer(): void {
   restTimerIntervalId = setInterval(() => {
     restTimerSeconds++;
     updateTimerDisplay();
-    updateTimerButtonIndicator(); // Update button time while ticking
   }, 1000);
-  updateTimerButtonIndicator();
+  updateTimerButtons();
 }
 
 function pauseRestTimer(): void {
@@ -2025,10 +2001,10 @@ function pauseRestTimer(): void {
     clearInterval(restTimerIntervalId);
     restTimerIntervalId = null;
   }
-  updateTimerButtonIndicator();
+  updateTimerButtons();
 }
 
-function resetRestTimer(): void {
+function stopRestTimer(): void {
   // Stop the timer if running
   if (restTimerRunning) {
     restTimerRunning = false;
@@ -2040,7 +2016,7 @@ function resetRestTimer(): void {
   // Reset to zero
   restTimerSeconds = 0;
   updateTimerDisplay();
-  updateTimerButtonIndicator();
+  updateTimerButtons();
 }
 
 // ==================== INIT ====================
@@ -2129,11 +2105,9 @@ async function init(): Promise<void> {
   showRegisterForm,
   logout,
   // Rest Timer
-  openRestTimer,
-  closeRestTimer,
   startRestTimer,
   pauseRestTimer,
-  resetRestTimer,
+  stopRestTimer,
 };
 
 init();

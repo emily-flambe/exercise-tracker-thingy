@@ -441,25 +441,12 @@ function startWorkoutInternal(targetCategories?: Category[]): void {
 function updateWorkoutTitle(): void {
   if (!state.currentWorkout) return;
 
-  const categories = state.currentWorkout.targetCategories;
-  const hasCategories = categories && categories.length > 0;
-
-  let categoryText = '';
-  if (hasCategories) {
-    if (categories.length <= 2) {
-      categoryText = categories.join(' & ');
-    } else {
-      categoryText = `${categories.slice(0, 2).join(', ')} +${categories.length - 2}`;
-    }
-  }
-
   if (isEditingFromHistory) {
-    // Editing from history - include date
-    const dateText = formatDate(state.currentWorkout.startTime);
-    $('workout-title').textContent = hasCategories ? `${dateText} - ${categoryText}` : dateText;
+    // Editing from history - show date
+    $('workout-title').textContent = formatDate(state.currentWorkout.startTime);
   } else {
     // New workout
-    $('workout-title').textContent = hasCategories ? categoryText : "Today's Workout";
+    $('workout-title').textContent = "Today's Workout";
   }
 }
 

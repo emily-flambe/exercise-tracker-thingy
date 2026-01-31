@@ -53,6 +53,11 @@ let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// ==================== REST TIMER STATE ====================
+let restTimerSeconds = 0;
+let restTimerRunning = false;
+let restTimerIntervalId: ReturnType<typeof setInterval> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
 let selectedTargetCategories = new Set<Category>(); // Track selected categories for new workout
 let isEditingCategories = false; // Track if we're editing categories of an existing workout
@@ -1951,6 +1956,88 @@ function logout(): void {
   showAuthScreen();
 }
 
+// ==================== REST TIMER ====================
+function formatTimerDisplay(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay(): void {
+  const display = $('rest-timer-display');
+  if (display) {
+    display.textContent = formatTimerDisplay(restTimerSeconds);
+  }
+}
+
+function updateTimerButtonIndicator(): void {
+  const btn = $('rest-timer-btn');
+  if (!btn) return;
+
+  const indicator = btn.querySelector('.timer-running-indicator');
+  if (restTimerRunning) {
+    btn.setAttribute('data-running', 'true');
+    btn.classList.add('timer-running');
+    if (indicator) indicator.classList.remove('hidden');
+  } else {
+    btn.setAttribute('data-running', 'false');
+    btn.classList.remove('timer-running');
+    if (indicator) indicator.classList.add('hidden');
+  }
+}
+
+function openRestTimer(): void {
+  const modal = $('rest-timer-modal');
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  updateTimerDisplay();
+}
+
+function closeRestTimer(): void {
+  const modal = $('rest-timer-modal');
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  // Timer keeps running in background - just update the button indicator
+  updateTimerButtonIndicator();
+}
+
+function startRestTimer(): void {
+  if (restTimerRunning) return;
+
+  restTimerRunning = true;
+  restTimerIntervalId = setInterval(() => {
+    restTimerSeconds++;
+    updateTimerDisplay();
+  }, 1000);
+  updateTimerButtonIndicator();
+}
+
+function pauseRestTimer(): void {
+  if (!restTimerRunning) return;
+
+  restTimerRunning = false;
+  if (restTimerIntervalId) {
+    clearInterval(restTimerIntervalId);
+    restTimerIntervalId = null;
+  }
+  updateTimerButtonIndicator();
+}
+
+function resetRestTimer(): void {
+  // Stop the timer if running
+  if (restTimerRunning) {
+    restTimerRunning = false;
+    if (restTimerIntervalId) {
+      clearInterval(restTimerIntervalId);
+      restTimerIntervalId = null;
+    }
+  }
+  // Reset to zero
+  restTimerSeconds = 0;
+  updateTimerDisplay();
+  updateTimerButtonIndicator();
+}
+
 // ==================== INIT ====================
 async function init(): Promise<void> {
   // Set version
@@ -2036,6 +2123,12 @@ async function init(): Promise<void> {
   showLoginForm,
   showRegisterForm,
   logout,
+  // Rest Timer
+  openRestTimer,
+  closeRestTimer,
+  startRestTimer,
+  pauseRestTimer,
+  resetRestTimer,
 };
 
 init();

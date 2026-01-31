@@ -46,6 +46,35 @@
       Saved
     </div>
 
+    <!-- Rest Timer Modal -->
+    <div id="rest-timer-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
+      <div class="absolute inset-0 bg-black/70" onclick="app.closeRestTimer()"></div>
+      <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-sm w-full mx-4">
+        <div class="flex justify-between items-center p-4 border-b border-gray-700">
+          <h2 class="text-lg font-semibold">Rest Timer</h2>
+          <button id="rest-timer-close-btn" onclick="app.closeRestTimer()" class="text-gray-400 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="p-6 text-center">
+          <div id="rest-timer-display" class="text-5xl font-mono font-bold mb-6">00:00</div>
+          <div class="flex justify-center gap-4">
+            <button id="rest-timer-start-btn" onclick="app.startRestTimer()" class="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2 rounded-lg">
+              Start
+            </button>
+            <button id="rest-timer-pause-btn" onclick="app.pauseRestTimer()" class="bg-yellow-600 hover:bg-yellow-700 text-white font-medium px-6 py-2 rounded-lg">
+              Pause
+            </button>
+            <button id="rest-timer-reset-btn" onclick="app.resetRestTimer()" class="bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-2 rounded-lg">
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- PR History Modal -->
     <div id="pr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
       <div class="absolute inset-0 bg-black/70" onclick="app.hidePRHistory()"></div>
@@ -106,9 +135,17 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
               </svg>
             </button>
-            <button onclick="app.finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">
-              Finish
-            </button>
+            <div class="flex items-center gap-2">
+              <button id="rest-timer-btn" onclick="app.openRestTimer()" class="bg-gray-700 hover:bg-gray-600 text-white font-medium px-3 py-2 rounded-lg flex items-center gap-1" data-running="false">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="timer-running-indicator hidden text-green-400">●</span>
+              </button>
+              <button onclick="app.finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">
+                Finish
+              </button>
+            </div>
           </header>
           <div id="exercise-list"></div>
           <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">

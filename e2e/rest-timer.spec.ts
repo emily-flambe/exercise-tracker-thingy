@@ -255,4 +255,58 @@ test.describe('Rest Timer', () => {
     // At least one of these indicators should be true
     expect(hasRunningAttribute === 'true' || hasRunningIndicator || hasRunningClass).toBeTruthy();
   });
+
+  test('timer button should show elapsed time instead of clock icon when timer has time', async ({ page }) => {
+    // Start a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
+
+    // Initially button should show clock icon, not time
+    await expect(page.locator('#rest-timer-icon')).toBeVisible();
+    await expect(page.locator('#rest-timer-btn-time')).not.toBeVisible();
+
+    // Open timer modal and start
+    await page.locator('#rest-timer-btn').click();
+    await page.locator('#rest-timer-start-btn').click();
+
+    // Wait for timer to tick
+    await page.waitForTimeout(1500);
+
+    // Close modal
+    await page.locator('#rest-timer-close-btn').click();
+    await expect(page.locator('#rest-timer-modal')).not.toBeVisible();
+
+    // Button should now show time instead of clock icon
+    await expect(page.locator('#rest-timer-icon')).not.toBeVisible();
+    await expect(page.locator('#rest-timer-btn-time')).toBeVisible();
+    
+    // Time should be in MM:SS format and not 00:00
+    const timeText = await page.locator('#rest-timer-btn-time').textContent();
+    expect(timeText).toMatch(/^\d{2}:\d{2}$/);
+    expect(timeText).not.toBe('00:00');
+  });
+
+  test('timer button should show clock icon again after reset', async ({ page }) => {
+    // Start a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
+
+    // Open timer modal, start, then close
+    await page.locator('#rest-timer-btn').click();
+    await page.locator('#rest-timer-start-btn').click();
+    await page.waitForTimeout(1500);
+    await page.locator('#rest-timer-close-btn').click();
+
+    // Button should show time
+    await expect(page.locator('#rest-timer-btn-time')).toBeVisible();
+
+    // Open modal and reset
+    await page.locator('#rest-timer-btn').click();
+    await page.locator('#rest-timer-reset-btn').click();
+    await page.locator('#rest-timer-close-btn').click();
+
+    // Button should show clock icon again
+    await expect(page.locator('#rest-timer-icon')).toBeVisible();
+    await expect(page.locator('#rest-timer-btn-time')).not.toBeVisible();
+  });
 });

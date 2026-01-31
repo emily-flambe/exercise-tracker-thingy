@@ -137,9 +137,10 @@
             </button>
             <div class="flex items-center gap-2">
               <button id="rest-timer-btn" onclick="app.openRestTimer()" class="bg-gray-700 hover:bg-gray-600 text-white font-medium px-3 py-2 rounded-lg flex items-center gap-1" data-running="false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg id="rest-timer-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
+                <span id="rest-timer-btn-time" class="hidden font-mono text-sm"></span>
                 <span class="timer-running-indicator hidden text-green-400">●</span>
               </button>
               <button onclick="app.finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">

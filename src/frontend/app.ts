@@ -1975,6 +1975,23 @@ function updateTimerButtonIndicator(): void {
   if (!btn) return;
 
   const indicator = btn.querySelector('.timer-running-indicator');
+  const icon = $('rest-timer-icon');
+  const btnTime = $('rest-timer-btn-time');
+
+  // Show time on button when timer has elapsed time (running or paused)
+  if (restTimerSeconds > 0) {
+    if (icon) icon.classList.add('hidden');
+    if (btnTime) {
+      btnTime.textContent = formatTimerDisplay(restTimerSeconds);
+      btnTime.classList.remove('hidden');
+    }
+  } else {
+    // Show icon when timer is at 00:00
+    if (icon) icon.classList.remove('hidden');
+    if (btnTime) btnTime.classList.add('hidden');
+  }
+
+  // Running indicator (green dot)
   if (restTimerRunning) {
     btn.setAttribute('data-running', 'true');
     btn.classList.add('timer-running');
@@ -2008,6 +2025,7 @@ function startRestTimer(): void {
   restTimerIntervalId = setInterval(() => {
     restTimerSeconds++;
     updateTimerDisplay();
+    updateTimerButtonIndicator(); // Update button time while ticking
   }, 1000);
   updateTimerButtonIndicator();
 }

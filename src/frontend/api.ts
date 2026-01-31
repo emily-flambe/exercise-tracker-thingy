@@ -141,12 +141,15 @@ export interface Workout {
   created_at: number;
 }
 
+export type MuscleGroup = 'Upper' | 'Lower' | 'Core' | 'Other';
+
 export interface CustomExercise {
   id: string;
   user_id: string;
   name: string;
   type: 'total' | '/side' | '+bar' | 'bodyweight';
   category: string;
+  muscle_group: MuscleGroup;
   unit: 'lbs' | 'kg';
   created_at: number;
 }
@@ -197,6 +200,7 @@ export async function createCustomExercise(data: {
   name: string;
   type: string;
   category: string;
+  muscle_group: string;
   unit: string;
 }): Promise<CustomExercise> {
   return apiFetch<CustomExercise>('/exercises', {
@@ -209,6 +213,7 @@ export async function updateCustomExercise(id: string, data: {
   name: string;
   type: string;
   category: string;
+  muscle_group: string;
   unit: string;
 }): Promise<CustomExercise> {
   return apiFetch<CustomExercise>(`/exercises/${id}`, {

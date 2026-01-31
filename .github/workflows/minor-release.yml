@@ -1,0 +1,93 @@
+name: Minor Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tags
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Determine next minor version
+        id: version
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            # No tags exist, start with v1.0.0
+            NEW_VERSION="1.0.0"
+          else
+            # Extract version without 'v' prefix
+            VERSION=${LATEST_TAG#v}
+
+            # Split version into major.minor.patch
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+            # Increment minor version, reset patch to 0
+            MINOR=$((MINOR + 1))
+            NEW_VERSION="$MAJOR.$MINOR.0"
+          fi
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Next version: v$NEW_VERSION"
+
+      - name: Set version in package.json
+        run: npm pkg set version=${{ steps.version.outputs.version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web and sync Capacitor
+        run: npm run cap:sync
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Build release APK
+        working-directory: android
+        env:
+          KEYSTORE_FILE: release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: workout
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Rename APK with version
+        run: |
+          VERSION="${{ steps.version.outputs.tag }}"
+          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/workout-tracker-${VERSION}.apk
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.version.outputs.tag }} -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: android/app/build/outputs/apk/release/*.apk
+          generate_release_notes: true

@@ -127,8 +127,8 @@
           </div>
         </div>
 
-        <div id="workout-active" class="screen p-4">
-          <header class="flex justify-between items-center mb-4 pt-2">
+        <div id="workout-active" class="screen">
+          <header class="sticky top-0 z-10 bg-gray-800 flex justify-between items-center px-4 py-3 border-b border-gray-700">
             <button onclick="app.showEditCategories()" class="text-left hover:text-blue-400 transition-colors">
               <h1 class="text-xl font-bold" id="workout-title">Today's Workout</h1>
             </button>
@@ -145,20 +145,22 @@
               </button>
             </div>
           </header>
-          <div id="exercise-list"></div>
-          <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
-            + Add Exercise
-          </button>
-          <div id="delete-workout-btn" class="w-full text-center py-4 mt-4">
-            <button onclick="app.showDeleteCurrentWorkoutConfirm()" class="text-red-400 hover:text-red-300 text-sm">
-              Delete Workout
+          <div class="p-4">
+            <div id="exercise-list"></div>
+            <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
+              + Add Exercise
             </button>
-          </div>
-          <div id="delete-workout-confirm" class="hidden w-full text-center py-4 mt-4">
-            <div class="flex items-center justify-center gap-3">
-              <span class="text-red-400 text-sm">Delete this workout?</span>
-              <button onclick="app.confirmDeleteCurrentWorkout()" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded">Yes</button>
-              <button onclick="app.cancelDeleteCurrentWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+            <div id="delete-workout-btn" class="w-full text-center py-4 mt-4">
+              <button onclick="app.showDeleteCurrentWorkoutConfirm()" class="text-red-400 hover:text-red-300 text-sm">
+                Delete Workout
+              </button>
+            </div>
+            <div id="delete-workout-confirm" class="hidden w-full text-center py-4 mt-4">
+              <div class="flex items-center justify-center gap-3">
+                <span class="text-red-400 text-sm">Delete this workout?</span>
+                <button onclick="app.confirmDeleteCurrentWorkout()" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded">Yes</button>
+                <button onclick="app.cancelDeleteCurrentWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+              </div>
             </div>
           </div>
         </div>

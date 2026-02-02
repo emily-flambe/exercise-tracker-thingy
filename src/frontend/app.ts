@@ -53,6 +53,11 @@ let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// ==================== REST TIMER STATE ====================
+let restTimerSeconds = 0;
+let restTimerRunning = false;
+let restTimerIntervalId: ReturnType<typeof setInterval> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
 let selectedTargetCategories = new Set<Category>(); // Track selected categories for new workout
 let isEditingCategories = false; // Track if we're editing categories of an existing workout
@@ -436,25 +441,12 @@ function startWorkoutInternal(targetCategories?: Category[]): void {
 function updateWorkoutTitle(): void {
   if (!state.currentWorkout) return;
 
-  const categories = state.currentWorkout.targetCategories;
-  const hasCategories = categories && categories.length > 0;
-
-  let categoryText = '';
-  if (hasCategories) {
-    if (categories.length <= 2) {
-      categoryText = categories.join(' & ');
-    } else {
-      categoryText = `${categories.slice(0, 2).join(', ')} +${categories.length - 2}`;
-    }
-  }
-
   if (isEditingFromHistory) {
-    // Editing from history - include date
-    const dateText = formatDate(state.currentWorkout.startTime);
-    $('workout-title').textContent = hasCategories ? `${dateText} - ${categoryText}` : dateText;
+    // Editing from history - show date
+    $('workout-title').textContent = formatDate(state.currentWorkout.startTime);
   } else {
     // New workout
-    $('workout-title').textContent = hasCategories ? categoryText : "Today's Workout";
+    $('workout-title').textContent = "Today's Workout";
   }
 }
 
@@ -1951,6 +1943,82 @@ function logout(): void {
   showAuthScreen();
 }
 
+// ==================== REST TIMER ====================
+function formatTimerDisplay(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay(): void {
+  const display = $('rest-timer-display');
+  if (display) {
+    display.textContent = formatTimerDisplay(restTimerSeconds);
+  }
+}
+
+function updateTimerButtons(): void {
+  const playBtn = $('rest-timer-play-btn');
+  const pauseBtn = $('rest-timer-pause-btn');
+  const stopBtn = $('rest-timer-stop-btn');
+
+  if (!playBtn || !pauseBtn || !stopBtn) return;
+
+  if (restTimerRunning) {
+    // Running: show pause and stop
+    playBtn.classList.add('hidden');
+    pauseBtn.classList.remove('hidden');
+    stopBtn.classList.remove('hidden');
+  } else if (restTimerSeconds > 0) {
+    // Paused (has time but not running): show play and stop
+    playBtn.classList.remove('hidden');
+    pauseBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
+  } else {
+    // Stopped (no time): show only play
+    playBtn.classList.remove('hidden');
+    pauseBtn.classList.add('hidden');
+    stopBtn.classList.add('hidden');
+  }
+}
+
+function startRestTimer(): void {
+  if (restTimerRunning) return;
+
+  restTimerRunning = true;
+  restTimerIntervalId = setInterval(() => {
+    restTimerSeconds++;
+    updateTimerDisplay();
+  }, 1000);
+  updateTimerButtons();
+}
+
+function pauseRestTimer(): void {
+  if (!restTimerRunning) return;
+
+  restTimerRunning = false;
+  if (restTimerIntervalId) {
+    clearInterval(restTimerIntervalId);
+    restTimerIntervalId = null;
+  }
+  updateTimerButtons();
+}
+
+function stopRestTimer(): void {
+  // Stop the timer if running
+  if (restTimerRunning) {
+    restTimerRunning = false;
+    if (restTimerIntervalId) {
+      clearInterval(restTimerIntervalId);
+      restTimerIntervalId = null;
+    }
+  }
+  // Reset to zero
+  restTimerSeconds = 0;
+  updateTimerDisplay();
+  updateTimerButtons();
+}
+
 // ==================== INIT ====================
 async function init(): Promise<void> {
   // Set version
@@ -2036,6 +2104,10 @@ async function init(): Promise<void> {
   showLoginForm,
   showRegisterForm,
   logout,
+  // Rest Timer
+  startRestTimer,
+  pauseRestTimer,
+  stopRestTimer,
 };
 
 init();

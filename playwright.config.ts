@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.BASE_URL || 'http://localhost:8787';
+const useRemote = !!process.env.BASE_URL;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -9,7 +12,7 @@ export default defineConfig({
   reporter: 'html',
   timeout: 30000,
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:8787',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -18,12 +21,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: process.env.CI
-      ? 'wrangler dev --local --port 8787'
-      : 'npm run dev',
-    url: 'http://localhost:8787',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  // Skip webServer when using remote BASE_URL
+  ...(useRemote ? {} : {
+    webServer: {
+      command: process.env.CI
+        ? 'wrangler dev --local --port 8787'
+        : 'npm run dev',
+      url: 'http://localhost:8787',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+    },
+  }),
 });

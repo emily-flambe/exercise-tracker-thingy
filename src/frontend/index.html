@@ -98,32 +98,55 @@
           </div>
         </div>
 
-        <div id="workout-active" class="screen p-4">
-          <header class="flex justify-between items-center mb-4 pt-2">
-            <button onclick="app.showEditCategories()" class="text-left flex items-center gap-2 hover:text-blue-400 transition-colors group">
+        <div id="workout-active" class="screen">
+          <header class="sticky top-0 z-10 bg-gray-800 flex justify-between items-center px-4 py-3 border-b border-gray-700">
+            <button onclick="app.showEditCategories()" class="text-left hover:text-blue-400 transition-colors">
               <h1 class="text-xl font-bold" id="workout-title">Today's Workout</h1>
-              <svg class="w-4 h-4 text-gray-500 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-              </svg>
             </button>
-            <button onclick="app.finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">
-              Finish
-            </button>
+            <div class="flex items-center gap-2">
+              <!-- Rest Timer Inline -->
+              <div id="rest-timer-container" class="flex items-center gap-1">
+                <span id="rest-timer-display" class="font-mono text-lg font-bold min-w-[52px] text-center">00:00</span>
+                <!-- Play button (shown when stopped or paused) -->
+                <button id="rest-timer-play-btn" onclick="app.startRestTimer()" class="bg-green-600 hover:bg-green-700 text-white p-1.5 rounded-lg" title="Start">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </button>
+                <!-- Pause button (shown when running) -->
+                <button id="rest-timer-pause-btn" onclick="app.pauseRestTimer()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-white p-1.5 rounded-lg" title="Pause">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                  </svg>
+                </button>
+                <!-- Stop button (shown when running or paused) -->
+                <button id="rest-timer-stop-btn" onclick="app.stopRestTimer()" class="hidden bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-lg" title="Stop">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 6h12v12H6z"/>
+                  </svg>
+                </button>
+              </div>
+              <button onclick="app.finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">
+                Finish
+              </button>
+            </div>
           </header>
-          <div id="exercise-list"></div>
-          <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
-            + Add Exercise
-          </button>
-          <div id="delete-workout-btn" class="w-full text-center py-4 mt-4">
-            <button onclick="app.showDeleteCurrentWorkoutConfirm()" class="text-red-400 hover:text-red-300 text-sm">
-              Delete Workout
+          <div class="p-4">
+            <div id="exercise-list"></div>
+            <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
+              + Add Exercise
             </button>
-          </div>
-          <div id="delete-workout-confirm" class="hidden w-full text-center py-4 mt-4">
-            <div class="flex items-center justify-center gap-3">
-              <span class="text-red-400 text-sm">Delete this workout?</span>
-              <button onclick="app.confirmDeleteCurrentWorkout()" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded">Yes</button>
-              <button onclick="app.cancelDeleteCurrentWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+            <div id="delete-workout-btn" class="w-full text-center py-4 mt-4">
+              <button onclick="app.showDeleteCurrentWorkoutConfirm()" class="text-red-400 hover:text-red-300 text-sm">
+                Delete Workout
+              </button>
+            </div>
+            <div id="delete-workout-confirm" class="hidden w-full text-center py-4 mt-4">
+              <div class="flex items-center justify-center gap-3">
+                <span class="text-red-400 text-sm">Delete this workout?</span>
+                <button onclick="app.confirmDeleteCurrentWorkout()" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded">Yes</button>
+                <button onclick="app.cancelDeleteCurrentWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+              </div>
             </div>
           </div>
         </div>

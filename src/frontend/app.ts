@@ -55,7 +55,8 @@ let expandedNotes = new Set<string>(); // Track which notes are expanded (format
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // ==================== REST TIMER STATE ====================
-let restTimerSeconds = 0;
+let restTimerStartTime: number | null = null; // Timestamp when timer started/resumed
+let restTimerAccumulated = 0; // Accumulated seconds from previous pauses
 let restTimerRunning = false;
 let restTimerIntervalId: ReturnType<typeof setInterval> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
@@ -433,7 +434,6 @@ function startWorkoutInternal(targetCategories?: Category[]): void {
   expandedNotes.clear();
   selectedTargetCategories.clear();
   updateWorkoutTitle();
-  $('workout-finish-btn').textContent = 'Finish';
   showWorkoutScreen('workout-active');
   renderWorkout();
 }
@@ -459,7 +459,6 @@ function startWorkout(): void {
   isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
-  $('workout-finish-btn').textContent = 'Finish';
   showWorkoutScreen('workout-active');
   renderWorkout();
 }
@@ -483,23 +482,8 @@ async function finishWorkout(): Promise<void> {
 
     if (isEditingFromHistory) {
       // Editing existing workout from history - save and stay on workout screen
-      const btn = $('workout-finish-btn');
-
       await api.updateWorkout(state.editingWorkoutId!, workoutData);
       await loadData();
-
-      // Show "Saved" feedback
-      btn.textContent = 'Saved';
-      btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-      btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-
-      // Restore "Save" text after 2 seconds
-      setTimeout(() => {
-        btn.textContent = 'Save';
-        btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-        btn.classList.add('bg-green-600', 'hover:bg-green-700');
-      }, 2000);
-
       // Keep user on workout - don't clear state or navigate away
     } else if (state.editingWorkoutId) {
       // New workout that was auto-saved - update it and go to empty screen
@@ -1395,7 +1379,6 @@ function editWorkout(id: string): void {
   isEditingFromHistory = true;
   expandedNotes.clear();
   updateWorkoutTitle();
-  $('workout-finish-btn').textContent = 'Save';
   switchTab('workout');
   showWorkoutScreen('workout-active');
   renderWorkout();
@@ -1950,10 +1933,17 @@ function formatTimerDisplay(seconds: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+function getRestTimerSeconds(): number {
+  if (restTimerRunning && restTimerStartTime !== null) {
+    return restTimerAccumulated + Math.floor((Date.now() - restTimerStartTime) / 1000);
+  }
+  return restTimerAccumulated;
+}
+
 function updateTimerDisplay(): void {
   const display = $('rest-timer-display');
   if (display) {
-    display.textContent = formatTimerDisplay(restTimerSeconds);
+    display.textContent = formatTimerDisplay(getRestTimerSeconds());
   }
 }
 
@@ -1969,7 +1959,7 @@ function updateTimerButtons(): void {
     playBtn.classList.add('hidden');
     pauseBtn.classList.remove('hidden');
     stopBtn.classList.remove('hidden');
-  } else if (restTimerSeconds > 0) {
+  } else if (getRestTimerSeconds() > 0) {
     // Paused (has time but not running): show play and stop
     playBtn.classList.remove('hidden');
     pauseBtn.classList.add('hidden');
@@ -1986,16 +1976,21 @@ function startRestTimer(): void {
   if (restTimerRunning) return;
 
   restTimerRunning = true;
+  restTimerStartTime = Date.now();
+  // Update display frequently to stay accurate even when backgrounded
   restTimerIntervalId = setInterval(() => {
-    restTimerSeconds++;
     updateTimerDisplay();
   }, 1000);
+  updateTimerDisplay();
   updateTimerButtons();
 }
 
 function pauseRestTimer(): void {
   if (!restTimerRunning) return;
 
+  // Save accumulated time before stopping
+  restTimerAccumulated = getRestTimerSeconds();
+  restTimerStartTime = null;
   restTimerRunning = false;
   if (restTimerIntervalId) {
     clearInterval(restTimerIntervalId);
@@ -2014,7 +2009,8 @@ function stopRestTimer(): void {
     }
   }
   // Reset to zero
-  restTimerSeconds = 0;
+  restTimerStartTime = null;
+  restTimerAccumulated = 0;
   updateTimerDisplay();
   updateTimerButtons();
 }

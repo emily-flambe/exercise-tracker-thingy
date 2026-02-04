@@ -23,6 +23,7 @@ async function createTestExercises(page: Page) {
   await createExercise(page, 'Bench Press', '+bar', 'Chest', 'Upper');
   await createExercise(page, 'Squat', '+bar', 'Legs', 'Lower');
   await createExercise(page, 'Lat Pulldown', 'total', 'Back', 'Upper');
+  await createExercise(page, 'Overhead Press', '+bar', 'Shoulders', 'Upper');
 }
 
 test.describe('Workout Tracker', () => {

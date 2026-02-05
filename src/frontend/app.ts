@@ -14,6 +14,7 @@ interface Exercise {
   name: string;
   type: 'total' | '/side' | '+bar' | 'bodyweight';
   category: string;
+  muscle_group: string;
   unit: 'lbs' | 'kg';
 }
 
@@ -69,6 +70,7 @@ function getAllExercises(): Exercise[] {
     name: c.name,
     type: c.type,
     category: c.category,
+    muscle_group: c.muscle_group || 'Other',
     unit: c.unit,
   }));
 }
@@ -1081,6 +1083,7 @@ function addExerciseToWorkout(name: string): void {
 function showCreateExerciseFromWorkout(): void {
   $input('workout-exercise-name-input').value = '';
   $select('workout-exercise-category-input').value = 'Other';
+  $select('workout-exercise-muscle-group-input').value = 'Other';
   document.querySelectorAll('input[name="workout-weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = false;
   });
@@ -1102,6 +1105,7 @@ function setWorkoutExerciseUnit(unit: 'lbs' | 'kg'): void {
 async function saveExerciseFromWorkout(): Promise<void> {
   const name = $input('workout-exercise-name-input').value.trim();
   const category = $select('workout-exercise-category-input').value;
+  const muscle_group = $select('workout-exercise-muscle-group-input').value;
   const typeInput = document.querySelector('input[name="workout-weight-type"]:checked') as HTMLInputElement | null;
   const unit = workoutExerciseUnit;
 
@@ -1117,7 +1121,7 @@ async function saveExerciseFromWorkout(): Promise<void> {
   const type = typeInput.value as 'total' | '/side' | '+bar' | 'bodyweight';
 
   try {
-    await api.createCustomExercise({ name, type, category, unit });
+    await api.createCustomExercise({ name, type, category, muscle_group, unit });
     await loadData();
 
     // Add the newly created exercise to the current workout
@@ -1561,6 +1565,8 @@ function showCreateExercise(): void {
   $input('exercise-name-input').disabled = false;
   $select('exercise-category-input').value = 'Other';
   $select('exercise-category-input').disabled = false;
+  $select('exercise-muscle-group-input').value = 'Other';
+  $select('exercise-muscle-group-input').disabled = false;
   document.querySelectorAll('input[name="weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = false;
     (r as HTMLInputElement).disabled = false;
@@ -1591,6 +1597,8 @@ function showEditExercise(exerciseName: string): void {
   $input('exercise-name-input').disabled = !isCustom;
   $select('exercise-category-input').value = exercise.category;
   $select('exercise-category-input').disabled = !isCustom;
+  $select('exercise-muscle-group-input').value = exercise.muscle_group || 'Other';
+  $select('exercise-muscle-group-input').disabled = !isCustom;
 
   document.querySelectorAll('input[name="weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = (r as HTMLInputElement).value === exercise.type;
@@ -1765,6 +1773,7 @@ function renderWeightChart(data: Array<{ date: number; maxWeight: number }>, uni
 function hideEditExercise(): void {
   $input('exercise-name-input').disabled = false;
   $select('exercise-category-input').disabled = false;
+  $select('exercise-muscle-group-input').disabled = false;
   document.querySelectorAll('input[name="weight-type"]').forEach(r => (r as HTMLInputElement).disabled = false);
 
   state.editingExercise = null;
@@ -1781,6 +1790,7 @@ function setExerciseUnit(unit: 'lbs' | 'kg'): void {
 async function saveExercise(): Promise<void> {
   const name = $input('exercise-name-input').value.trim();
   const category = $select('exercise-category-input').value;
+  const muscle_group = $select('exercise-muscle-group-input').value;
   const typeInput = document.querySelector('input[name="weight-type"]:checked') as HTMLInputElement | null;
   const unit = currentExerciseUnit;
 
@@ -1798,9 +1808,9 @@ async function saveExercise(): Promise<void> {
   try {
     const oldName = state.editingExercise?.name;
     if (state.editingExercise?.id) {
-      await api.updateCustomExercise(state.editingExercise.id, { name, type, category, unit });
+      await api.updateCustomExercise(state.editingExercise.id, { name, type, category, muscle_group, unit });
     } else {
-      await api.createCustomExercise({ name, type, category, unit });
+      await api.createCustomExercise({ name, type, category, muscle_group, unit });
     }
     await loadData();
 

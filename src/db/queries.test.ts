@@ -347,6 +347,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Old Exercise Name',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -373,6 +374,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'New Exercise Name',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -389,6 +391,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Press Exercise',
       type: 'total',
       category: 'Shoulders',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -417,6 +420,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Renamed Press',
       type: 'total',
       category: 'Shoulders',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -436,6 +440,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Multi Workout Exercise',
       type: 'total',
       category: 'Back',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -469,6 +474,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Renamed Multi',
       type: 'total',
       category: 'Back',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -486,6 +492,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Consistent Name',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -507,6 +514,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Consistent Name',
       type: '+bar',
       category: 'Shoulders',
+      muscle_group: 'Upper',
       unit: 'kg'
     });
 
@@ -524,6 +532,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Shared Name',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -531,6 +540,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Shared Name',
       type: 'total',
       category: 'Back',
+      muscle_group: 'Upper',
       unit: 'kg'
     });
 
@@ -554,6 +564,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'User1 Renamed',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 

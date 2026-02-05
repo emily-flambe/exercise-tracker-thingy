@@ -1,6 +1,29 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 const testPassword = 'testpass123';
+
+// Helper function to create a custom exercise
+async function createExercise(page: Page, name: string, type: string, category: string, muscleGroup: string) {
+  await page.getByRole('button', { name: 'Exercises' }).click();
+  await page.getByRole('button', { name: '+ New' }).click();
+  await page.fill('#exercise-name-input', name);
+  await page.selectOption('#exercise-category-input', category);
+  await page.selectOption('#exercise-muscle-group-input', muscleGroup);
+  // Weight type is a radio button
+  await page.locator(`input[name="weight-type"][value="${type}"]`).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  // Wait for save to complete and list view to become visible
+  await expect(page.locator('#exercises-list-view')).toBeVisible({ timeout: 10000 });
+  // Go back to workout tab
+  await page.getByRole('button', { name: 'Workout' }).click();
+}
+
+// Helper function to set up test exercises
+async function createTestExercises(page: Page) {
+  await createExercise(page, 'Bench Press', '+bar', 'Chest', 'Upper');
+  await createExercise(page, 'Squat', '+bar', 'Legs', 'Lower');
+  await createExercise(page, 'Lat Pulldown', 'total', 'Back', 'Upper');
+}
 
 test.describe('Workout Tracker', () => {
   test.beforeEach(async ({ page }) => {
@@ -21,6 +44,9 @@ test.describe('Workout Tracker', () => {
 
     // Wait for main app to be visible
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+
+    // Create test exercises (since there are no default exercises)
+    await createTestExercises(page);
   });
 
   test('should display the start workout button', async ({ page }) => {
@@ -113,6 +139,9 @@ test.describe('Workout Tracker', () => {
   });
 
   test('should gray out exercises already in workout in search results', async ({ page }) => {
+    // Create Overhead Press for this specific test
+    await createExercise(page, 'Overhead Press', '+bar', 'Shoulders', 'Upper');
+
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -329,6 +358,9 @@ test.describe('Calendar View', () => {
 
     // Wait for main app to be visible
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+
+    // Create test exercises (since there are no default exercises)
+    await createTestExercises(page);
   });
 
   test('should show calendar view in history tab after completing workout', async ({ page }) => {
@@ -455,7 +487,8 @@ test.describe('Calendar View', () => {
     // Should navigate to workout tab showing the workout
     await expect(page.locator('#tab-workout.tab-content.active')).toBeVisible();
     await expect(page.locator('#workout-active').getByText('Bench Press')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+    // Verify the set we added is visible (weight 135, reps 10)
+    await expect(page.locator('input[type="number"]').first()).toBeVisible();
   });
 
   test('should not show "Copy to new workout" button', async ({ page }) => {
@@ -666,6 +699,9 @@ test.describe('Exercise Rename During Active Workout', () => {
 
     // Wait for main app to be visible
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+
+    // Create test exercises (since there are no default exercises)
+    await createTestExercises(page);
   });
 
   test('should update current workout when exercise is renamed', async ({ page }) => {

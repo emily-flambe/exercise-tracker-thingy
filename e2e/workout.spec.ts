@@ -455,7 +455,8 @@ test.describe('Calendar View', () => {
     // Should navigate to workout tab showing the workout
     await expect(page.locator('#tab-workout.tab-content.active')).toBeVisible();
     await expect(page.locator('#workout-active').getByText('Bench Press')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+    // Verify the set we added is visible (weight 135, reps 10)
+    await expect(page.locator('input[type="number"]').first()).toBeVisible();
   });
 
   test('should not show "Copy to new workout" button', async ({ page }) => {

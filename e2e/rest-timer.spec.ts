@@ -83,7 +83,7 @@ test.describe('Rest Timer', () => {
     await page.locator('#rest-timer-start-btn').click();
 
     // Wait a bit and verify timer has incremented
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1100);
 
     // Timer should show at least 00:01
     const timerText = await page.locator('#rest-timer-display').textContent();
@@ -104,7 +104,7 @@ test.describe('Rest Timer', () => {
     await page.locator('#rest-timer-start-btn').click();
 
     // Wait for timer to increment
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1100);
 
     // Click pause
     await page.locator('#rest-timer-pause-btn').click();
@@ -113,7 +113,7 @@ test.describe('Rest Timer', () => {
     const pausedTime = await page.locator('#rest-timer-display').textContent();
 
     // Wait a bit more
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1100);
 
     // Timer should still show the same time (paused)
     await expect(page.locator('#rest-timer-display')).toHaveText(pausedTime!);
@@ -131,7 +131,7 @@ test.describe('Rest Timer', () => {
     await page.locator('#rest-timer-start-btn').click();
 
     // Wait for timer to increment
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1100);
 
     // Verify timer is not 00:00
     const timerText = await page.locator('#rest-timer-display').textContent();
@@ -168,7 +168,7 @@ test.describe('Rest Timer', () => {
     await expect(page.locator('#rest-timer-modal')).not.toBeVisible();
 
     // Wait a bit while modal is closed
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1200);
 
     // Reopen modal
     await page.locator('#rest-timer-btn').click();
@@ -201,7 +201,7 @@ test.describe('Rest Timer', () => {
     await page.locator('#rest-timer-start-btn').click();
 
     // Wait for timer to increment
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(2100);
 
     // Close the modal
     await page.locator('#rest-timer-close-btn').click();
@@ -270,7 +270,7 @@ test.describe('Rest Timer', () => {
     await page.locator('#rest-timer-start-btn').click();
 
     // Wait for timer to tick
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1100);
 
     // Close modal
     await page.locator('#rest-timer-close-btn').click();
@@ -294,7 +294,7 @@ test.describe('Rest Timer', () => {
     // Open timer modal, start, then close
     await page.locator('#rest-timer-btn').click();
     await page.locator('#rest-timer-start-btn').click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1100);
     await page.locator('#rest-timer-close-btn').click();
 
     // Button should show time

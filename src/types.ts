@@ -41,6 +41,7 @@ export interface WorkoutExercise {
   name: string;
   sets: Set[];
   completed?: boolean;
+  notes?: string;
 }
 
 export interface Workout {
@@ -69,6 +70,7 @@ export interface WorkoutExerciseRow {
   exercise_name: string;
   position: number;
   completed: number;
+  notes: string | null;
 }
 
 export interface SetRow {

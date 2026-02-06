@@ -46,6 +46,27 @@
       Saved
     </div>
 
+    <!-- Exercise Notes Modal -->
+    <div id="exercise-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
+      <div class="absolute inset-0 bg-black/70" onclick="app.hideExerciseNotes()"></div>
+      <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-sm w-full mx-4 max-h-[80vh] overflow-hidden">
+        <div class="flex justify-between items-center p-4 border-b border-gray-700">
+          <h2 class="text-lg font-semibold" id="exercise-notes-title">Exercise Notes</h2>
+          <button onclick="app.hideExerciseNotes()" class="text-gray-400 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="p-4">
+          <textarea id="exercise-notes-textarea" rows="6" placeholder="Add notes for this exercise..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500 resize-none"></textarea>
+          <div class="flex justify-end mt-3">
+            <button onclick="app.saveExerciseNotes()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- PR History Modal -->
     <div id="pr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
       <div class="absolute inset-0 bg-black/70" onclick="app.hidePRHistory()"></div>

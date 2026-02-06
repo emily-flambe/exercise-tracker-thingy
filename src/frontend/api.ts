@@ -107,6 +107,7 @@ export interface WorkoutExercise {
   name: string;
   sets: Set[];
   completed?: boolean;
+  notes?: string;
 }
 
 export interface PersonalRecord {

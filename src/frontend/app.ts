@@ -14,6 +14,7 @@ interface Exercise {
   name: string;
   type: 'total' | '/side' | '+bar' | 'bodyweight';
   category: string;
+  muscle_group: string;
   unit: 'lbs' | 'kg';
 }
 
@@ -55,7 +56,8 @@ let expandedNotes = new Set<string>(); // Track which notes are expanded (format
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // ==================== REST TIMER STATE ====================
-let restTimerSeconds = 0;
+let restTimerStartTime: number | null = null; // Timestamp when timer started/resumed
+let restTimerAccumulated = 0; // Accumulated seconds from previous pauses
 let restTimerRunning = false;
 let restTimerIntervalId: ReturnType<typeof setInterval> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
@@ -75,6 +77,7 @@ function getAllExercises(): Exercise[] {
     name: c.name,
     type: c.type,
     category: c.category,
+    muscle_group: c.muscle_group || 'Other',
     unit: c.unit,
   }));
 }
@@ -222,6 +225,43 @@ function hidePRHistory(): void {
   const modal = $('pr-modal');
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
+}
+
+// Exercise notes modal
+let editingNotesExerciseIndex: number | null = null;
+
+function showExerciseNotes(exerciseIndex: number): void {
+  if (!state.currentWorkout) return;
+  const exercise = state.currentWorkout.exercises[exerciseIndex];
+  editingNotesExerciseIndex = exerciseIndex;
+
+  const modal = $('exercise-notes-modal');
+  const title = $('exercise-notes-title');
+  const textarea = $('exercise-notes-textarea') as HTMLTextAreaElement;
+
+  title.textContent = `${exercise.name} Notes`;
+  textarea.value = exercise.notes || '';
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  textarea.focus();
+}
+
+function hideExerciseNotes(): void {
+  const modal = $('exercise-notes-modal');
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  editingNotesExerciseIndex = null;
+}
+
+function saveExerciseNotes(): void {
+  if (editingNotesExerciseIndex === null || !state.currentWorkout) return;
+  const textarea = $('exercise-notes-textarea') as HTMLTextAreaElement;
+  const notes = textarea.value.trim();
+  state.currentWorkout.exercises[editingNotesExerciseIndex].notes = notes || undefined;
+  hideExerciseNotes();
+  renderWorkout();
+  scheduleAutoSave();
 }
 
 // Check if a set is a PR based on exercise name, weight, reps, and position
@@ -439,7 +479,6 @@ function startWorkoutInternal(targetCategories?: Category[]): void {
   expandedNotes.clear();
   selectedTargetCategories.clear();
   updateWorkoutTitle();
-  $('workout-finish-btn').textContent = 'Finish';
   showWorkoutScreen('workout-active');
   renderWorkout();
 }
@@ -465,7 +504,6 @@ function startWorkout(): void {
   isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
-  $('workout-finish-btn').textContent = 'Finish';
   showWorkoutScreen('workout-active');
   renderWorkout();
 }
@@ -489,23 +527,8 @@ async function finishWorkout(): Promise<void> {
 
     if (isEditingFromHistory) {
       // Editing existing workout from history - save and stay on workout screen
-      const btn = $('workout-finish-btn');
-
       await api.updateWorkout(state.editingWorkoutId!, workoutData);
       await loadData();
-
-      // Show "Saved" feedback
-      btn.textContent = 'Saved';
-      btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-      btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-
-      // Restore "Save" text after 2 seconds
-      setTimeout(() => {
-        btn.textContent = 'Save';
-        btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-        btn.classList.add('bg-green-600', 'hover:bg-green-700');
-      }, 2000);
-
       // Keep user on workout - don't clear state or navigate away
     } else if (state.editingWorkoutId) {
       // New workout that was auto-saved - update it and go to empty screen
@@ -732,7 +755,12 @@ function renderWorkout(): void {
           </div>
         </div>
         ${setsHtml}
-        <div class="flex justify-end mt-2">
+        <div class="flex justify-between items-center mt-2">
+          <button onclick="app.showExerciseNotes(${i})" class="${ex.notes ? 'text-blue-400' : 'text-gray-500'} hover:text-blue-300 transition-colors" title="${ex.notes ? 'Edit notes' : 'Add notes'}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+          </button>
           <button onclick="app.showPRHistory('${ex.name.replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-yellow-400 transition-colors" title="View PR history">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
@@ -1087,6 +1115,7 @@ function addExerciseToWorkout(name: string): void {
 function showCreateExerciseFromWorkout(): void {
   $input('workout-exercise-name-input').value = '';
   $select('workout-exercise-category-input').value = 'Other';
+  $select('workout-exercise-muscle-group-input').value = 'Other';
   document.querySelectorAll('input[name="workout-weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = false;
   });
@@ -1108,6 +1137,7 @@ function setWorkoutExerciseUnit(unit: 'lbs' | 'kg'): void {
 async function saveExerciseFromWorkout(): Promise<void> {
   const name = $input('workout-exercise-name-input').value.trim();
   const category = $select('workout-exercise-category-input').value;
+  const muscle_group = $select('workout-exercise-muscle-group-input').value;
   const typeInput = document.querySelector('input[name="workout-weight-type"]:checked') as HTMLInputElement | null;
   const unit = workoutExerciseUnit;
 
@@ -1123,7 +1153,7 @@ async function saveExerciseFromWorkout(): Promise<void> {
   const type = typeInput.value as 'total' | '/side' | '+bar' | 'bodyweight';
 
   try {
-    await api.createCustomExercise({ name, type, category, unit });
+    await api.createCustomExercise({ name, type, category, muscle_group, unit });
     await loadData();
 
     // Add the newly created exercise to the current workout
@@ -1401,7 +1431,6 @@ function editWorkout(id: string): void {
   isEditingFromHistory = true;
   expandedNotes.clear();
   updateWorkoutTitle();
-  $('workout-finish-btn').textContent = 'Save';
   switchTab('workout');
   showWorkoutScreen('workout-active');
   renderWorkout();
@@ -1567,6 +1596,8 @@ function showCreateExercise(): void {
   $input('exercise-name-input').disabled = false;
   $select('exercise-category-input').value = 'Other';
   $select('exercise-category-input').disabled = false;
+  $select('exercise-muscle-group-input').value = 'Other';
+  $select('exercise-muscle-group-input').disabled = false;
   document.querySelectorAll('input[name="weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = false;
     (r as HTMLInputElement).disabled = false;
@@ -1597,6 +1628,8 @@ function showEditExercise(exerciseName: string): void {
   $input('exercise-name-input').disabled = !isCustom;
   $select('exercise-category-input').value = exercise.category;
   $select('exercise-category-input').disabled = !isCustom;
+  $select('exercise-muscle-group-input').value = exercise.muscle_group || 'Other';
+  $select('exercise-muscle-group-input').disabled = !isCustom;
 
   document.querySelectorAll('input[name="weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = (r as HTMLInputElement).value === exercise.type;
@@ -1771,6 +1804,7 @@ function renderWeightChart(data: Array<{ date: number; maxWeight: number }>, uni
 function hideEditExercise(): void {
   $input('exercise-name-input').disabled = false;
   $select('exercise-category-input').disabled = false;
+  $select('exercise-muscle-group-input').disabled = false;
   document.querySelectorAll('input[name="weight-type"]').forEach(r => (r as HTMLInputElement).disabled = false);
 
   state.editingExercise = null;
@@ -1787,6 +1821,7 @@ function setExerciseUnit(unit: 'lbs' | 'kg'): void {
 async function saveExercise(): Promise<void> {
   const name = $input('exercise-name-input').value.trim();
   const category = $select('exercise-category-input').value;
+  const muscle_group = $select('exercise-muscle-group-input').value;
   const typeInput = document.querySelector('input[name="weight-type"]:checked') as HTMLInputElement | null;
   const unit = currentExerciseUnit;
 
@@ -1804,9 +1839,9 @@ async function saveExercise(): Promise<void> {
   try {
     const oldName = state.editingExercise?.name;
     if (state.editingExercise?.id) {
-      await api.updateCustomExercise(state.editingExercise.id, { name, type, category, unit });
+      await api.updateCustomExercise(state.editingExercise.id, { name, type, category, muscle_group, unit });
     } else {
-      await api.createCustomExercise({ name, type, category, unit });
+      await api.createCustomExercise({ name, type, category, muscle_group, unit });
     }
     await loadData();
 
@@ -1958,10 +1993,17 @@ function formatTimerDisplay(seconds: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+function getRestTimerSeconds(): number {
+  if (restTimerRunning && restTimerStartTime !== null) {
+    return restTimerAccumulated + Math.floor((Date.now() - restTimerStartTime) / 1000);
+  }
+  return restTimerAccumulated;
+}
+
 function updateTimerDisplay(): void {
   const display = $('rest-timer-display');
   if (display) {
-    display.textContent = formatTimerDisplay(restTimerSeconds);
+    display.textContent = formatTimerDisplay(getRestTimerSeconds());
   }
 }
 
@@ -1977,7 +2019,7 @@ function updateTimerButtons(): void {
     playBtn.classList.add('hidden');
     pauseBtn.classList.remove('hidden');
     stopBtn.classList.remove('hidden');
-  } else if (restTimerSeconds > 0) {
+  } else if (getRestTimerSeconds() > 0) {
     // Paused (has time but not running): show play and stop
     playBtn.classList.remove('hidden');
     pauseBtn.classList.add('hidden');
@@ -1994,16 +2036,21 @@ function startRestTimer(): void {
   if (restTimerRunning) return;
 
   restTimerRunning = true;
+  restTimerStartTime = Date.now();
+  // Update display frequently to stay accurate even when backgrounded
   restTimerIntervalId = setInterval(() => {
-    restTimerSeconds++;
     updateTimerDisplay();
   }, 1000);
+  updateTimerDisplay();
   updateTimerButtons();
 }
 
 function pauseRestTimer(): void {
   if (!restTimerRunning) return;
 
+  // Save accumulated time before stopping
+  restTimerAccumulated = getRestTimerSeconds();
+  restTimerStartTime = null;
   restTimerRunning = false;
   if (restTimerIntervalId) {
     clearInterval(restTimerIntervalId);
@@ -2022,7 +2069,8 @@ function stopRestTimer(): void {
     }
   }
   // Reset to zero
-  restTimerSeconds = 0;
+  restTimerStartTime = null;
+  restTimerAccumulated = 0;
   updateTimerDisplay();
   updateTimerButtons();
 }
@@ -2177,6 +2225,9 @@ async function init(): Promise<void> {
   toggleExerciseCompleted,
   showPRHistory,
   hidePRHistory,
+  showExerciseNotes,
+  hideExerciseNotes,
+  saveExerciseNotes,
   toggleSetCompleted,
   toggleSetMissed,
   toggleNoteField,

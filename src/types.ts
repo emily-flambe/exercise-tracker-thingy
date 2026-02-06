@@ -11,11 +11,13 @@ export type Category =
   | 'Core'
   | 'Cardio'
   | 'Other';
+export type MuscleGroup = 'Upper' | 'Lower' | 'Core' | 'Other';
 
 export interface Exercise {
   name: string;
   type: WeightType;
   category: Category;
+  muscle_group: MuscleGroup;
   unit: Unit;
 }
 
@@ -39,6 +41,7 @@ export interface WorkoutExercise {
   name: string;
   sets: Set[];
   completed?: boolean;
+  notes?: string;
 }
 
 export interface Workout {
@@ -67,6 +70,7 @@ export interface WorkoutExerciseRow {
   exercise_name: string;
   position: number;
   completed: number;
+  notes: string | null;
 }
 
 export interface SetRow {
@@ -86,6 +90,7 @@ export interface CustomExerciseRow {
   name: string;
   type: string;
   category: string;
+  muscle_group: string;
   unit: string;
   created_at: number;
 }
@@ -131,6 +136,7 @@ export interface CreateExerciseRequest {
   name: string;
   type: WeightType;
   category: Category;
+  muscle_group: MuscleGroup;
   unit: Unit;
 }
 
@@ -138,6 +144,7 @@ export interface UpdateExerciseRequest {
   name?: string;
   type?: WeightType;
   category?: Category;
+  muscle_group?: MuscleGroup;
   unit?: Unit;
 }
 

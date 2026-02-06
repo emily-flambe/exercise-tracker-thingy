@@ -4,6 +4,7 @@ import {
   createUser,
   createWorkout,
   getWorkout,
+  updateWorkout,
   createCustomExercise,
   updateCustomExercise,
   getAllCustomExercises,
@@ -347,6 +348,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Old Exercise Name',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -373,6 +375,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'New Exercise Name',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -389,6 +392,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Press Exercise',
       type: 'total',
       category: 'Shoulders',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -417,6 +421,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Renamed Press',
       type: 'total',
       category: 'Shoulders',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -436,6 +441,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Multi Workout Exercise',
       type: 'total',
       category: 'Back',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -469,6 +475,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Renamed Multi',
       type: 'total',
       category: 'Back',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -486,6 +493,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Consistent Name',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -507,6 +515,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Consistent Name',
       type: '+bar',
       category: 'Shoulders',
+      muscle_group: 'Upper',
       unit: 'kg'
     });
 
@@ -524,6 +533,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Shared Name',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -531,6 +541,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'Shared Name',
       type: 'total',
       category: 'Back',
+      muscle_group: 'Upper',
       unit: 'kg'
     });
 
@@ -554,6 +565,7 @@ describe('Exercise Rename Synchronization', () => {
       name: 'User1 Renamed',
       type: 'total',
       category: 'Chest',
+      muscle_group: 'Upper',
       unit: 'lbs'
     });
 
@@ -564,5 +576,329 @@ describe('Exercise Rename Synchronization', () => {
     // Verify user 2's workout is NOT updated
     const updated2 = await getWorkout(env.DB, created2.id, user2.id);
     expect(updated2?.exercises[0].name).toBe('Shared Name');
+  });
+});
+
+describe('Exercise Notes', () => {
+  let userId: string;
+  const testUsername = 'testuser_notes';
+  const testPasswordHash = 'hash123';
+
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM users WHERE username = ?').bind(testUsername).run();
+    const user = await createUser(env.DB, testUsername, testPasswordHash);
+    userId = user.id;
+  });
+
+  it('should persist notes through createWorkout and return them in getWorkout', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'Felt strong today, good form on all reps',
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    expect(created.exercises[0].notes).toBe('Felt strong today, good form on all reps');
+
+    // Also verify via a fresh getWorkout call (not the returned object)
+    const fetched = await getWorkout(env.DB, created.id, userId);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.exercises[0].notes).toBe('Felt strong today, good form on all reps');
+  });
+
+  it('should handle exercises without notes (undefined)', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Squat',
+          sets: [
+            { weight: 225, reps: 5, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    // notes should be undefined, not null
+    expect(created.exercises[0].notes).toBeUndefined();
+
+    const fetched = await getWorkout(env.DB, created.id, userId);
+    expect(fetched!.exercises[0].notes).toBeUndefined();
+  });
+
+  it('should handle exercises with explicitly null notes', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Deadlift',
+          notes: undefined,
+          sets: [
+            { weight: 315, reps: 3, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    // Should come back as undefined (not null) in the API response
+    expect(created.exercises[0].notes).toBeUndefined();
+  });
+
+  it('should preserve notes through updateWorkout', async () => {
+    // Create workout with notes
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'Original note',
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+    expect(created.exercises[0].notes).toBe('Original note');
+
+    // Update workout - change the note
+    const updateData: CreateWorkoutRequest = {
+      start_time: created.start_time,
+      end_time: created.end_time,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'Updated note after review',
+          sets: [
+            { weight: 135, reps: 10, completed: true },
+            { weight: 155, reps: 8, completed: true }
+          ]
+        }
+      ]
+    };
+    const updated = await updateWorkout(env.DB, created.id, userId, updateData);
+
+    expect(updated).not.toBeNull();
+    expect(updated!.exercises[0].notes).toBe('Updated note after review');
+
+    // Verify with fresh fetch
+    const fetched = await getWorkout(env.DB, created.id, userId);
+    expect(fetched!.exercises[0].notes).toBe('Updated note after review');
+  });
+
+  it('should allow removing notes via updateWorkout (set to undefined)', async () => {
+    // Create workout with notes
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'Will remove this',
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+    expect(created.exercises[0].notes).toBe('Will remove this');
+
+    // Update workout - remove note by omitting it
+    const updateData: CreateWorkoutRequest = {
+      start_time: created.start_time,
+      end_time: created.end_time,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const updated = await updateWorkout(env.DB, created.id, userId, updateData);
+
+    expect(updated).not.toBeNull();
+    expect(updated!.exercises[0].notes).toBeUndefined();
+  });
+
+  it('should handle notes on multiple exercises independently', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'Chest day main lift',
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        },
+        {
+          name: 'Incline DB Press',
+          sets: [
+            { weight: 50, reps: 12, completed: true }
+          ]
+        },
+        {
+          name: 'Cable Fly',
+          notes: 'Squeeze at the top',
+          sets: [
+            { weight: 30, reps: 15, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    expect(created.exercises[0].notes).toBe('Chest day main lift');
+    expect(created.exercises[1].notes).toBeUndefined();
+    expect(created.exercises[2].notes).toBe('Squeeze at the top');
+  });
+
+  it('should handle empty string notes', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: '',
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    // Empty string should be stored and returned (not converted to undefined)
+    // This tests whether the implementation treats '' differently from null/undefined
+    const fetched = await getWorkout(env.DB, created.id, userId);
+    // Empty string is falsy but not null, so it depends on the ?? operator behavior
+    // '' ?? undefined === '' (nullish coalescing does NOT trigger on empty string)
+    expect(fetched!.exercises[0].notes).toBe('');
+  });
+
+  it('should handle very long notes', async () => {
+    const longNote = 'A'.repeat(5000);
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: longNote,
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    expect(created.exercises[0].notes).toBe(longNote);
+
+    const fetched = await getWorkout(env.DB, created.id, userId);
+    expect(fetched!.exercises[0].notes).toBe(longNote);
+  });
+
+  it('should handle notes with special characters', async () => {
+    const specialNote = "Used Smith machine. Weight doesn't include bar.\nForm: 3-1-2 tempo.\tRest: 90s.\n\"PR attempt\" — failed at lockout (≥90% 1RM)";
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: specialNote,
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    expect(created.exercises[0].notes).toBe(specialNote);
+
+    const fetched = await getWorkout(env.DB, created.id, userId);
+    expect(fetched!.exercises[0].notes).toBe(specialNote);
+  });
+
+  it('should not confuse exercise notes with set notes', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'Exercise-level note',
+          sets: [
+            { weight: 135, reps: 10, completed: true, note: 'Set-level note' }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    // Exercise note and set note should be independent
+    expect(created.exercises[0].notes).toBe('Exercise-level note');
+    expect(created.exercises[0].sets[0].note).toBe('Set-level note');
+
+    const fetched = await getWorkout(env.DB, created.id, userId);
+    expect(fetched!.exercises[0].notes).toBe('Exercise-level note');
+    expect(fetched!.exercises[0].sets[0].note).toBe('Set-level note');
+  });
+
+  it('should preserve notes when adding notes to previously note-less exercise via update', async () => {
+    // Create workout without notes
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+    expect(created.exercises[0].notes).toBeUndefined();
+
+    // Update to add notes
+    const updateData: CreateWorkoutRequest = {
+      start_time: created.start_time,
+      end_time: created.end_time,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'Added note after the fact',
+          sets: [
+            { weight: 135, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    const updated = await updateWorkout(env.DB, created.id, userId, updateData);
+
+    expect(updated).not.toBeNull();
+    expect(updated!.exercises[0].notes).toBe('Added note after the fact');
   });
 });

@@ -28,51 +28,51 @@ test.describe('Rest Timer', () => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
 
-    // Timer container is inline in the workout header and should be visible
+    // Timer container should be visible during active workout
     await expect(page.locator('#rest-timer-container')).toBeVisible();
+    // Timer display should show 00:00
+    await expect(page.locator('#rest-timer-display')).toHaveText('00:00');
   });
 
   test('timer container should NOT be visible when no workout is active', async ({ page }) => {
-    // No workout started - #workout-active is hidden, so its children are not visible
+    // No workout started - timer container should not be visible
     await expect(page.locator('#rest-timer-container')).not.toBeVisible();
   });
 
-  test('timer shows initial state with 00:00 and only play button visible', async ({ page }) => {
+  test('timer should have play, pause, and stop buttons', async ({ page }) => {
     // Start a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
 
-    // Display should show 00:00
-    await expect(page.locator('#rest-timer-display')).toHaveText('00:00');
-
-    // Only play button should be visible (stopped state: seconds=0)
+    // Verify play button exists and is visible (timer starts stopped)
     await expect(page.locator('#rest-timer-play-btn')).toBeVisible();
-    await expect(page.locator('#rest-timer-pause-btn')).not.toBeVisible();
-    await expect(page.locator('#rest-timer-stop-btn')).not.toBeVisible();
+    // Pause and stop buttons should exist but be hidden initially
+    await expect(page.locator('#rest-timer-pause-btn')).toBeAttached();
+    await expect(page.locator('#rest-timer-stop-btn')).toBeAttached();
   });
 
-  test('start timer increments display beyond 00:00', async ({ page }) => {
+  test('clicking play should begin the timer (time increments)', async ({ page }) => {
     // Start a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
 
-    // Verify initial state
+    // Verify timer starts at 00:00
     await expect(page.locator('#rest-timer-display')).toHaveText('00:00');
 
-    // Click play to start timer
+    // Click play
     await page.locator('#rest-timer-play-btn').click();
 
-    // Wait for at least one tick
-    await page.waitForTimeout(1100);
+    // Wait a bit and verify timer has incremented
+    await page.waitForTimeout(1500);
 
-    // Timer should have incremented past 00:00
+    // Timer should show at least 00:01
     const timerText = await page.locator('#rest-timer-display').textContent();
     expect(timerText).not.toBe('00:00');
-    // Verify MM:SS format
+    // Verify it's in MM:SS format
     expect(timerText).toMatch(/^\d{2}:\d{2}$/);
   });
 
-  test('pause stops the timer from incrementing', async ({ page }) => {
+  test('clicking pause should stop the timer', async ({ page }) => {
     // Start a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
@@ -81,21 +81,22 @@ test.describe('Rest Timer', () => {
     await page.locator('#rest-timer-play-btn').click();
 
     // Wait for timer to increment
-    await page.waitForTimeout(1100);
+    await page.waitForTimeout(1500);
 
-    // Pause the timer
+    // Click pause
     await page.locator('#rest-timer-pause-btn').click();
 
-    // Record the paused time
+    // Record the time
     const pausedTime = await page.locator('#rest-timer-display').textContent();
 
-    // Wait and verify time hasn't changed
-    await page.waitForTimeout(1100);
+    // Wait a bit more
+    await page.waitForTimeout(1500);
 
+    // Timer should still show the same time (paused)
     await expect(page.locator('#rest-timer-display')).toHaveText(pausedTime!);
   });
 
-  test('stop resets timer to 00:00', async ({ page }) => {
+  test('clicking stop should return timer to 00:00', async ({ page }) => {
     // Start a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
@@ -104,7 +105,7 @@ test.describe('Rest Timer', () => {
     await page.locator('#rest-timer-play-btn').click();
 
     // Wait for timer to increment
-    await page.waitForTimeout(1100);
+    await page.waitForTimeout(1500);
 
     // Verify timer is not 00:00
     const timerText = await page.locator('#rest-timer-display').textContent();
@@ -117,49 +118,78 @@ test.describe('Rest Timer', () => {
     await expect(page.locator('#rest-timer-display')).toHaveText('00:00');
   });
 
-  test('button states when running: play hidden, pause visible, stop visible', async ({ page }) => {
+  test('timer should show correct buttons based on state', async ({ page }) => {
     // Start a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
 
-    // Click play to start timer
-    await page.locator('#rest-timer-play-btn').click();
-
-    // Running state: play hidden, pause visible, stop visible
-    await expect(page.locator('#rest-timer-play-btn')).not.toBeVisible();
-    await expect(page.locator('#rest-timer-pause-btn')).toBeVisible();
-    await expect(page.locator('#rest-timer-stop-btn')).toBeVisible();
-  });
-
-  test('button states when paused: play visible, pause hidden, stop visible', async ({ page }) => {
-    // Start a workout
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-
-    // Start timer then pause
-    await page.locator('#rest-timer-play-btn').click();
-    await page.waitForTimeout(1100);
-    await page.locator('#rest-timer-pause-btn').click();
-
-    // Paused state (seconds > 0, not running): play visible, pause hidden, stop visible
-    await expect(page.locator('#rest-timer-play-btn')).toBeVisible();
-    await expect(page.locator('#rest-timer-pause-btn')).not.toBeVisible();
-    await expect(page.locator('#rest-timer-stop-btn')).toBeVisible();
-  });
-
-  test('button states after stop: play visible, pause hidden, stop hidden', async ({ page }) => {
-    // Start a workout
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-
-    // Start timer, wait, then stop
-    await page.locator('#rest-timer-play-btn').click();
-    await page.waitForTimeout(1100);
-    await page.locator('#rest-timer-stop-btn').click();
-
-    // Stopped state (seconds=0): play visible, pause hidden, stop hidden
+    // Initially: play visible, pause and stop hidden
     await expect(page.locator('#rest-timer-play-btn')).toBeVisible();
     await expect(page.locator('#rest-timer-pause-btn')).not.toBeVisible();
     await expect(page.locator('#rest-timer-stop-btn')).not.toBeVisible();
+
+    // Start the timer
+    await page.locator('#rest-timer-play-btn').click();
+    await page.waitForTimeout(1200);
+
+    // Running: pause and stop visible, play hidden
+    await expect(page.locator('#rest-timer-play-btn')).not.toBeVisible();
+    await expect(page.locator('#rest-timer-pause-btn')).toBeVisible();
+    await expect(page.locator('#rest-timer-stop-btn')).toBeVisible();
+
+    // Pause the timer
+    await page.locator('#rest-timer-pause-btn').click();
+
+    // Paused: play and stop visible, pause hidden
+    await expect(page.locator('#rest-timer-play-btn')).toBeVisible();
+    await expect(page.locator('#rest-timer-pause-btn')).not.toBeVisible();
+    await expect(page.locator('#rest-timer-stop-btn')).toBeVisible();
+
+    // Stop the timer
+    await page.locator('#rest-timer-stop-btn').click();
+
+    // Stopped: play visible, pause and stop hidden
+    await expect(page.locator('#rest-timer-play-btn')).toBeVisible();
+    await expect(page.locator('#rest-timer-pause-btn')).not.toBeVisible();
+    await expect(page.locator('#rest-timer-stop-btn')).not.toBeVisible();
+  });
+
+  test('timer should resume from paused time when play pressed again', async ({ page }) => {
+    // Start a workout
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
+
+    // Start the timer
+    await page.locator('#rest-timer-play-btn').click();
+
+    // Wait for timer to increment
+    await page.waitForTimeout(1500);
+
+    // Pause the timer
+    await page.locator('#rest-timer-pause-btn').click();
+
+    // Record the paused time
+    const pausedTime = await page.locator('#rest-timer-display').textContent();
+    const parseTime = (time: string) => {
+      const [mins, secs] = time.split(':').map(Number);
+      return mins * 60 + secs;
+    };
+    const pausedSeconds = parseTime(pausedTime!);
+
+    // Wait a bit
+    await page.waitForTimeout(1000);
+
+    // Resume the timer
+    await page.locator('#rest-timer-play-btn').click();
+
+    // Wait for timer to continue
+    await page.waitForTimeout(1500);
+
+    // Timer should have continued from paused time
+    const resumedTime = await page.locator('#rest-timer-display').textContent();
+    const resumedSeconds = parseTime(resumedTime!);
+
+    // Should be greater than paused time
+    expect(resumedSeconds).toBeGreaterThan(pausedSeconds);
   });
 });

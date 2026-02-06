@@ -53,43 +53,11 @@ export async function createUser(db: D1Database, username: string, passwordHash:
     .bind(id, username, passwordHash, now)
     .run();
 
-  // Seed default exercises for the new user
-  await seedDefaultExercises(db, id);
-
   return {
     id,
     username,
     created_at: now,
   };
-}
-
-// Default exercises to seed for new users (sparse but covers main movements)
-const DEFAULT_EXERCISES: Array<{ name: string; type: string; category: string; unit: string }> = [
-  // Push
-  { name: 'Bench Press', type: '+bar', category: 'Chest', unit: 'lbs' },
-  { name: 'Overhead Press', type: '+bar', category: 'Shoulders', unit: 'lbs' },
-  { name: 'Tricep Pushdown', type: 'total', category: 'Triceps', unit: 'lbs' },
-  // Pull
-  { name: 'Deadlift', type: '+bar', category: 'Back', unit: 'lbs' },
-  { name: 'Barbell Row', type: '+bar', category: 'Back', unit: 'lbs' },
-  { name: 'Lat Pulldown', type: 'total', category: 'Back', unit: 'lbs' },
-  { name: 'Pull-ups', type: 'bodyweight', category: 'Back', unit: 'lbs' },
-  { name: 'Barbell Curl', type: 'total', category: 'Biceps', unit: 'lbs' },
-  // Legs
-  { name: 'Squat', type: '+bar', category: 'Legs', unit: 'lbs' },
-  { name: 'Leg Press', type: 'total', category: 'Legs', unit: 'lbs' },
-  { name: 'Romanian Deadlift', type: '+bar', category: 'Legs', unit: 'lbs' },
-];
-
-async function seedDefaultExercises(db: D1Database, userId: string): Promise<void> {
-  const now = Date.now();
-
-  for (const exercise of DEFAULT_EXERCISES) {
-    await db
-      .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(generateId(), userId, exercise.name, exercise.type, exercise.category, exercise.unit, now)
-      .run();
-  }
 }
 
 // ==================== WORKOUTS ====================
@@ -185,6 +153,7 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
       name: exRow.exercise_name,
       sets,
       completed: exRow.completed === 1,
+      notes: exRow.notes ?? undefined,
     });
   }
 
@@ -209,8 +178,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     const exId = generateId();
 
     await db
-      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed) VALUES (?, ?, ?, ?, ?)')
-      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0)
+      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed, notes) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0, ex.notes ?? null)
       .run();
 
     for (let j = 0; j < ex.sets.length; j++) {
@@ -259,8 +228,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
     const exId = generateId();
 
     await db
-      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed) VALUES (?, ?, ?, ?, ?)')
-      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0)
+      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed, notes) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0, ex.notes ?? null)
       .run();
 
     for (let j = 0; j < ex.sets.length; j++) {
@@ -301,6 +270,7 @@ export async function getAllCustomExercises(db: D1Database, userId: string): Pro
     name: row.name,
     type: row.type as CustomExercise['type'],
     category: row.category as CustomExercise['category'],
+    muscle_group: (row.muscle_group || 'Other') as CustomExercise['muscle_group'],
     unit: row.unit as CustomExercise['unit'],
     created_at: row.created_at,
   }));
@@ -320,6 +290,7 @@ export async function getCustomExercise(db: D1Database, id: string, userId: stri
     name: row.name,
     type: row.type as CustomExercise['type'],
     category: row.category as CustomExercise['category'],
+    muscle_group: (row.muscle_group || 'Other') as CustomExercise['muscle_group'],
     unit: row.unit as CustomExercise['unit'],
     created_at: row.created_at,
   };
@@ -330,8 +301,8 @@ export async function createCustomExercise(db: D1Database, userId: string, data:
   const now = Date.now();
 
   await db
-    .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, data.name, data.type, data.category, data.unit, now)
+    .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, muscle_group, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, data.name, data.type, data.category, data.muscle_group, data.unit, now)
     .run();
 
   return {
@@ -340,6 +311,7 @@ export async function createCustomExercise(db: D1Database, userId: string, data:
     name: data.name,
     type: data.type,
     category: data.category,
+    muscle_group: data.muscle_group,
     unit: data.unit,
     created_at: now,
   };
@@ -354,8 +326,8 @@ export async function updateCustomExercise(db: D1Database, id: string, userId: s
 
   // Update the custom exercise
   await db
-    .prepare('UPDATE custom_exercises SET name = ?, type = ?, category = ?, unit = ? WHERE id = ?')
-    .bind(newName, data.type, data.category, data.unit, id)
+    .prepare('UPDATE custom_exercises SET name = ?, type = ?, category = ?, muscle_group = ?, unit = ? WHERE id = ?')
+    .bind(newName, data.type, data.category, data.muscle_group, data.unit, id)
     .run();
 
   // If the name changed, sync it across all workout_exercises and personal_records

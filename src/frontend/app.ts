@@ -268,7 +268,7 @@ function saveExerciseNotes(): void {
 function calculateIsPR(exerciseName: string, weight: number, reps: number, exerciseIndex: number, setIndex: number): boolean {
   if (!state.currentWorkout) return false;
 
-  // Find the best reps at this weight in previous workouts (completed and not missed sets only)
+  // Find the best reps at this weight in previous workouts (exclude missed sets only)
   let previousBestReps: number | null = null;
   for (const workout of state.history) {
     // Skip the workout being edited if we're editing
@@ -281,8 +281,8 @@ function calculateIsPR(exerciseName: string, weight: number, reps: number, exerc
     if (!exercise) continue;
 
     for (const set of exercise.sets) {
-      // Only consider completed sets that are not missed (matching backend logic)
-      if (set.completed === false || set.missed === true) continue;
+      // Skip sets explicitly marked as missed
+      if (set.missed === true) continue;
 
       if (set.weight === weight) {
         if (previousBestReps === null || set.reps > previousBestReps) {
@@ -305,8 +305,8 @@ function calculateIsPR(exerciseName: string, weight: number, reps: number, exerc
 
     for (let j = 0; j < maxSetIndex; j++) {
       const set = ex.sets[j];
-      // Only consider completed sets that are not missed
-      if (set.completed === false || set.missed === true) continue;
+      // Skip sets explicitly marked as missed
+      if (set.missed === true) continue;
 
       if (set.weight === weight) {
         if (currentWorkoutBestReps === null || set.reps > currentWorkoutBestReps) {

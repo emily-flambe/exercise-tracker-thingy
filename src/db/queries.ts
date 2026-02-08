@@ -13,11 +13,26 @@ import type {
   User,
   PersonalRecord,
   PersonalRecordRow,
-  Category,
+  MuscleGroup,
 } from '../types';
 
 function generateId(): string {
   return crypto.randomUUID();
+}
+
+// Map old granular category values to coarse muscle groups for backward compatibility
+function mapToMuscleGroup(value: string): MuscleGroup {
+  const mapping: Record<string, MuscleGroup> = {
+    'Chest': 'Upper', 'Shoulders': 'Upper', 'Triceps': 'Upper',
+    'Back': 'Upper', 'Biceps': 'Upper',
+    'Legs': 'Lower',
+    'Core': 'Core',
+    'Cardio': 'Cardio',
+    'Other': 'Other',
+    // Pass through already-valid muscle groups
+    'Upper': 'Upper', 'Lower': 'Lower',
+  };
+  return mapping[value] || 'Other';
 }
 
 // ==================== USERS ====================
@@ -73,7 +88,7 @@ export async function getAllWorkouts(db: D1Database, userId: string): Promise<Wo
   for (const row of workoutRows.results) {
     const exercises = await getWorkoutExercises(db, row.id);
     const targetCategories = row.target_categories
-      ? (JSON.parse(row.target_categories) as Category[])
+      ? [...new Set((JSON.parse(row.target_categories) as string[]).map(mapToMuscleGroup))]
       : undefined;
     workouts.push({
       id: row.id,
@@ -99,7 +114,7 @@ export async function getWorkout(db: D1Database, id: string, userId: string): Pr
 
   const exercises = await getWorkoutExercises(db, id);
   const targetCategories = row.target_categories
-    ? (JSON.parse(row.target_categories) as Category[])
+    ? [...new Set((JSON.parse(row.target_categories) as string[]).map(mapToMuscleGroup))]
     : undefined;
 
   return {

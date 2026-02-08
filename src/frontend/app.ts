@@ -1,5 +1,5 @@
 import * as api from './api';
-import type { Workout, WorkoutExercise, Set as WorkoutSet, CustomExercise, User, PersonalRecord, Category } from './api';
+import type { Workout, WorkoutExercise, Set as WorkoutSet, CustomExercise, User, PersonalRecord, MuscleGroup } from './api';
 import type { CreateWorkoutRequest } from '../types';
 
 // Injected by Vite at build time
@@ -22,7 +22,7 @@ interface Exercise {
 interface AppState {
   currentWorkout: {
     startTime: number;
-    targetCategories?: Category[];
+    targetCategories?: MuscleGroup[];
     exercises: WorkoutExercise[];
   } | null;
   editingWorkoutId: string | null;
@@ -61,9 +61,9 @@ let restTimerAccumulated = 0; // Accumulated seconds from previous pauses
 let restTimerRunning = false;
 let restTimerIntervalId: ReturnType<typeof setInterval> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
-let selectedTargetCategories = new Set<Category>(); // Track selected categories for new workout
+let selectedTargetCategories = new Set<MuscleGroup>(); // Track selected muscle groups for new workout
 let isEditingCategories = false; // Track if we're editing categories of an existing workout
-let selectedCalendarFilters = new Set<Category>(); // Track selected category filters for calendar view
+let selectedCalendarFilters = new Set<MuscleGroup>(); // Track selected muscle group filters for calendar view
 
 // ==================== PULL-TO-REFRESH STATE ====================
 let pullStartY = 0;
@@ -381,7 +381,7 @@ function showWorkoutScreen(screenId: string): void {
 }
 
 // ==================== WORKOUT ====================
-const ALL_CATEGORIES: Category[] = ['Chest', 'Shoulders', 'Triceps', 'Back', 'Biceps', 'Legs', 'Core', 'Cardio', 'Other'];
+const ALL_MUSCLE_GROUPS: MuscleGroup[] = ['Upper', 'Lower', 'Core', 'Cardio', 'Other'];
 
 function showCategorySelection(): void {
   selectedTargetCategories.clear();
@@ -435,7 +435,7 @@ function cancelEditCategories(): void {
 
 function renderCategorySelectionGrid(): void {
   const grid = $('category-select-grid');
-  grid.innerHTML = ALL_CATEGORIES.map(category => {
+  grid.innerHTML = ALL_MUSCLE_GROUPS.map(category => {
     const isSelected = selectedTargetCategories.has(category);
     const selectedClass = isSelected
       ? 'bg-blue-600 border-blue-500 text-white'
@@ -448,7 +448,7 @@ function renderCategorySelectionGrid(): void {
   }).join('');
 }
 
-function toggleTargetCategory(category: Category): void {
+function toggleTargetCategory(category: MuscleGroup): void {
   if (selectedTargetCategories.has(category)) {
     selectedTargetCategories.delete(category);
   } else {
@@ -468,7 +468,7 @@ function skipCategorySelection(): void {
   startWorkoutInternal(undefined);
 }
 
-function startWorkoutInternal(targetCategories?: Category[]): void {
+function startWorkoutInternal(targetCategories?: MuscleGroup[]): void {
   state.currentWorkout = {
     startTime: Date.now(),
     targetCategories,
@@ -980,12 +980,21 @@ function renderAddExerciseCategories(): void {
   const container = $('add-exercise-categories');
   const targetCategories = state.currentWorkout?.targetCategories || [];
 
+  const categoryToMuscleGroup: Record<string, MuscleGroup> = {
+    'Chest': 'Upper', 'Shoulders': 'Upper', 'Triceps': 'Upper',
+    'Back': 'Upper', 'Biceps': 'Upper',
+    'Legs': 'Lower',
+    'Core': 'Core',
+    'Cardio': 'Cardio',
+    'Other': 'Other',
+  };
+
   container.innerHTML = mainCategories.map(main => {
     let exercises = allExercises.filter(e => main.subCategories.includes(e.category));
     if (exercises.length === 0) return '';
 
     exercises = sortAddExercises(exercises);
-    const isTargetCategory = targetCategories.includes(main.name as Category);
+    const isTargetCategory = targetCategories.includes(categoryToMuscleGroup[main.name] || 'Other');
     const isExpanded = expandedAddExerciseCategories.has(main.name);
 
     // Highlight target categories
@@ -1182,23 +1191,23 @@ function getWorkoutsForDate(date: Date): Workout[] {
   return state.history.filter(w => w.start_time >= startOfDay && w.start_time <= endOfDay);
 }
 
-function getCategoriesForWorkouts(workouts: Workout[]): Set<Category> {
-  const categories = new Set<Category>();
+function getMuscleGroupsForWorkouts(workouts: Workout[]): Set<MuscleGroup> {
+  const groups = new Set<MuscleGroup>();
   const exercises = state.customExercises;
 
   for (const workout of workouts) {
     for (const workoutExercise of workout.exercises) {
       const exercise = exercises.find(e => e.name === workoutExercise.name);
       if (exercise) {
-        categories.add(exercise.category as Category);
+        groups.add(exercise.muscle_group);
       }
     }
   }
 
-  return categories;
+  return groups;
 }
 
-function toggleCalendarFilter(category: Category): void {
+function toggleCalendarFilter(category: MuscleGroup): void {
   if (selectedCalendarFilters.has(category)) {
     selectedCalendarFilters.delete(category);
   } else {
@@ -1274,7 +1283,7 @@ function renderHistory(): void {
     const hasWorkouts = workouts.length > 0;
 
     // Check if this day's workouts match any selected filter
-    const dayCategories = hasWorkouts ? getCategoriesForWorkouts(workouts) : new Set<Category>();
+    const dayCategories = hasWorkouts ? getMuscleGroupsForWorkouts(workouts) : new Set<MuscleGroup>();
     const matchesFilter = hasActiveFilter && Array.from(selectedCalendarFilters).some(cat => dayCategories.has(cat));
 
     let cellClass = 'aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative';
@@ -1308,7 +1317,7 @@ function renderHistory(): void {
 
   // Filter pills
   html += '<div class="mt-4 flex flex-wrap gap-2">';
-  ALL_CATEGORIES.forEach(category => {
+  ALL_MUSCLE_GROUPS.forEach(category => {
     const isSelected = selectedCalendarFilters.has(category);
     const pillClass = isSelected
       ? 'bg-yellow-500 text-black'

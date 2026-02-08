@@ -11,7 +11,7 @@ export type Category =
   | 'Core'
   | 'Cardio'
   | 'Other';
-export type MuscleGroup = 'Upper' | 'Lower' | 'Core' | 'Other';
+export type MuscleGroup = 'Upper' | 'Lower' | 'Core' | 'Cardio' | 'Other';
 
 export interface Exercise {
   name: string;
@@ -49,7 +49,7 @@ export interface Workout {
   user_id: string;
   start_time: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
   created_at: number;
 }
@@ -121,14 +121,14 @@ export interface PersonalRecordRow {
 export interface CreateWorkoutRequest {
   start_time: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
 }
 
 export interface UpdateWorkoutRequest {
   start_time?: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises?: WorkoutExercise[];
 }
 

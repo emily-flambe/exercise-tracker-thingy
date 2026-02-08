@@ -593,33 +593,33 @@ test.describe('Calendar View', () => {
     // Wait for calendar to render with today's workout
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
-    // Verify filter pills are displayed below the calendar
-    await expect(page.getByRole('button', { name: 'Chest' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Back' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Legs' })).toBeVisible();
+    // Verify filter pills are displayed below the calendar (now coarse muscle groups)
+    await expect(page.getByRole('button', { name: 'Upper' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Lower' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Core' })).toBeVisible();
 
     // Verify today's workout cell has blue background initially (no filter active)
     const todayCell = page.locator('.ring-2.ring-green-400');
     await expect(todayCell).toHaveClass(/bg-blue-600/);
 
-    // Click on Chest filter (Bench Press is a Chest exercise)
-    await page.getByRole('button', { name: 'Chest' }).click();
+    // Click on Upper filter (Bench Press is an Upper body exercise)
+    await page.getByRole('button', { name: 'Upper' }).click();
 
-    // Verify the Chest filter pill is now highlighted (yellow background)
-    await expect(page.getByRole('button', { name: 'Chest' })).toHaveClass(/bg-yellow-500/);
+    // Verify the Upper filter pill is now highlighted (yellow background)
+    await expect(page.getByRole('button', { name: 'Upper' })).toHaveClass(/bg-yellow-500/);
 
     // Verify today's workout cell is now yellow (matches filter)
     await expect(todayCell).toHaveClass(/bg-yellow-500/);
 
-    // Click on Legs filter (deselect Chest, select Legs)
-    await page.getByRole('button', { name: 'Chest' }).click(); // deselect Chest
-    await page.getByRole('button', { name: 'Legs' }).click();  // select Legs
+    // Click on Lower filter (deselect Upper, select Lower)
+    await page.getByRole('button', { name: 'Upper' }).click(); // deselect Upper
+    await page.getByRole('button', { name: 'Lower' }).click();  // select Lower
 
-    // Verify today's workout cell is back to blue (doesn't match Legs filter)
+    // Verify today's workout cell is back to blue (doesn't match Lower filter)
     await expect(todayCell).toHaveClass(/bg-blue-600/);
 
-    // Deselect Legs filter
-    await page.getByRole('button', { name: 'Legs' }).click();
+    // Deselect Lower filter
+    await page.getByRole('button', { name: 'Lower' }).click();
 
     // Verify today's workout cell is still blue (no filter active)
     await expect(todayCell).toHaveClass(/bg-blue-600/);

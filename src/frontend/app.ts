@@ -1907,11 +1907,13 @@ async function clearAllData(): Promise<void> {
 
 // ==================== AUTH ====================
 function showAuthScreen(): void {
+  $('loading-screen').classList.add('hidden');
   $('auth-screen').classList.remove('hidden');
   $('main-app').classList.add('hidden');
 }
 
 function showMainApp(): void {
+  $('loading-screen').classList.add('hidden');
   $('auth-screen').classList.add('hidden');
   $('main-app').classList.remove('hidden');
   if (currentUser) {

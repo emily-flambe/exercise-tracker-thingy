@@ -1,25 +1,12 @@
 import { test, expect } from '@playwright/test';
-
-const testPassword = 'testpass123';
+import { registerUserViaApi, authenticatePage, TestSetup } from './helpers';
 
 test.describe('Rest Timer', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+  let setup: TestSetup;
 
-    // Clear any existing tokens and reload
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
-
-    // Generate unique username for each test
-    const testUsername = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-    // Register a new user
-    await page.click('#auth-register-tab');
-    await page.fill('#auth-username', testUsername);
-    await page.fill('#auth-password', testPassword);
-    await page.click('#auth-submit-btn');
-
-    // Wait for main app to be visible
+  test.beforeEach(async ({ page, request }) => {
+    setup = await registerUserViaApi(request);
+    await authenticatePage(page, setup.token);
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
   });
 

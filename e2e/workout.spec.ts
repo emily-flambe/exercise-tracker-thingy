@@ -1,52 +1,32 @@
 import { test, expect, Page } from '@playwright/test';
+import {
+  setupTestUserWithExercises,
+  registerUserViaApi,
+  createExerciseViaApi,
+  authenticatePage,
+  TestSetup,
+} from './helpers';
 
-const testPassword = 'testpass123';
-
-// Helper function to create a custom exercise
-async function createExercise(page: Page, name: string, type: string, category: string, muscleGroup: string) {
+// Helper function to create a custom exercise via the UI (only needed for tests that test this flow)
+async function createExerciseViaUI(page: Page, name: string, type: string, category: string, muscleGroup: string) {
   await page.getByRole('button', { name: 'Exercises' }).click();
   await page.getByRole('button', { name: '+ New' }).click();
   await page.fill('#exercise-name-input', name);
   await page.selectOption('#exercise-category-input', category);
   await page.selectOption('#exercise-muscle-group-input', muscleGroup);
-  // Weight type is a radio button
   await page.locator(`input[name="weight-type"][value="${type}"]`).click();
   await page.getByRole('button', { name: 'Save' }).click();
-  // Wait for save to complete and list view to become visible
   await expect(page.locator('#exercises-list-view')).toBeVisible({ timeout: 10000 });
-  // Go back to workout tab
   await page.getByRole('button', { name: 'Workout' }).click();
 }
 
-// Helper function to set up test exercises
-async function createTestExercises(page: Page) {
-  await createExercise(page, 'Bench Press', '+bar', 'Chest', 'Upper');
-  await createExercise(page, 'Squat', '+bar', 'Legs', 'Lower');
-  await createExercise(page, 'Lat Pulldown', 'total', 'Back', 'Upper');
-}
-
 test.describe('Workout Tracker', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+  let setup: TestSetup;
 
-    // Clear any existing tokens and reload
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
-
-    // Generate unique username for each test
-    const testUsername = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-    // Register a new user
-    await page.click('#auth-register-tab');
-    await page.fill('#auth-username', testUsername);
-    await page.fill('#auth-password', testPassword);
-    await page.click('#auth-submit-btn');
-
-    // Wait for main app to be visible
+  test.beforeEach(async ({ page, request }) => {
+    setup = await setupTestUserWithExercises(request);
+    await authenticatePage(page, setup.token);
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
-
-    // Create test exercises (since there are no default exercises)
-    await createTestExercises(page);
   });
 
   test('should display the start workout button', async ({ page }) => {
@@ -81,18 +61,14 @@ test.describe('Workout Tracker', () => {
   });
 
   test('should navigate between tabs', async ({ page }) => {
-    // Check workout tab is active
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible();
 
-    // Go to history
     await page.getByRole('button', { name: 'History', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
 
-    // Go to exercises
     await page.getByRole('button', { name: 'Exercises' }).click();
     await expect(page.getByRole('heading', { name: 'Exercises' })).toBeVisible();
 
-    // Go to settings
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   });
@@ -102,11 +78,9 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
-    // Expand Chest category
     await page.getByRole('button', { name: /^Chest/ }).click();
     await expect(page.locator('#add-Chest-exercises').getByText('Bench Press', { exact: true })).toBeVisible();
 
-    // Expand Back category
     await page.getByRole('button', { name: /^Back/ }).click();
     await expect(page.locator('#add-Back-exercises').getByText('Lat Pulldown')).toBeVisible();
   });
@@ -116,21 +90,16 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
-    // Add Bench Press via search
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Verify Bench Press is in workout
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
 
-    // Go back to add exercise screen
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
-    // Expand Chest category
     await page.getByRole('button', { name: /^Chest/ }).click();
 
-    // Verify Bench Press is grayed out with "In workout" badge
     const benchPressButton = page.locator('#add-Chest-exercises button[data-exercise-in-workout="true"]').filter({ hasText: 'Bench Press' });
     await expect(benchPressButton).toBeVisible();
     await expect(benchPressButton).toHaveClass(/opacity-50/);
@@ -138,35 +107,35 @@ test.describe('Workout Tracker', () => {
     await expect(benchPressButton.getByText('In workout')).toBeVisible();
   });
 
-  test('should gray out exercises already in workout in search results', async ({ page }) => {
-    // Create Overhead Press for this specific test
-    await createExercise(page, 'Overhead Press', '+bar', 'Shoulders', 'Upper');
+  test('should gray out exercises already in workout in search results', async ({ page, request }) => {
+    // Create Overhead Press via API for this specific test
+    await createExerciseViaApi(request, setup.token, {
+      name: 'Overhead Press', type: '+bar', category: 'Shoulders', muscle_group: 'Upper',
+    });
+    // Reload to pick up the new exercise
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
 
-    // Add Bench Press via search
     await page.fill('#add-exercise-search', 'Bench Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Verify Bench Press is in workout
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
 
-    // Go back to add exercise screen and search for "Press"
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
     await page.fill('#add-exercise-search', 'Press');
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
 
-    // Verify Bench Press is grayed out in search results
     const benchPressButton = page.locator('#add-exercise-search-results button[data-exercise-in-workout="true"]').filter({ hasText: 'Bench Press' });
     await expect(benchPressButton).toBeVisible();
     await expect(benchPressButton).toHaveClass(/opacity-50/);
     await expect(benchPressButton).toBeDisabled();
     await expect(benchPressButton.getByText('In workout')).toBeVisible();
 
-    // Verify Overhead Press is NOT grayed out (contains "Press" but not in workout)
     const overheadPressButton = page.locator('#add-exercise-search-results button[data-exercise-in-workout="false"]').filter({ hasText: 'Overhead Press' });
     await expect(overheadPressButton).toBeVisible();
     await expect(overheadPressButton).not.toHaveClass(/opacity-50/);
@@ -181,13 +150,11 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Verify set was added
     await expect(page.locator('input[type="number"]').first()).toHaveValue('135');
   });
 
@@ -199,16 +166,12 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Should see the pencil icon
     await expect(page.locator('button[title="Add note"]').first()).toBeVisible();
-
-    // Should NOT see the notes input field initially
     await expect(page.locator('input[placeholder="note"]').first()).not.toBeVisible();
   });
 
@@ -220,16 +183,13 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Click pencil icon to expand notes
     await page.locator('button[title="Add note"]').first().click();
 
-    // Should now see the notes input field
     await expect(page.locator('input[placeholder="note"]').first()).toBeVisible();
   });
 
@@ -241,19 +201,16 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Add a note
     await page.locator('button[title="Add note"]').first().click();
     const noteField = page.locator('input[placeholder="note"]').first();
     await noteField.fill('felt strong today');
     await noteField.blur();
 
-    // Wait for the button title to change from "Add note" to "Edit note"
     await expect(page.locator('button[title="Edit note"]').first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -265,25 +222,19 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add first set - should be a PR since it's the first at this weight
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Wait for the set to be added and verify star exists and is dim
     await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Toggle the set completed state (exercise 0, set 0)
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Wait for bright star to appear (confirmed PR)
     await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
 
-    // Toggle set completed state again to unconfirm
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Wait for dim star to reappear (unconfirmed PR)
     await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
   });
 
@@ -296,22 +247,17 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set with 8 reps (will be dim PR)
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '8');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Verify dim star appears
     await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Confirm the first set (exercise 0, set 0)
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Wait for workout to be saved and navigate back to empty screen
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
     // Start second workout
@@ -322,49 +268,29 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set with 10 reps (beats previous 8, should be dim PR initially)
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Verify star is dim initially
     await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
 
-    // Confirm the second workout's set (exercise 0, set 0)
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Wait for bright star to appear (confirmed PR beats previous record)
     await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
   });
 });
 
 test.describe('Calendar View', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+  let setup: TestSetup;
 
-    // Clear any existing tokens and reload
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
-
-    // Generate unique username for each test
-    const testUsername = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-    // Register a new user
-    await page.click('#auth-register-tab');
-    await page.fill('#auth-username', testUsername);
-    await page.fill('#auth-password', testPassword);
-    await page.click('#auth-submit-btn');
-
-    // Wait for main app to be visible
+  test.beforeEach(async ({ page, request }) => {
+    setup = await setupTestUserWithExercises(request);
+    await authenticatePage(page, setup.token);
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
-
-    // Create test exercises (since there are no default exercises)
-    await createTestExercises(page);
   });
 
   test('should show calendar view in history tab after completing workout', async ({ page }) => {
-    // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -372,51 +298,40 @@ test.describe('Calendar View', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Wait for workout to be saved (Start Workout button reappears)
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
-    // Navigate to history tab
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    // Wait for calendar to render with today's workout
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
-    // Should see calendar elements
     const currentMonth = new Date().toLocaleString('default', { month: 'long' });
     const currentYear = new Date().getFullYear();
     await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
 
-    // Should see day headers
     await expect(page.getByText('Sun', { exact: true })).toBeVisible();
     await expect(page.getByText('Mon', { exact: true })).toBeVisible();
     await expect(page.getByText('Tue', { exact: true })).toBeVisible();
 
-    // Should see today highlighted with workout (blue background indicates workout exists)
     const todayCell = page.locator('.ring-2.ring-green-400');
     await expect(todayCell).toHaveClass(/bg-blue-600/);
   });
 
   test('should navigate between months in calendar', async ({ page }) => {
-    // Navigate to history tab
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
     const currentMonth = new Date().toLocaleString('default', { month: 'long' });
     const currentYear = new Date().getFullYear();
     await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
 
-    // Click next month button
     await page.locator('button').filter({ has: page.locator('path[d*="M9 5l7 7-7 7"]') }).click();
 
-    // Should show next month (use day 1 to avoid month overflow issues like Jan 31 -> March)
     const nextMonthDate = new Date();
     nextMonthDate.setDate(1);
     nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
@@ -424,38 +339,29 @@ test.describe('Calendar View', () => {
     const nextYear = nextMonthDate.getFullYear();
     await expect(page.getByText(`${nextMonth} ${nextYear}`)).toBeVisible();
 
-    // Should show "Today" button when not on current month
     await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
 
-    // Click previous month twice to go back
     await page.locator('button').filter({ has: page.locator('path[d*="M15 19l-7-7 7-7"]') }).click();
     await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
   });
 
   test('should navigate to today when clicking Today button', async ({ page }) => {
-    // Navigate to history tab
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    // Go to next month
     await page.locator('button').filter({ has: page.locator('path[d*="M9 5l7 7-7 7"]') }).click();
 
-    // Should see Today button
     await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
 
-    // Click Today button
     await page.getByRole('button', { name: 'Today' }).click();
 
-    // Should be back to current month
     const currentMonth = new Date().toLocaleString('default', { month: 'long' });
     const currentYear = new Date().getFullYear();
     await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
 
-    // Today button should not be visible on current month
     await expect(page.getByRole('button', { name: 'Today' })).not.toBeVisible();
   });
 
   test('should open workout when clicking on day with workout', async ({ page }) => {
-    // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -463,36 +369,27 @@ test.describe('Calendar View', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Wait for workout to be saved (Start Workout button reappears)
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
-    // Navigate to history tab
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    // Wait for calendar to render with today's workout
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
-    // Click on today's workout cell
     await page.locator('.ring-2.ring-green-400').click();
 
-    // Should navigate to workout tab showing the workout
     await expect(page.locator('#tab-workout.tab-content.active')).toBeVisible();
     await expect(page.locator('#workout-active').getByText('Bench Press')).toBeVisible();
-    // Verify the set we added is visible (weight 135, reps 10)
     await expect(page.locator('input[type="number"]').first()).toBeVisible();
   });
 
   test('should not show "Copy to new workout" button', async ({ page }) => {
-    // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -500,22 +397,17 @@ test.describe('Calendar View', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Navigate to history tab
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    // Verify calendar is showing
     await expect(page.getByText('Sun', { exact: true })).toBeVisible();
 
-    // Should not see "Copy to new workout" button anywhere on page
     const copyButton = page.getByText('Copy to new workout');
     await expect(copyButton).toHaveCount(0);
   });
@@ -534,7 +426,6 @@ test.describe('Calendar View', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Wait for save
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
     // Create second workout
@@ -550,26 +441,20 @@ test.describe('Calendar View', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Wait for second workout to be saved
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
-    // Navigate to history tab
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    // Wait for calendar to render
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
-    // Click on today's cell (has green ring and blue background for workout)
     await page.locator('.ring-2.ring-green-400').click();
 
-    // Should show day view with both workouts
     await expect(page.getByText('Back to calendar')).toBeVisible();
     await expect(page.locator('#history-list').getByText('Bench Press')).toBeVisible();
     await expect(page.locator('#history-list').getByText('Squat')).toBeVisible();
   });
 
   test('should show filter pills below calendar and highlight matching dates yellow', async ({ page }) => {
-    // Create a workout with a Chest exercise (Bench Press)
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -577,56 +462,42 @@ test.describe('Calendar View', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Finish workout
     await page.getByRole('button', { name: 'Finish' }).click();
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
-    // Navigate to history tab
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    // Wait for calendar to render with today's workout
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
-    // Verify filter pills are displayed below the calendar (now coarse muscle groups)
     await expect(page.getByRole('button', { name: 'Upper' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Lower' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Core' })).toBeVisible();
 
-    // Verify today's workout cell has blue background initially (no filter active)
     const todayCell = page.locator('.ring-2.ring-green-400');
     await expect(todayCell).toHaveClass(/bg-blue-600/);
 
-    // Click on Upper filter (Bench Press is an Upper body exercise)
     await page.getByRole('button', { name: 'Upper' }).click();
 
-    // Verify the Upper filter pill is now highlighted (yellow background)
     await expect(page.getByRole('button', { name: 'Upper' })).toHaveClass(/bg-yellow-500/);
 
-    // Verify today's workout cell is now yellow (matches filter)
     await expect(todayCell).toHaveClass(/bg-yellow-500/);
 
-    // Click on Lower filter (deselect Upper, select Lower)
-    await page.getByRole('button', { name: 'Upper' }).click(); // deselect Upper
-    await page.getByRole('button', { name: 'Lower' }).click();  // select Lower
-
-    // Verify today's workout cell is back to blue (doesn't match Lower filter)
-    await expect(todayCell).toHaveClass(/bg-blue-600/);
-
-    // Deselect Lower filter
+    await page.getByRole('button', { name: 'Upper' }).click();
     await page.getByRole('button', { name: 'Lower' }).click();
 
-    // Verify today's workout cell is still blue (no filter active)
+    await expect(todayCell).toHaveClass(/bg-blue-600/);
+
+    await page.getByRole('button', { name: 'Lower' }).click();
+
     await expect(todayCell).toHaveClass(/bg-blue-600/);
   });
 
   test('should return to calendar from day view', async ({ page }) => {
-    // Create a workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -639,7 +510,6 @@ test.describe('Calendar View', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Wait for save
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
     // Create second workout for same day to trigger day view
@@ -655,25 +525,18 @@ test.describe('Calendar View', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Finish' }).click();
 
-    // Wait for second workout to be saved
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
-    // Navigate to history tab
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    // Wait for calendar to render with today's workout
     await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
 
-    // Click on today to open day view (today has green ring)
     await page.locator('.ring-2.ring-green-400').click();
 
-    // Should be in day view
     await expect(page.getByText('Back to calendar')).toBeVisible();
 
-    // Click back to calendar
     await page.getByText('Back to calendar').click();
 
-    // Should be back to calendar view
     const currentMonth = new Date().toLocaleString('default', { month: 'long' });
     const currentYear = new Date().getFullYear();
     await expect(page.getByText(`${currentMonth} ${currentYear}`)).toBeVisible();
@@ -681,31 +544,15 @@ test.describe('Calendar View', () => {
 });
 
 test.describe('Exercise Rename During Active Workout', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+  let setup: TestSetup;
 
-    // Clear any existing tokens and reload
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
-
-    // Generate unique username for each test
-    const testUsername = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-    // Register a new user
-    await page.click('#auth-register-tab');
-    await page.fill('#auth-username', testUsername);
-    await page.fill('#auth-password', testPassword);
-    await page.click('#auth-submit-btn');
-
-    // Wait for main app to be visible
+  test.beforeEach(async ({ page, request }) => {
+    setup = await setupTestUserWithExercises(request);
+    await authenticatePage(page, setup.token);
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
-
-    // Create test exercises (since there are no default exercises)
-    await createTestExercises(page);
   });
 
   test('should update current workout when exercise is renamed', async ({ page }) => {
-    // Start a workout and add an exercise
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -713,31 +560,24 @@ test.describe('Exercise Rename During Active Workout', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Verify exercise is in workout
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
 
-    // Go to Exercises tab and rename the exercise
     await page.getByRole('button', { name: 'Exercises' }).click();
     await page.fill('#exercise-search', 'Bench Press');
     await page.locator('#exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Change the name
     await page.fill('#exercise-name-input', 'Barbell Bench Press');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Wait for save to complete and return to exercise list
     await expect(page.locator('#exercises-list-view')).toBeVisible({ timeout: 5000 });
 
-    // Go back to workout tab
     await page.getByRole('button', { name: 'Workout' }).click();
 
-    // Verify the exercise name was updated in the current workout
     await expect(page.locator('#exercise-list').getByText('Barbell Bench Press')).toBeVisible();
     await expect(page.locator('#exercise-list').getByText('Bench Press', { exact: true })).not.toBeVisible();
   });
@@ -751,16 +591,13 @@ test.describe('Exercise Rename During Active Workout', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set with 8 reps at 135 lbs
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '8');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Confirm the set
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Finish first workout
     await page.getByRole('button', { name: 'Finish' }).click();
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
 
@@ -772,14 +609,11 @@ test.describe('Exercise Rename During Active Workout', () => {
     await expect(page.locator('#add-exercise-search-results')).toBeVisible();
     await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
 
-    // Add a set with 8 reps at 135 lbs (same as before - should NOT be a PR)
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '8');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // The set should NOT show a PR star (8 reps doesn't beat previous 8 reps)
-    // First verify there's no star visible
     const prStars = page.locator('#exercise-list span').filter({ hasText: '★' });
     await expect(prStars).toHaveCount(0);
 
@@ -791,13 +625,10 @@ test.describe('Exercise Rename During Active Workout', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.locator('#exercises-list-view')).toBeVisible({ timeout: 5000 });
 
-    // Go back to workout
     await page.getByRole('button', { name: 'Workout' }).click();
 
-    // Verify exercise was renamed
     await expect(page.locator('#exercise-list').getByText('Barbell Bench Press')).toBeVisible();
 
-    // The set should still NOT show a PR star (the history was preserved under the new name)
     const prStarsAfterRename = page.locator('#exercise-list span').filter({ hasText: '★' });
     await expect(prStarsAfterRename).toHaveCount(0);
 
@@ -807,7 +638,6 @@ test.describe('Exercise Rename During Active Workout', () => {
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // This set should show a PR star (10 reps beats previous 8 reps)
     await expect(page.locator('#exercise-list span.opacity-40').filter({ hasText: '★' })).toBeVisible();
   });
 });
@@ -828,14 +658,12 @@ test.describe('Authentication', () => {
     await page.evaluate(() => localStorage.clear());
     await page.reload();
 
-    // Register
     const uniqueUser = `user_${Date.now()}`;
     await page.click('#auth-register-tab');
     await page.fill('#auth-username', uniqueUser);
     await page.fill('#auth-password', 'password123');
     await page.click('#auth-submit-btn');
 
-    // Should see main app
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible();
   });
@@ -845,12 +673,10 @@ test.describe('Authentication', () => {
     await page.evaluate(() => localStorage.clear());
     await page.reload();
 
-    // Try to login with non-existent user
     await page.fill('#auth-username', 'nonexistent');
     await page.fill('#auth-password', 'wrongpass');
     await page.click('#auth-submit-btn');
 
-    // Should show error
     await expect(page.locator('#auth-error')).toBeVisible();
     await expect(page.locator('#auth-error')).toContainText('Invalid');
   });
@@ -860,7 +686,6 @@ test.describe('Authentication', () => {
     await page.evaluate(() => localStorage.clear());
     await page.reload();
 
-    // Register a user first
     const uniqueUser = `loading_${Date.now()}`;
     await page.click('#auth-register-tab');
     await page.fill('#auth-username', uniqueUser);
@@ -868,8 +693,6 @@ test.describe('Authentication', () => {
     await page.click('#auth-submit-btn');
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
-    // Reload the page while authenticated — inject a MutationObserver before
-    // the app JS runs to catch any flash of the auth screen
     await page.reload();
     await page.evaluate(() => {
       const el = document.getElementById('auth-screen');
@@ -884,12 +707,10 @@ test.describe('Authentication', () => {
       if (el) observer.observe(el, { attributes: true, attributeFilter: ['class'] });
     });
 
-    // Main app should appear after auth check
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('#loading-screen')).toBeHidden();
     await expect(page.locator('#auth-screen')).toBeHidden();
 
-    // Verify auth screen never flashed during the load
     const flashed = await page.evaluate(() => (window as any).__authScreenFlashed);
     expect(flashed).toBeFalsy();
   });
@@ -907,11 +728,9 @@ test.describe('Authentication', () => {
       await expect(page.locator('#main-app')).toBeVisible({ timeout: 5000 });
     }
 
-    // Go to settings and logout
     await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Logout' }).click();
 
-    // Should show auth screen
     await expect(page.locator('#auth-screen')).toBeVisible();
   });
 });

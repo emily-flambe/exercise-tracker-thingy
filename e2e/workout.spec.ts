@@ -855,6 +855,45 @@ test.describe('Authentication', () => {
     await expect(page.locator('#auth-error')).toContainText('Invalid');
   });
 
+  test('should not flash login screen when authenticated on reload', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    // Register a user first
+    const uniqueUser = `loading_${Date.now()}`;
+    await page.click('#auth-register-tab');
+    await page.fill('#auth-username', uniqueUser);
+    await page.fill('#auth-password', 'password123');
+    await page.click('#auth-submit-btn');
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+
+    // Reload the page while authenticated — inject a MutationObserver before
+    // the app JS runs to catch any flash of the auth screen
+    await page.reload();
+    await page.evaluate(() => {
+      const el = document.getElementById('auth-screen');
+      if (el && !el.classList.contains('hidden')) {
+        (window as any).__authScreenFlashed = true;
+      }
+      const observer = new MutationObserver(() => {
+        if (el && !el.classList.contains('hidden')) {
+          (window as any).__authScreenFlashed = true;
+        }
+      });
+      if (el) observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+
+    // Main app should appear after auth check
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#loading-screen')).toBeHidden();
+    await expect(page.locator('#auth-screen')).toBeHidden();
+
+    // Verify auth screen never flashed during the load
+    const flashed = await page.evaluate(() => (window as any).__authScreenFlashed);
+    expect(flashed).toBeFalsy();
+  });
+
   test('should logout and show login screen', async ({ page }) => {
     await page.goto('/');
 

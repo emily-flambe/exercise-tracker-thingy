@@ -8,7 +8,8 @@ import {
   createCustomExercise,
   updateCustomExercise,
   getAllCustomExercises,
-  getPRsForExercise
+  getPRsForExercise,
+  type UpdateWorkoutResult
 } from './queries';
 import type { CreateWorkoutRequest } from '../types';
 
@@ -689,10 +690,11 @@ describe('Exercise Notes', () => {
         }
       ]
     };
-    const updated = await updateWorkout(env.DB, created.id, userId, updateData);
+    const result = await updateWorkout(env.DB, created.id, userId, updateData);
 
-    expect(updated).not.toBeNull();
-    expect(updated!.exercises[0].notes).toBe('Updated note after review');
+    expect(result.status).toBe('success');
+    const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
+    expect(updated.exercises[0].notes).toBe('Updated note after review');
 
     // Verify with fresh fetch
     const fetched = await getWorkout(env.DB, created.id, userId);
@@ -730,10 +732,11 @@ describe('Exercise Notes', () => {
         }
       ]
     };
-    const updated = await updateWorkout(env.DB, created.id, userId, updateData);
+    const result = await updateWorkout(env.DB, created.id, userId, updateData);
 
-    expect(updated).not.toBeNull();
-    expect(updated!.exercises[0].notes).toBeUndefined();
+    expect(result.status).toBe('success');
+    const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
+    expect(updated.exercises[0].notes).toBeUndefined();
   });
 
   it('should handle notes on multiple exercises independently', async () => {
@@ -896,9 +899,177 @@ describe('Exercise Notes', () => {
         }
       ]
     };
-    const updated = await updateWorkout(env.DB, created.id, userId, updateData);
+    const result = await updateWorkout(env.DB, created.id, userId, updateData);
 
-    expect(updated).not.toBeNull();
-    expect(updated!.exercises[0].notes).toBe('Added note after the fact');
+    expect(result.status).toBe('success');
+    const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
+    expect(updated.exercises[0].notes).toBe('Added note after the fact');
+  });
+});
+
+describe('Optimistic Locking', () => {
+  let userId: string;
+  const testUsername = 'testuser_locking';
+  const testPasswordHash = 'hash123';
+
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM users WHERE username = ?').bind(testUsername).run();
+    const user = await createUser(env.DB, testUsername, testPasswordHash);
+    userId = user.id;
+  });
+
+  it('should set updated_at on createWorkout', async () => {
+    const before = Date.now();
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [{ weight: 135, reps: 10, completed: true }]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+    const after = Date.now();
+
+    expect(created.updated_at).toBeGreaterThanOrEqual(before);
+    expect(created.updated_at).toBeLessThanOrEqual(after);
+  });
+
+  it('should update updated_at on successful updateWorkout', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now() - 10000,
+      end_time: Date.now() - 5000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [{ weight: 135, reps: 10, completed: true }]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+    const originalUpdatedAt = created.updated_at;
+
+    // Wait a bit so timestamps differ
+    await new Promise(r => setTimeout(r, 10));
+
+    const updateData: CreateWorkoutRequest & { updated_at?: number } = {
+      start_time: created.start_time,
+      end_time: created.end_time,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 135, reps: 10, completed: true },
+            { weight: 135, reps: 12, completed: true }
+          ]
+        }
+      ],
+      updated_at: originalUpdatedAt,
+    };
+    const result = await updateWorkout(env.DB, created.id, userId, updateData);
+
+    expect(result.status).toBe('success');
+    const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
+    expect(updated.updated_at).toBeGreaterThan(originalUpdatedAt);
+  });
+
+  it('should return conflict when updated_at does not match', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [{ weight: 135, reps: 10, completed: true }]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    // Simulate external update (updates updated_at on server)
+    const externalUpdate: CreateWorkoutRequest = {
+      start_time: created.start_time,
+      end_time: created.end_time,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'Coach says: great form!',
+          sets: [{ weight: 135, reps: 10, completed: true }]
+        }
+      ],
+    };
+    const externalResult = await updateWorkout(env.DB, created.id, userId, externalUpdate);
+    expect(externalResult.status).toBe('success');
+
+    // Now try to update with stale updated_at (from original create)
+    const staleUpdate: CreateWorkoutRequest & { updated_at: number } = {
+      start_time: created.start_time,
+      end_time: created.end_time,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 135, reps: 10, completed: true },
+            { weight: 155, reps: 8, completed: true }
+          ]
+        }
+      ],
+      updated_at: created.updated_at, // Stale!
+    };
+    const result = await updateWorkout(env.DB, created.id, userId, staleUpdate);
+
+    expect(result.status).toBe('conflict');
+    const conflict = result as Extract<UpdateWorkoutResult, { status: 'conflict' }>;
+    // Should return the current server state
+    expect(conflict.current.exercises[0].notes).toBe('Coach says: great form!');
+  });
+
+  it('should allow update without updated_at (backward compatible)', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [{ weight: 135, reps: 10, completed: true }]
+        }
+      ]
+    };
+    const created = await createWorkout(env.DB, userId, workout);
+
+    // Update without sending updated_at - should always succeed (backward compat)
+    const updateData: CreateWorkoutRequest = {
+      start_time: created.start_time,
+      end_time: created.end_time,
+      exercises: [
+        {
+          name: 'Bench Press',
+          notes: 'No version check',
+          sets: [{ weight: 135, reps: 10, completed: true }]
+        }
+      ],
+    };
+    const result = await updateWorkout(env.DB, created.id, userId, updateData);
+
+    expect(result.status).toBe('success');
+    const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
+    expect(updated.exercises[0].notes).toBe('No version check');
+  });
+
+  it('should return not_found for non-existent workout', async () => {
+    const updateData: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [{ weight: 135, reps: 10, completed: true }]
+        }
+      ],
+    };
+    const result = await updateWorkout(env.DB, 'nonexistent-id', userId, updateData);
+
+    expect(result.status).toBe('not_found');
   });
 });

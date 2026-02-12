@@ -52,6 +52,7 @@ export interface Workout {
   target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
   created_at: number;
+  updated_at: number;
 }
 
 // Database row types
@@ -62,6 +63,7 @@ export interface WorkoutRow {
   end_time: number | null;
   target_categories: string | null;
   created_at: number;
+  updated_at: number | null;
 }
 
 export interface WorkoutExerciseRow {
@@ -130,6 +132,7 @@ export interface UpdateWorkoutRequest {
   end_time?: number;
   target_categories?: MuscleGroup[];
   exercises?: WorkoutExercise[];
+  updated_at?: number;
 }
 
 export interface CreateExerciseRequest {

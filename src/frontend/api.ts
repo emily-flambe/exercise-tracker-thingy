@@ -13,6 +13,13 @@ export class ApiError extends Error {
   }
 }
 
+export class ConflictError extends ApiError {
+  constructor(public currentWorkout: Workout) {
+    super(409, 'Conflict');
+    this.name = 'ConflictError';
+  }
+}
+
 // Token management
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -140,6 +147,7 @@ export interface Workout {
   target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
   created_at: number;
+  updated_at: number;
 }
 
 export type MuscleGroup = 'Upper' | 'Lower' | 'Core' | 'Cardio' | 'Other';
@@ -181,11 +189,33 @@ export async function updateWorkout(id: string, data: {
   end_time?: number;
   target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
+  updated_at?: number;
 }): Promise<Workout> {
-  return apiFetch<Workout>(`/workouts/${id}`, {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE}/workouts/${id}`, {
     method: 'PUT',
+    headers,
     body: JSON.stringify(data),
   });
+
+  if (response.status === 409) {
+    const body = await response.json() as { error: string; current: Workout };
+    throw new ConflictError(body.current);
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Request failed' })) as { error?: string };
+    throw new ApiError(response.status, errorData.error || 'Request failed');
+  }
+
+  return response.json();
 }
 
 export async function deleteWorkout(id: string): Promise<void> {

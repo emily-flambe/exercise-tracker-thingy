@@ -98,6 +98,7 @@ export async function getAllWorkouts(db: D1Database, userId: string): Promise<Wo
       target_categories: targetCategories,
       exercises,
       created_at: row.created_at,
+      updated_at: row.updated_at ?? row.created_at,
     });
   }
 
@@ -125,6 +126,7 @@ export async function getWorkout(db: D1Database, id: string, userId: string): Pr
     target_categories: targetCategories,
     exercises,
     created_at: row.created_at,
+    updated_at: row.updated_at ?? row.created_at,
   };
 }
 
@@ -183,8 +185,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     : null;
 
   await db
-    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now)
+    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now, now)
     .run();
 
   // Insert exercises and sets
@@ -212,18 +214,29 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
   return getWorkout(db, id, userId) as Promise<Workout>;
 }
 
-export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest): Promise<Workout | null> {
-  const existing = await getWorkout(db, id, userId);
-  if (!existing) return null;
+export type UpdateWorkoutResult =
+  | { status: 'success'; workout: Workout }
+  | { status: 'not_found' }
+  | { status: 'conflict'; current: Workout };
 
+export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest & { updated_at?: number }): Promise<UpdateWorkoutResult> {
+  const existing = await getWorkout(db, id, userId);
+  if (!existing) return { status: 'not_found' };
+
+  // Optimistic locking: if caller provided updated_at, check it matches
+  if (data.updated_at !== undefined && data.updated_at !== existing.updated_at) {
+    return { status: 'conflict', current: existing };
+  }
+
+  const now = Date.now();
   const targetCategoriesJson = data.target_categories
     ? JSON.stringify(data.target_categories)
     : null;
 
-  // Update workout row
+  // Update workout row with new updated_at
   await db
-    .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ? WHERE id = ?')
-    .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, id)
+    .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ?, updated_at = ? WHERE id = ?')
+    .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, now, id)
     .run();
 
   // Delete existing exercises, sets, and PRs for this workout
@@ -259,7 +272,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
   // Detect and record PRs
   await detectAndRecordPRs(db, userId, id, data.exercises, data.start_time);
 
-  return getWorkout(db, id, userId);
+  const updated = await getWorkout(db, id, userId);
+  return { status: 'success', workout: updated! };
 }
 
 export async function deleteWorkout(db: D1Database, id: string, userId: string): Promise<boolean> {

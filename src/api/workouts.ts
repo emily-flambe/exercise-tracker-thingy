@@ -45,19 +45,23 @@ app.post('/', async (c) => {
 app.put('/:id', async (c) => {
   const userId = c.get('userId');
   const id = c.req.param('id');
-  const body = await c.req.json<CreateWorkoutRequest>();
+  const body = await c.req.json<CreateWorkoutRequest & { updated_at?: number }>();
 
   if (!body.start_time || !Array.isArray(body.exercises)) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
 
-  const workout = await queries.updateWorkout(c.env.DB, id, userId, body);
+  const result = await queries.updateWorkout(c.env.DB, id, userId, body);
 
-  if (!workout) {
+  if (result.status === 'not_found') {
     return c.json({ error: 'Workout not found' }, 404);
   }
 
-  return c.json(workout);
+  if (result.status === 'conflict') {
+    return c.json({ error: 'Conflict', current: result.current }, 409);
+  }
+
+  return c.json(result.workout);
 });
 
 // DELETE /api/workouts/:id - Delete workout

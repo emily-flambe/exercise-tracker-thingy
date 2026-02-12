@@ -1,4 +1,5 @@
 import * as api from './api';
+import { ConflictError } from './api';
 import type { Workout, WorkoutExercise, Set as WorkoutSet, CustomExercise, User, PersonalRecord, MuscleGroup } from './api';
 import type { CreateWorkoutRequest } from '../types';
 
@@ -52,6 +53,7 @@ let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let workoutExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let editingWorkoutUpdatedAt: number | null = null;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -475,6 +477,7 @@ function startWorkoutInternal(targetCategories?: MuscleGroup[]): void {
     exercises: [],
   };
   state.editingWorkoutId = null;
+  editingWorkoutUpdatedAt = null;
   isEditingFromHistory = false;
   expandedNotes.clear();
   selectedTargetCategories.clear();
@@ -501,6 +504,7 @@ function startWorkout(): void {
     exercises: [],
   };
   state.editingWorkoutId = null;
+  editingWorkoutUpdatedAt = null;
   isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
@@ -512,13 +516,14 @@ async function finishWorkout(): Promise<void> {
   if (!state.currentWorkout || state.currentWorkout.exercises.length === 0) {
     state.currentWorkout = null;
     state.editingWorkoutId = null;
+    editingWorkoutUpdatedAt = null;
     expandedNotes.clear();
     showWorkoutScreen('workout-empty');
     return;
   }
 
   try {
-    const workoutData = {
+    const workoutData: CreateWorkoutRequest & { updated_at?: number } = {
       start_time: state.currentWorkout.startTime,
       end_time: Date.now(),
       target_categories: state.currentWorkout.targetCategories,
@@ -527,15 +532,22 @@ async function finishWorkout(): Promise<void> {
 
     if (isEditingFromHistory) {
       // Editing existing workout from history - save and stay on workout screen
+      if (editingWorkoutUpdatedAt !== null) {
+        workoutData.updated_at = editingWorkoutUpdatedAt;
+      }
       await api.updateWorkout(state.editingWorkoutId!, workoutData);
       await loadData();
       // Keep user on workout - don't clear state or navigate away
     } else if (state.editingWorkoutId) {
       // New workout that was auto-saved - update it and go to empty screen
+      if (editingWorkoutUpdatedAt !== null) {
+        workoutData.updated_at = editingWorkoutUpdatedAt;
+      }
       await api.updateWorkout(state.editingWorkoutId, workoutData);
       await loadData();
       state.currentWorkout = null;
       state.editingWorkoutId = null;
+      editingWorkoutUpdatedAt = null;
       isEditingFromHistory = false;
       expandedNotes.clear();
       showWorkoutScreen('workout-empty');
@@ -576,6 +588,7 @@ async function confirmDeleteCurrentWorkout(): Promise<void> {
     // Clear local state
     state.currentWorkout = null;
     state.editingWorkoutId = null;
+    editingWorkoutUpdatedAt = null;
     isEditingFromHistory = false;
     expandedNotes.clear();
 
@@ -609,7 +622,7 @@ async function autoSaveWorkout(): Promise<void> {
   }
 
   try {
-    const workoutData: CreateWorkoutRequest = {
+    const workoutData: CreateWorkoutRequest & { updated_at?: number } = {
       start_time: state.currentWorkout.startTime,
       // Keep workout active - don't set end_time for new workouts
       // For edited workouts, we need to preserve that it was already finished
@@ -624,21 +637,70 @@ async function autoSaveWorkout(): Promise<void> {
         // Preserve the original end_time for finished workouts being edited
         workoutData.end_time = originalWorkout.end_time;
       }
-      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      // Send updated_at for optimistic locking
+      if (editingWorkoutUpdatedAt !== null) {
+        workoutData.updated_at = editingWorkoutUpdatedAt;
+      }
+      const savedWorkout = await api.updateWorkout(state.editingWorkoutId, workoutData);
+      editingWorkoutUpdatedAt = savedWorkout.updated_at;
     } else {
       // Creating a new workout - don't set end_time to keep it active
       const savedWorkout = await api.createWorkout(workoutData);
       // Set the editingWorkoutId so future auto-saves update this workout
       state.editingWorkoutId = savedWorkout.id;
+      editingWorkoutUpdatedAt = savedWorkout.updated_at;
     }
 
     // Reload data to refresh history, but keep current workout active
     await loadData();
     console.log('Workout auto-saved');
   } catch (error) {
-    console.error('Failed to auto-save workout:', error);
-    // Silently fail - don't interrupt user's workflow with alerts
+    if (error instanceof ConflictError) {
+      // Another client updated this workout - merge their changes into local state
+      console.log('Auto-save conflict detected, merging server changes');
+      mergeServerWorkout(error.currentWorkout);
+      // Retry auto-save with the merged state
+      scheduleAutoSave();
+    } else {
+      console.error('Failed to auto-save workout:', error);
+      // Silently fail - don't interrupt user's workflow with alerts
+    }
   }
+}
+
+function mergeServerWorkout(serverWorkout: Workout): void {
+  if (!state.currentWorkout) return;
+
+  // Update our version stamp to the server's
+  editingWorkoutUpdatedAt = serverWorkout.updated_at;
+
+  // Merge exercise-level data from server into local state.
+  // Strategy: keep local exercises/sets (user is actively editing those),
+  // but pull in server-side fields the user hasn't touched (e.g., notes from Coach Chaos).
+  const localExercises = state.currentWorkout.exercises;
+  const serverExercises = serverWorkout.exercises;
+
+  for (const localEx of localExercises) {
+    const serverEx = serverExercises.find(se => se.name === localEx.name);
+    if (!serverEx) continue;
+
+    // If server has notes and local doesn't, take server notes
+    // (external client like Coach Chaos added coaching notes)
+    if (serverEx.notes && !localEx.notes) {
+      localEx.notes = serverEx.notes;
+    }
+  }
+
+  // Check if server has exercises that local doesn't (externally added)
+  for (const serverEx of serverExercises) {
+    const localEx = localExercises.find(le => le.name === serverEx.name);
+    if (!localEx) {
+      // External client added a new exercise - append it
+      localExercises.push(JSON.parse(JSON.stringify(serverEx)));
+    }
+  }
+
+  renderWorkout();
 }
 
 function renderWorkout(): void {
@@ -1437,6 +1499,7 @@ function editWorkout(id: string): void {
     exercises: JSON.parse(JSON.stringify(source.exercises)),
   };
   state.editingWorkoutId = id;
+  editingWorkoutUpdatedAt = source.updated_at;
   isEditingFromHistory = true;
   expandedNotes.clear();
   updateWorkoutTitle();
@@ -1897,6 +1960,7 @@ async function clearAllData(): Promise<void> {
       await loadData();
       state.currentWorkout = null;
       state.editingWorkoutId = null;
+      editingWorkoutUpdatedAt = null;
       showWorkoutScreen('workout-empty');
     } catch (error) {
       console.error('Failed to clear data:', error);
@@ -1991,6 +2055,7 @@ function logout(): void {
   state.customExercises = [];
   state.currentWorkout = null;
   state.editingWorkoutId = null;
+  editingWorkoutUpdatedAt = null;
   ($('auth-username') as HTMLInputElement).value = '';
   ($('auth-password') as HTMLInputElement).value = '';
   showLoginForm();

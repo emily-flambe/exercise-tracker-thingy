@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS workouts (
   end_time INTEGER,
   target_categories TEXT,
   created_at INTEGER NOT NULL,
+  updated_at INTEGER,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

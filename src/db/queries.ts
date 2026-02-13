@@ -98,6 +98,7 @@ export async function getAllWorkouts(db: D1Database, userId: string): Promise<Wo
       target_categories: targetCategories,
       exercises,
       created_at: row.created_at,
+      updated_at: row.updated_at ?? row.created_at,
     });
   }
 
@@ -125,6 +126,7 @@ export async function getWorkout(db: D1Database, id: string, userId: string): Pr
     target_categories: targetCategories,
     exercises,
     created_at: row.created_at,
+    updated_at: row.updated_at ?? row.created_at,
   };
 }
 
@@ -183,8 +185,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     : null;
 
   await db
-    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now)
+    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now, now)
     .run();
 
   // Insert exercises and sets
@@ -212,19 +214,39 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
   return getWorkout(db, id, userId) as Promise<Workout>;
 }
 
-export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest): Promise<Workout | null> {
-  const existing = await getWorkout(db, id, userId);
-  if (!existing) return null;
+export type UpdateWorkoutResult =
+  | { status: 'success'; workout: Workout }
+  | { status: 'not_found' }
+  | { status: 'conflict'; current: Workout };
 
+export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest & { updated_at?: number }): Promise<UpdateWorkoutResult> {
+  const now = Date.now();
   const targetCategoriesJson = data.target_categories
     ? JSON.stringify(data.target_categories)
     : null;
 
-  // Update workout row
-  await db
-    .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ? WHERE id = ?')
-    .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, id)
-    .run();
+  // Atomic compare-and-swap: include updated_at in WHERE clause to prevent TOCTOU races
+  let result;
+  if (data.updated_at !== undefined) {
+    result = await db
+      .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ?, updated_at = ? WHERE id = ? AND user_id = ? AND updated_at = ?')
+      .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, now, id, userId, data.updated_at)
+      .run();
+  } else {
+    // No version check (backward compatible) - still scope to user_id
+    result = await db
+      .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ?, updated_at = ? WHERE id = ? AND user_id = ?')
+      .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, now, id, userId)
+      .run();
+  }
+
+  if (result.meta.changes === 0) {
+    // Either not found or version mismatch - check which
+    const existing = await getWorkout(db, id, userId);
+    if (!existing) return { status: 'not_found' };
+    // Workout exists but updated_at didn't match - conflict
+    return { status: 'conflict', current: existing };
+  }
 
   // Delete existing exercises, sets, and PRs for this workout
   await db
@@ -259,7 +281,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
   // Detect and record PRs
   await detectAndRecordPRs(db, userId, id, data.exercises, data.start_time);
 
-  return getWorkout(db, id, userId);
+  const updated = await getWorkout(db, id, userId);
+  return { status: 'success', workout: updated! };
 }
 
 export async function deleteWorkout(db: D1Database, id: string, userId: string): Promise<boolean> {

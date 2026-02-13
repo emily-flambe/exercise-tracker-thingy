@@ -54,6 +54,8 @@ let workoutExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let editingWorkoutUpdatedAt: number | null = null;
+let autoSaveConflictRetries = 0;
+const MAX_AUTO_SAVE_CONFLICT_RETRIES = 3;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -478,6 +480,7 @@ function startWorkoutInternal(targetCategories?: MuscleGroup[]): void {
   };
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
+  autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
   selectedTargetCategories.clear();
@@ -505,6 +508,7 @@ function startWorkout(): void {
   };
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
+  autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
@@ -517,6 +521,7 @@ async function finishWorkout(): Promise<void> {
     state.currentWorkout = null;
     state.editingWorkoutId = null;
     editingWorkoutUpdatedAt = null;
+    autoSaveConflictRetries = 0;
     expandedNotes.clear();
     showWorkoutScreen('workout-empty');
     return;
@@ -548,6 +553,7 @@ async function finishWorkout(): Promise<void> {
       state.currentWorkout = null;
       state.editingWorkoutId = null;
       editingWorkoutUpdatedAt = null;
+      autoSaveConflictRetries = 0;
       isEditingFromHistory = false;
       expandedNotes.clear();
       showWorkoutScreen('workout-empty');
@@ -562,8 +568,39 @@ async function finishWorkout(): Promise<void> {
       showWorkoutScreen('workout-empty');
     }
   } catch (error) {
-    console.error('Failed to save workout:', error);
-    alert('Failed to save workout');
+    if (error instanceof ConflictError) {
+      // Conflict on explicit save - merge server changes and retry once
+      console.log('Finish workout conflict detected, merging and retrying');
+      mergeServerWorkout(error.currentWorkout);
+      try {
+        const retryData: CreateWorkoutRequest & { updated_at?: number } = {
+          start_time: state.currentWorkout!.startTime,
+          end_time: Date.now(),
+          target_categories: state.currentWorkout!.targetCategories,
+          exercises: state.currentWorkout!.exercises,
+        };
+        if (editingWorkoutUpdatedAt !== null) {
+          retryData.updated_at = editingWorkoutUpdatedAt;
+        }
+        await api.updateWorkout(state.editingWorkoutId!, retryData);
+        await loadData();
+        if (!isEditingFromHistory) {
+          state.currentWorkout = null;
+          state.editingWorkoutId = null;
+          editingWorkoutUpdatedAt = null;
+          autoSaveConflictRetries = 0;
+          isEditingFromHistory = false;
+          expandedNotes.clear();
+          showWorkoutScreen('workout-empty');
+        }
+      } catch (retryError) {
+        console.error('Failed to save workout after conflict merge:', retryError);
+        alert('Failed to save workout due to a conflict. Your changes are still in the editor — please try saving again.');
+      }
+    } else {
+      console.error('Failed to save workout:', error);
+      alert('Failed to save workout');
+    }
   }
 }
 
@@ -589,6 +626,7 @@ async function confirmDeleteCurrentWorkout(): Promise<void> {
     state.currentWorkout = null;
     state.editingWorkoutId = null;
     editingWorkoutUpdatedAt = null;
+    autoSaveConflictRetries = 0;
     isEditingFromHistory = false;
     expandedNotes.clear();
 
@@ -653,11 +691,19 @@ async function autoSaveWorkout(): Promise<void> {
 
     // Reload data to refresh history, but keep current workout active
     await loadData();
+    autoSaveConflictRetries = 0; // Reset on success
     console.log('Workout auto-saved');
   } catch (error) {
     if (error instanceof ConflictError) {
+      autoSaveConflictRetries++;
+      if (autoSaveConflictRetries > MAX_AUTO_SAVE_CONFLICT_RETRIES) {
+        console.error(`Auto-save conflict persists after ${MAX_AUTO_SAVE_CONFLICT_RETRIES} retries, giving up`);
+        autoSaveConflictRetries = 0;
+        alert('Your workout could not be saved due to repeated conflicts with another session. Your changes are still in the editor — please try saving manually.');
+        return;
+      }
       // Another client updated this workout - merge their changes into local state
-      console.log('Auto-save conflict detected, merging server changes');
+      console.log(`Auto-save conflict detected (attempt ${autoSaveConflictRetries}/${MAX_AUTO_SAVE_CONFLICT_RETRIES}), merging server changes`);
       mergeServerWorkout(error.currentWorkout);
       // Retry auto-save with the merged state
       scheduleAutoSave();
@@ -1961,6 +2007,7 @@ async function clearAllData(): Promise<void> {
       state.currentWorkout = null;
       state.editingWorkoutId = null;
       editingWorkoutUpdatedAt = null;
+      autoSaveConflictRetries = 0;
       showWorkoutScreen('workout-empty');
     } catch (error) {
       console.error('Failed to clear data:', error);
@@ -2056,6 +2103,7 @@ function logout(): void {
   state.currentWorkout = null;
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
+  autoSaveConflictRetries = 0;
   ($('auth-username') as HTMLInputElement).value = '';
   ($('auth-password') as HTMLInputElement).value = '';
   showLoginForm();

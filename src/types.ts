@@ -171,6 +171,15 @@ export interface AuthResponse {
   user: User;
 }
 
+// API key types
+export interface ApiKeyRow {
+  id: string;
+  user_id: string;
+  key_hash: string;
+  name: string;
+  created_at: number;
+}
+
 // Cloudflare bindings
 export interface Env {
   DB: D1Database;

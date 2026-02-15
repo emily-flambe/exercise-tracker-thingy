@@ -529,3 +529,40 @@ export async function clearAllData(db: D1Database, userId: string): Promise<void
   await db.prepare('DELETE FROM custom_exercises WHERE user_id = ?').bind(userId).run();
   await db.prepare('DELETE FROM personal_records WHERE user_id = ?').bind(userId).run();
 }
+
+// ==================== API KEYS ====================
+
+export async function createApiKey(db: D1Database, userId: string, name: string): Promise<{ id: string; key: string }> {
+  const id = generateId();
+  const now = Date.now();
+
+  // Generate a random key with wt_ prefix
+  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+  const key = 'wt_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  // Hash the key for storage using SHA-256
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(key));
+  const keyHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  await db
+    .prepare('INSERT INTO api_keys (id, user_id, key_hash, name, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(id, userId, keyHash, name, now)
+    .run();
+
+  return { id, key };
+}
+
+export async function getUserByApiKey(db: D1Database, key: string): Promise<string | null> {
+  // Hash the provided key
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(key));
+  const keyHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const row = await db
+    .prepare('SELECT user_id FROM api_keys WHERE key_hash = ?')
+    .bind(keyHash)
+    .first<{ user_id: string }>();
+
+  return row?.user_id ?? null;
+}

@@ -33,7 +33,7 @@ app.post('/', async (c) => {
   const userId = c.get('userId');
   const body = await c.req.json<CreateExerciseRequest>();
 
-  if (!body.name || !body.type || !body.category || !body.unit) {
+  if (!body.name || !body.type || !body.category || !body.muscle_group || !body.unit) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
 
@@ -47,7 +47,7 @@ app.put('/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json<CreateExerciseRequest>();
 
-  if (!body.name || !body.type || !body.category || !body.unit) {
+  if (!body.name || !body.type || !body.category || !body.muscle_group || !body.unit) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
 

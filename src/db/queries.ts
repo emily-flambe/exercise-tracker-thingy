@@ -13,11 +13,26 @@ import type {
   User,
   PersonalRecord,
   PersonalRecordRow,
-  Category,
+  MuscleGroup,
 } from '../types';
 
 function generateId(): string {
   return crypto.randomUUID();
+}
+
+// Map old granular category values to coarse muscle groups for backward compatibility
+function mapToMuscleGroup(value: string): MuscleGroup {
+  const mapping: Record<string, MuscleGroup> = {
+    'Chest': 'Upper', 'Shoulders': 'Upper', 'Triceps': 'Upper',
+    'Back': 'Upper', 'Biceps': 'Upper',
+    'Legs': 'Lower',
+    'Core': 'Core',
+    'Cardio': 'Cardio',
+    'Other': 'Other',
+    // Pass through already-valid muscle groups
+    'Upper': 'Upper', 'Lower': 'Lower',
+  };
+  return mapping[value] || 'Other';
 }
 
 // ==================== USERS ====================
@@ -53,43 +68,11 @@ export async function createUser(db: D1Database, username: string, passwordHash:
     .bind(id, username, passwordHash, now)
     .run();
 
-  // Seed default exercises for the new user
-  await seedDefaultExercises(db, id);
-
   return {
     id,
     username,
     created_at: now,
   };
-}
-
-// Default exercises to seed for new users (sparse but covers main movements)
-const DEFAULT_EXERCISES: Array<{ name: string; type: string; category: string; unit: string }> = [
-  // Push
-  { name: 'Bench Press', type: '+bar', category: 'Chest', unit: 'lbs' },
-  { name: 'Overhead Press', type: '+bar', category: 'Shoulders', unit: 'lbs' },
-  { name: 'Tricep Pushdown', type: 'total', category: 'Triceps', unit: 'lbs' },
-  // Pull
-  { name: 'Deadlift', type: '+bar', category: 'Back', unit: 'lbs' },
-  { name: 'Barbell Row', type: '+bar', category: 'Back', unit: 'lbs' },
-  { name: 'Lat Pulldown', type: 'total', category: 'Back', unit: 'lbs' },
-  { name: 'Pull-ups', type: 'bodyweight', category: 'Back', unit: 'lbs' },
-  { name: 'Barbell Curl', type: 'total', category: 'Biceps', unit: 'lbs' },
-  // Legs
-  { name: 'Squat', type: '+bar', category: 'Legs', unit: 'lbs' },
-  { name: 'Leg Press', type: 'total', category: 'Legs', unit: 'lbs' },
-  { name: 'Romanian Deadlift', type: '+bar', category: 'Legs', unit: 'lbs' },
-];
-
-async function seedDefaultExercises(db: D1Database, userId: string): Promise<void> {
-  const now = Date.now();
-
-  for (const exercise of DEFAULT_EXERCISES) {
-    await db
-      .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(generateId(), userId, exercise.name, exercise.type, exercise.category, exercise.unit, now)
-      .run();
-  }
 }
 
 // ==================== WORKOUTS ====================
@@ -105,7 +88,7 @@ export async function getAllWorkouts(db: D1Database, userId: string): Promise<Wo
   for (const row of workoutRows.results) {
     const exercises = await getWorkoutExercises(db, row.id);
     const targetCategories = row.target_categories
-      ? (JSON.parse(row.target_categories) as Category[])
+      ? [...new Set((JSON.parse(row.target_categories) as string[]).map(mapToMuscleGroup))]
       : undefined;
     workouts.push({
       id: row.id,
@@ -115,6 +98,7 @@ export async function getAllWorkouts(db: D1Database, userId: string): Promise<Wo
       target_categories: targetCategories,
       exercises,
       created_at: row.created_at,
+      updated_at: row.updated_at ?? row.created_at,
     });
   }
 
@@ -131,7 +115,7 @@ export async function getWorkout(db: D1Database, id: string, userId: string): Pr
 
   const exercises = await getWorkoutExercises(db, id);
   const targetCategories = row.target_categories
-    ? (JSON.parse(row.target_categories) as Category[])
+    ? [...new Set((JSON.parse(row.target_categories) as string[]).map(mapToMuscleGroup))]
     : undefined;
 
   return {
@@ -142,6 +126,7 @@ export async function getWorkout(db: D1Database, id: string, userId: string): Pr
     target_categories: targetCategories,
     exercises,
     created_at: row.created_at,
+    updated_at: row.updated_at ?? row.created_at,
   };
 }
 
@@ -185,6 +170,7 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
       name: exRow.exercise_name,
       sets,
       completed: exRow.completed === 1,
+      notes: exRow.notes ?? undefined,
     });
   }
 
@@ -199,8 +185,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     : null;
 
   await db
-    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now)
+    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now, now)
     .run();
 
   // Insert exercises and sets
@@ -209,8 +195,8 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
     const exId = generateId();
 
     await db
-      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed) VALUES (?, ?, ?, ?, ?)')
-      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0)
+      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed, notes) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0, ex.notes ?? null)
       .run();
 
     for (let j = 0; j < ex.sets.length; j++) {
@@ -228,19 +214,39 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
   return getWorkout(db, id, userId) as Promise<Workout>;
 }
 
-export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest): Promise<Workout | null> {
-  const existing = await getWorkout(db, id, userId);
-  if (!existing) return null;
+export type UpdateWorkoutResult =
+  | { status: 'success'; workout: Workout }
+  | { status: 'not_found' }
+  | { status: 'conflict'; current: Workout };
 
+export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest & { updated_at?: number }): Promise<UpdateWorkoutResult> {
+  const now = Date.now();
   const targetCategoriesJson = data.target_categories
     ? JSON.stringify(data.target_categories)
     : null;
 
-  // Update workout row
-  await db
-    .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ? WHERE id = ?')
-    .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, id)
-    .run();
+  // Atomic compare-and-swap: include updated_at in WHERE clause to prevent TOCTOU races
+  let result;
+  if (data.updated_at !== undefined) {
+    result = await db
+      .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ?, updated_at = ? WHERE id = ? AND user_id = ? AND updated_at = ?')
+      .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, now, id, userId, data.updated_at)
+      .run();
+  } else {
+    // No version check (backward compatible) - still scope to user_id
+    result = await db
+      .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ?, updated_at = ? WHERE id = ? AND user_id = ?')
+      .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, now, id, userId)
+      .run();
+  }
+
+  if (result.meta.changes === 0) {
+    // Either not found or version mismatch - check which
+    const existing = await getWorkout(db, id, userId);
+    if (!existing) return { status: 'not_found' };
+    // Workout exists but updated_at didn't match - conflict
+    return { status: 'conflict', current: existing };
+  }
 
   // Delete existing exercises, sets, and PRs for this workout
   await db
@@ -259,8 +265,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
     const exId = generateId();
 
     await db
-      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed) VALUES (?, ?, ?, ?, ?)')
-      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0)
+      .prepare('INSERT INTO workout_exercises (id, workout_id, exercise_name, position, completed, notes) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(exId, id, ex.name, i, ex.completed ? 1 : 0, ex.notes ?? null)
       .run();
 
     for (let j = 0; j < ex.sets.length; j++) {
@@ -275,7 +281,8 @@ export async function updateWorkout(db: D1Database, id: string, userId: string, 
   // Detect and record PRs
   await detectAndRecordPRs(db, userId, id, data.exercises, data.start_time);
 
-  return getWorkout(db, id, userId);
+  const updated = await getWorkout(db, id, userId);
+  return { status: 'success', workout: updated! };
 }
 
 export async function deleteWorkout(db: D1Database, id: string, userId: string): Promise<boolean> {
@@ -301,6 +308,7 @@ export async function getAllCustomExercises(db: D1Database, userId: string): Pro
     name: row.name,
     type: row.type as CustomExercise['type'],
     category: row.category as CustomExercise['category'],
+    muscle_group: (row.muscle_group || 'Other') as CustomExercise['muscle_group'],
     unit: row.unit as CustomExercise['unit'],
     created_at: row.created_at,
   }));
@@ -320,6 +328,7 @@ export async function getCustomExercise(db: D1Database, id: string, userId: stri
     name: row.name,
     type: row.type as CustomExercise['type'],
     category: row.category as CustomExercise['category'],
+    muscle_group: (row.muscle_group || 'Other') as CustomExercise['muscle_group'],
     unit: row.unit as CustomExercise['unit'],
     created_at: row.created_at,
   };
@@ -330,8 +339,8 @@ export async function createCustomExercise(db: D1Database, userId: string, data:
   const now = Date.now();
 
   await db
-    .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, data.name, data.type, data.category, data.unit, now)
+    .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, muscle_group, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, data.name, data.type, data.category, data.muscle_group, data.unit, now)
     .run();
 
   return {
@@ -340,6 +349,7 @@ export async function createCustomExercise(db: D1Database, userId: string, data:
     name: data.name,
     type: data.type,
     category: data.category,
+    muscle_group: data.muscle_group,
     unit: data.unit,
     created_at: now,
   };
@@ -354,8 +364,8 @@ export async function updateCustomExercise(db: D1Database, id: string, userId: s
 
   // Update the custom exercise
   await db
-    .prepare('UPDATE custom_exercises SET name = ?, type = ?, category = ?, unit = ? WHERE id = ?')
-    .bind(newName, data.type, data.category, data.unit, id)
+    .prepare('UPDATE custom_exercises SET name = ?, type = ?, category = ?, muscle_group = ?, unit = ? WHERE id = ?')
+    .bind(newName, data.type, data.category, data.muscle_group, data.unit, id)
     .run();
 
   // If the name changed, sync it across all workout_exercises and personal_records
@@ -463,15 +473,13 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
     for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
       const set = exercise.sets[setIndex];
 
-      // Skip sets that are explicitly marked as incomplete or missed
-      // Treat undefined/null as completed for backward compatibility
-      if (set.completed === false || set.missed === true) {
+      // Skip sets explicitly marked as missed
+      if (set.missed === true) {
         continue;
       }
 
       // Check if this weight+reps combo is a PR
       // A PR is when at this weight, the reps are higher than any previous workout
-      // Only consider previously completed sets that are not missed (treat NULL as completed for backward compatibility)
       const previousBest = await db
         .prepare(`
           SELECT MAX(s.reps) as max_reps
@@ -482,7 +490,6 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
             AND we.exercise_name = ?
             AND s.weight = ?
             AND w.start_time < ?
-            AND (s.completed = 1 OR s.completed IS NULL)
             AND (s.missed = 0 OR s.missed IS NULL)
         `)
         .bind(userId, exercise.name, set.weight, startTime)

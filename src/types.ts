@@ -11,11 +11,13 @@ export type Category =
   | 'Core'
   | 'Cardio'
   | 'Other';
+export type MuscleGroup = 'Upper' | 'Lower' | 'Core' | 'Cardio' | 'Other';
 
 export interface Exercise {
   name: string;
   type: WeightType;
   category: Category;
+  muscle_group: MuscleGroup;
   unit: Unit;
 }
 
@@ -39,6 +41,7 @@ export interface WorkoutExercise {
   name: string;
   sets: Set[];
   completed?: boolean;
+  notes?: string;
 }
 
 export interface Workout {
@@ -46,9 +49,10 @@ export interface Workout {
   user_id: string;
   start_time: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
   created_at: number;
+  updated_at: number;
 }
 
 // Database row types
@@ -59,6 +63,7 @@ export interface WorkoutRow {
   end_time: number | null;
   target_categories: string | null;
   created_at: number;
+  updated_at: number | null;
 }
 
 export interface WorkoutExerciseRow {
@@ -67,6 +72,7 @@ export interface WorkoutExerciseRow {
   exercise_name: string;
   position: number;
   completed: number;
+  notes: string | null;
 }
 
 export interface SetRow {
@@ -86,6 +92,7 @@ export interface CustomExerciseRow {
   name: string;
   type: string;
   category: string;
+  muscle_group: string;
   unit: string;
   created_at: number;
 }
@@ -116,21 +123,23 @@ export interface PersonalRecordRow {
 export interface CreateWorkoutRequest {
   start_time: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
 }
 
 export interface UpdateWorkoutRequest {
   start_time?: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises?: WorkoutExercise[];
+  updated_at?: number;
 }
 
 export interface CreateExerciseRequest {
   name: string;
   type: WeightType;
   category: Category;
+  muscle_group: MuscleGroup;
   unit: Unit;
 }
 
@@ -138,6 +147,7 @@ export interface UpdateExerciseRequest {
   name?: string;
   type?: WeightType;
   category?: Category;
+  muscle_group?: MuscleGroup;
   unit?: Unit;
 }
 

@@ -13,6 +13,13 @@ export class ApiError extends Error {
   }
 }
 
+export class ConflictError extends ApiError {
+  constructor(public currentWorkout: Workout) {
+    super(409, 'Conflict');
+    this.name = 'ConflictError';
+  }
+}
+
 // Token management
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -107,6 +114,7 @@ export interface WorkoutExercise {
   name: string;
   sets: Set[];
   completed?: boolean;
+  notes?: string;
 }
 
 export interface PersonalRecord {
@@ -136,10 +144,13 @@ export interface Workout {
   user_id: string;
   start_time: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
   created_at: number;
+  updated_at: number;
 }
+
+export type MuscleGroup = 'Upper' | 'Lower' | 'Core' | 'Cardio' | 'Other';
 
 export interface CustomExercise {
   id: string;
@@ -147,6 +158,7 @@ export interface CustomExercise {
   name: string;
   type: 'total' | '/side' | '+bar' | 'bodyweight';
   category: string;
+  muscle_group: MuscleGroup;
   unit: 'lbs' | 'kg';
   created_at: number;
 }
@@ -163,7 +175,7 @@ export async function getWorkout(id: string): Promise<Workout> {
 export async function createWorkout(data: {
   start_time: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
 }): Promise<Workout> {
   return apiFetch<Workout>('/workouts', {
@@ -175,13 +187,35 @@ export async function createWorkout(data: {
 export async function updateWorkout(id: string, data: {
   start_time: number;
   end_time?: number;
-  target_categories?: Category[];
+  target_categories?: MuscleGroup[];
   exercises: WorkoutExercise[];
+  updated_at?: number;
 }): Promise<Workout> {
-  return apiFetch<Workout>(`/workouts/${id}`, {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE}/workouts/${id}`, {
     method: 'PUT',
+    headers,
     body: JSON.stringify(data),
   });
+
+  if (response.status === 409) {
+    const body = await response.json() as { error: string; current: Workout };
+    throw new ConflictError(body.current);
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Request failed' })) as { error?: string };
+    throw new ApiError(response.status, errorData.error || 'Request failed');
+  }
+
+  return response.json();
 }
 
 export async function deleteWorkout(id: string): Promise<void> {
@@ -197,6 +231,7 @@ export async function createCustomExercise(data: {
   name: string;
   type: string;
   category: string;
+  muscle_group: string;
   unit: string;
 }): Promise<CustomExercise> {
   return apiFetch<CustomExercise>('/exercises', {
@@ -209,6 +244,7 @@ export async function updateCustomExercise(id: string, data: {
   name: string;
   type: string;
   category: string;
+  muscle_group: string;
   unit: string;
 }): Promise<CustomExercise> {
   return apiFetch<CustomExercise>(`/exercises/${id}`, {

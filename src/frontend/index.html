@@ -10,8 +10,16 @@
 <body class="bg-gray-900 text-gray-100">
   <div class="phone-frame bg-gray-800">
 
+    <!-- LOADING SCREEN -->
+    <div id="loading-screen" class="p-4">
+      <div class="flex flex-col items-center justify-center py-24">
+        <h1 class="text-2xl font-bold mb-6">Workout Tracker</h1>
+        <div class="loading-spinner"></div>
+      </div>
+    </div>
+
     <!-- AUTH SCREEN -->
-    <div id="auth-screen" class="p-4">
+    <div id="auth-screen" class="hidden p-4">
       <div class="flex flex-col items-center justify-center py-12">
         <h1 class="text-2xl font-bold mb-8">Workout Tracker</h1>
 
@@ -41,9 +49,35 @@
     </div>
 
     <div id="main-app" class="hidden">
+    <!-- Pull-to-refresh indicator -->
+    <div id="pull-to-refresh" class="pull-to-refresh">
+      <div class="pull-spinner"></div>
+    </div>
+
     <!-- Auto-save toast notification -->
     <div id="save-toast" class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300">
       Saved
+    </div>
+
+    <!-- Exercise Notes Modal -->
+    <div id="exercise-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
+      <div class="absolute inset-0 bg-black/70" onclick="app.hideExerciseNotes()"></div>
+      <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-sm w-full mx-4 max-h-[80vh] overflow-hidden">
+        <div class="flex justify-between items-center p-4 border-b border-gray-700">
+          <h2 class="text-lg font-semibold" id="exercise-notes-title">Exercise Notes</h2>
+          <button onclick="app.hideExerciseNotes()" class="text-gray-400 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="p-4">
+          <textarea id="exercise-notes-textarea" rows="6" placeholder="Add notes for this exercise..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500 resize-none"></textarea>
+          <div class="flex justify-end mt-3">
+            <button onclick="app.saveExerciseNotes()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm">Save</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- PR History Modal -->
@@ -98,32 +132,55 @@
           </div>
         </div>
 
-        <div id="workout-active" class="screen p-4">
-          <header class="flex justify-between items-center mb-4 pt-2">
-            <button onclick="app.showEditCategories()" class="text-left flex items-center gap-2 hover:text-blue-400 transition-colors group">
+        <div id="workout-active" class="screen">
+          <header class="sticky top-0 z-10 bg-gray-800 flex justify-between items-center px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 border-b border-gray-700">
+            <button onclick="app.showEditCategories()" class="text-left hover:text-blue-400 transition-colors">
               <h1 class="text-xl font-bold" id="workout-title">Today's Workout</h1>
-              <svg class="w-4 h-4 text-gray-500 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-              </svg>
             </button>
-            <button onclick="app.finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">
-              Finish
-            </button>
+            <div class="flex items-center gap-2">
+              <!-- Rest Timer Inline -->
+              <div id="rest-timer-container" class="flex items-center gap-1">
+                <span id="rest-timer-display" class="font-mono text-lg font-bold min-w-[52px] text-center">00:00</span>
+                <!-- Play button (shown when stopped or paused) -->
+                <button id="rest-timer-play-btn" onclick="app.startRestTimer()" class="bg-green-600 hover:bg-green-700 text-white p-1.5 rounded-lg" title="Start">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </button>
+                <!-- Pause button (shown when running) -->
+                <button id="rest-timer-pause-btn" onclick="app.pauseRestTimer()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-white p-1.5 rounded-lg" title="Pause">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                  </svg>
+                </button>
+                <!-- Stop button (shown when running or paused) -->
+                <button id="rest-timer-stop-btn" onclick="app.stopRestTimer()" class="hidden bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-lg" title="Stop">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 6h12v12H6z"/>
+                  </svg>
+                </button>
+              </div>
+              <button onclick="app.finishWorkout()" id="workout-finish-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg">
+                Finish
+              </button>
+            </div>
           </header>
-          <div id="exercise-list"></div>
-          <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
-            + Add Exercise
-          </button>
-          <div id="delete-workout-btn" class="w-full text-center py-4 mt-4">
-            <button onclick="app.showDeleteCurrentWorkoutConfirm()" class="text-red-400 hover:text-red-300 text-sm">
-              Delete Workout
+          <div class="p-4">
+            <div id="exercise-list"></div>
+            <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
+              + Add Exercise
             </button>
-          </div>
-          <div id="delete-workout-confirm" class="hidden w-full text-center py-4 mt-4">
-            <div class="flex items-center justify-center gap-3">
-              <span class="text-red-400 text-sm">Delete this workout?</span>
-              <button onclick="app.confirmDeleteCurrentWorkout()" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded">Yes</button>
-              <button onclick="app.cancelDeleteCurrentWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+            <div id="delete-workout-btn" class="w-full text-center py-4 mt-4">
+              <button onclick="app.showDeleteCurrentWorkoutConfirm()" class="text-red-400 hover:text-red-300 text-sm">
+                Delete Workout
+              </button>
+            </div>
+            <div id="delete-workout-confirm" class="hidden w-full text-center py-4 mt-4">
+              <div class="flex items-center justify-center gap-3">
+                <span class="text-red-400 text-sm">Delete this workout?</span>
+                <button onclick="app.confirmDeleteCurrentWorkout()" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded">Yes</button>
+                <button onclick="app.cancelDeleteCurrentWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+              </div>
             </div>
           </div>
         </div>
@@ -168,6 +225,17 @@
                 <option value="Back">Back</option>
                 <option value="Biceps">Biceps</option>
                 <option value="Legs">Legs</option>
+                <option value="Core">Core</option>
+                <option value="Cardio">Cardio</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Muscle Group</label>
+              <select id="workout-exercise-muscle-group-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+                <option value="Upper">Upper</option>
+                <option value="Lower">Lower</option>
                 <option value="Core">Core</option>
                 <option value="Cardio">Cardio</option>
                 <option value="Other">Other</option>
@@ -272,6 +340,17 @@
                 <option value="Back">Back</option>
                 <option value="Biceps">Biceps</option>
                 <option value="Legs">Legs</option>
+                <option value="Core">Core</option>
+                <option value="Cardio">Cardio</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-sm text-gray-400 block mb-2">Muscle Group</label>
+              <select id="exercise-muscle-group-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+                <option value="Upper">Upper</option>
+                <option value="Lower">Lower</option>
                 <option value="Core">Core</option>
                 <option value="Cardio">Cardio</option>
                 <option value="Other">Other</option>

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS custom_exercises (
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('total', '/side', '+bar', 'bodyweight')),
   category TEXT NOT NULL,
+  muscle_group TEXT NOT NULL DEFAULT 'Other' CHECK (muscle_group IN ('Upper', 'Lower', 'Core', 'Cardio', 'Other')),
   unit TEXT NOT NULL DEFAULT 'lbs' CHECK (unit IN ('lbs', 'kg')),
   created_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS workouts (
   end_time INTEGER,
   target_categories TEXT,
   created_at INTEGER NOT NULL,
+  updated_at INTEGER,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -45,6 +47,7 @@ CREATE TABLE IF NOT EXISTS workout_exercises (
   exercise_name TEXT NOT NULL,
   position INTEGER NOT NULL,
   completed INTEGER NOT NULL DEFAULT 0,
+  notes TEXT,
   FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
 );
 

@@ -1,5 +1,6 @@
 import * as api from './api';
-import type { Workout, WorkoutExercise, Set, CustomExercise, User, PersonalRecord, Category } from './api';
+import { ConflictError } from './api';
+import type { Workout, WorkoutExercise, Set as WorkoutSet, CustomExercise, User, PersonalRecord, MuscleGroup } from './api';
 import type { CreateWorkoutRequest } from '../types';
 
 // Injected by Vite at build time
@@ -14,6 +15,7 @@ interface Exercise {
   name: string;
   type: 'total' | '/side' | '+bar' | 'bodyweight';
   category: string;
+  muscle_group: string;
   unit: 'lbs' | 'kg';
 }
 
@@ -21,7 +23,7 @@ interface Exercise {
 interface AppState {
   currentWorkout: {
     startTime: number;
-    targetCategories?: Category[];
+    targetCategories?: MuscleGroup[];
     exercises: WorkoutExercise[];
   } | null;
   editingWorkoutId: string | null;
@@ -51,11 +53,27 @@ let currentExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let workoutExerciseUnit: 'lbs' | 'kg' = 'lbs';
 let pendingDeleteWorkoutId: string | null = null;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let editingWorkoutUpdatedAt: number | null = null;
+let autoSaveConflictRetries = 0;
+const MAX_AUTO_SAVE_CONFLICT_RETRIES = 3;
 let expandedNotes = new Set<string>(); // Track which notes are expanded (format: "exerciseIndex-setIndex")
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// ==================== REST TIMER STATE ====================
+let restTimerStartTime: number | null = null; // Timestamp when timer started/resumed
+let restTimerAccumulated = 0; // Accumulated seconds from previous pauses
+let restTimerRunning = false;
+let restTimerIntervalId: ReturnType<typeof setInterval> | null = null;
 let currentCalendarDate = new Date(); // Track current month/year for calendar view
-let selectedTargetCategories = new Set<Category>(); // Track selected categories for new workout
+let selectedTargetCategories = new Set<MuscleGroup>(); // Track selected muscle groups for new workout
 let isEditingCategories = false; // Track if we're editing categories of an existing workout
+let selectedCalendarFilters = new Set<MuscleGroup>(); // Track selected muscle group filters for calendar view
+
+// ==================== PULL-TO-REFRESH STATE ====================
+let pullStartY = 0;
+let isPulling = false;
+let isRefreshing = false;
+const PULL_THRESHOLD = 80; // Pixels to pull before triggering refresh
 
 // ==================== HELPERS ====================
 function getAllExercises(): Exercise[] {
@@ -63,6 +81,7 @@ function getAllExercises(): Exercise[] {
     name: c.name,
     type: c.type,
     category: c.category,
+    muscle_group: c.muscle_group || 'Other',
     unit: c.unit,
   }));
 }
@@ -70,6 +89,11 @@ function getAllExercises(): Exercise[] {
 function getExerciseUnit(exerciseName: string): 'lbs' | 'kg' {
   const exercise = getAllExercises().find(e => e.name === exerciseName);
   return exercise?.unit || 'lbs';
+}
+
+function isExerciseInWorkout(exerciseName: string): boolean {
+  if (!state.currentWorkout) return false;
+  return state.currentWorkout.exercises.some(e => e.name === exerciseName);
 }
 
 function getTypeColor(type: string): string {
@@ -207,11 +231,48 @@ function hidePRHistory(): void {
   modal.setAttribute('aria-hidden', 'true');
 }
 
+// Exercise notes modal
+let editingNotesExerciseIndex: number | null = null;
+
+function showExerciseNotes(exerciseIndex: number): void {
+  if (!state.currentWorkout) return;
+  const exercise = state.currentWorkout.exercises[exerciseIndex];
+  editingNotesExerciseIndex = exerciseIndex;
+
+  const modal = $('exercise-notes-modal');
+  const title = $('exercise-notes-title');
+  const textarea = $('exercise-notes-textarea') as HTMLTextAreaElement;
+
+  title.textContent = `${exercise.name} Notes`;
+  textarea.value = exercise.notes || '';
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  textarea.focus();
+}
+
+function hideExerciseNotes(): void {
+  const modal = $('exercise-notes-modal');
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  editingNotesExerciseIndex = null;
+}
+
+function saveExerciseNotes(): void {
+  if (editingNotesExerciseIndex === null || !state.currentWorkout) return;
+  const textarea = $('exercise-notes-textarea') as HTMLTextAreaElement;
+  const notes = textarea.value.trim();
+  state.currentWorkout.exercises[editingNotesExerciseIndex].notes = notes || undefined;
+  hideExerciseNotes();
+  renderWorkout();
+  scheduleAutoSave();
+}
+
 // Check if a set is a PR based on exercise name, weight, reps, and position
 function calculateIsPR(exerciseName: string, weight: number, reps: number, exerciseIndex: number, setIndex: number): boolean {
   if (!state.currentWorkout) return false;
 
-  // Find the best reps at this weight in previous workouts (completed and not missed sets only)
+  // Find the best reps at this weight in previous workouts (exclude missed sets only)
   let previousBestReps: number | null = null;
   for (const workout of state.history) {
     // Skip the workout being edited if we're editing
@@ -224,8 +285,8 @@ function calculateIsPR(exerciseName: string, weight: number, reps: number, exerc
     if (!exercise) continue;
 
     for (const set of exercise.sets) {
-      // Only consider completed sets that are not missed (matching backend logic)
-      if (set.completed === false || set.missed === true) continue;
+      // Skip sets explicitly marked as missed
+      if (set.missed === true) continue;
 
       if (set.weight === weight) {
         if (previousBestReps === null || set.reps > previousBestReps) {
@@ -248,8 +309,8 @@ function calculateIsPR(exerciseName: string, weight: number, reps: number, exerc
 
     for (let j = 0; j < maxSetIndex; j++) {
       const set = ex.sets[j];
-      // Only consider completed sets that are not missed
-      if (set.completed === false || set.missed === true) continue;
+      // Skip sets explicitly marked as missed
+      if (set.missed === true) continue;
 
       if (set.weight === weight) {
         if (currentWorkoutBestReps === null || set.reps > currentWorkoutBestReps) {
@@ -324,7 +385,7 @@ function showWorkoutScreen(screenId: string): void {
 }
 
 // ==================== WORKOUT ====================
-const ALL_CATEGORIES: Category[] = ['Chest', 'Shoulders', 'Triceps', 'Back', 'Biceps', 'Legs', 'Core', 'Cardio', 'Other'];
+const ALL_MUSCLE_GROUPS: MuscleGroup[] = ['Upper', 'Lower', 'Core', 'Cardio', 'Other'];
 
 function showCategorySelection(): void {
   selectedTargetCategories.clear();
@@ -378,7 +439,7 @@ function cancelEditCategories(): void {
 
 function renderCategorySelectionGrid(): void {
   const grid = $('category-select-grid');
-  grid.innerHTML = ALL_CATEGORIES.map(category => {
+  grid.innerHTML = ALL_MUSCLE_GROUPS.map(category => {
     const isSelected = selectedTargetCategories.has(category);
     const selectedClass = isSelected
       ? 'bg-blue-600 border-blue-500 text-white'
@@ -391,7 +452,7 @@ function renderCategorySelectionGrid(): void {
   }).join('');
 }
 
-function toggleTargetCategory(category: Category): void {
+function toggleTargetCategory(category: MuscleGroup): void {
   if (selectedTargetCategories.has(category)) {
     selectedTargetCategories.delete(category);
   } else {
@@ -411,18 +472,19 @@ function skipCategorySelection(): void {
   startWorkoutInternal(undefined);
 }
 
-function startWorkoutInternal(targetCategories?: Category[]): void {
+function startWorkoutInternal(targetCategories?: MuscleGroup[]): void {
   state.currentWorkout = {
     startTime: Date.now(),
     targetCategories,
     exercises: [],
   };
   state.editingWorkoutId = null;
+  editingWorkoutUpdatedAt = null;
+  autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
   selectedTargetCategories.clear();
   updateWorkoutTitle();
-  $('workout-finish-btn').textContent = 'Finish';
   showWorkoutScreen('workout-active');
   renderWorkout();
 }
@@ -430,25 +492,12 @@ function startWorkoutInternal(targetCategories?: Category[]): void {
 function updateWorkoutTitle(): void {
   if (!state.currentWorkout) return;
 
-  const categories = state.currentWorkout.targetCategories;
-  const hasCategories = categories && categories.length > 0;
-
-  let categoryText = '';
-  if (hasCategories) {
-    if (categories.length <= 2) {
-      categoryText = categories.join(' & ');
-    } else {
-      categoryText = `${categories.slice(0, 2).join(', ')} +${categories.length - 2}`;
-    }
-  }
-
   if (isEditingFromHistory) {
-    // Editing from history - include date
-    const dateText = formatDate(state.currentWorkout.startTime);
-    $('workout-title').textContent = hasCategories ? `${dateText} - ${categoryText}` : dateText;
+    // Editing from history - show date
+    $('workout-title').textContent = formatDate(state.currentWorkout.startTime);
   } else {
     // New workout
-    $('workout-title').textContent = hasCategories ? categoryText : "Today's Workout";
+    $('workout-title').textContent = "Today's Workout";
   }
 }
 
@@ -458,10 +507,11 @@ function startWorkout(): void {
     exercises: [],
   };
   state.editingWorkoutId = null;
+  editingWorkoutUpdatedAt = null;
+  autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
-  $('workout-finish-btn').textContent = 'Finish';
   showWorkoutScreen('workout-active');
   renderWorkout();
 }
@@ -470,13 +520,15 @@ async function finishWorkout(): Promise<void> {
   if (!state.currentWorkout || state.currentWorkout.exercises.length === 0) {
     state.currentWorkout = null;
     state.editingWorkoutId = null;
+    editingWorkoutUpdatedAt = null;
+    autoSaveConflictRetries = 0;
     expandedNotes.clear();
     showWorkoutScreen('workout-empty');
     return;
   }
 
   try {
-    const workoutData = {
+    const workoutData: CreateWorkoutRequest & { updated_at?: number } = {
       start_time: state.currentWorkout.startTime,
       end_time: Date.now(),
       target_categories: state.currentWorkout.targetCategories,
@@ -485,30 +537,23 @@ async function finishWorkout(): Promise<void> {
 
     if (isEditingFromHistory) {
       // Editing existing workout from history - save and stay on workout screen
-      const btn = $('workout-finish-btn');
-
+      if (editingWorkoutUpdatedAt !== null) {
+        workoutData.updated_at = editingWorkoutUpdatedAt;
+      }
       await api.updateWorkout(state.editingWorkoutId!, workoutData);
       await loadData();
-
-      // Show "Saved" feedback
-      btn.textContent = 'Saved';
-      btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-      btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-
-      // Restore "Save" text after 2 seconds
-      setTimeout(() => {
-        btn.textContent = 'Save';
-        btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-        btn.classList.add('bg-green-600', 'hover:bg-green-700');
-      }, 2000);
-
       // Keep user on workout - don't clear state or navigate away
     } else if (state.editingWorkoutId) {
       // New workout that was auto-saved - update it and go to empty screen
+      if (editingWorkoutUpdatedAt !== null) {
+        workoutData.updated_at = editingWorkoutUpdatedAt;
+      }
       await api.updateWorkout(state.editingWorkoutId, workoutData);
       await loadData();
       state.currentWorkout = null;
       state.editingWorkoutId = null;
+      editingWorkoutUpdatedAt = null;
+      autoSaveConflictRetries = 0;
       isEditingFromHistory = false;
       expandedNotes.clear();
       showWorkoutScreen('workout-empty');
@@ -523,8 +568,39 @@ async function finishWorkout(): Promise<void> {
       showWorkoutScreen('workout-empty');
     }
   } catch (error) {
-    console.error('Failed to save workout:', error);
-    alert('Failed to save workout');
+    if (error instanceof ConflictError) {
+      // Conflict on explicit save - merge server changes and retry once
+      console.log('Finish workout conflict detected, merging and retrying');
+      mergeServerWorkout(error.currentWorkout);
+      try {
+        const retryData: CreateWorkoutRequest & { updated_at?: number } = {
+          start_time: state.currentWorkout!.startTime,
+          end_time: Date.now(),
+          target_categories: state.currentWorkout!.targetCategories,
+          exercises: state.currentWorkout!.exercises,
+        };
+        if (editingWorkoutUpdatedAt !== null) {
+          retryData.updated_at = editingWorkoutUpdatedAt;
+        }
+        await api.updateWorkout(state.editingWorkoutId!, retryData);
+        await loadData();
+        if (!isEditingFromHistory) {
+          state.currentWorkout = null;
+          state.editingWorkoutId = null;
+          editingWorkoutUpdatedAt = null;
+          autoSaveConflictRetries = 0;
+          isEditingFromHistory = false;
+          expandedNotes.clear();
+          showWorkoutScreen('workout-empty');
+        }
+      } catch (retryError) {
+        console.error('Failed to save workout after conflict merge:', retryError);
+        alert('Failed to save workout due to a conflict. Your changes are still in the editor — please try saving again.');
+      }
+    } else {
+      console.error('Failed to save workout:', error);
+      alert('Failed to save workout');
+    }
   }
 }
 
@@ -549,6 +625,8 @@ async function confirmDeleteCurrentWorkout(): Promise<void> {
     // Clear local state
     state.currentWorkout = null;
     state.editingWorkoutId = null;
+    editingWorkoutUpdatedAt = null;
+    autoSaveConflictRetries = 0;
     isEditingFromHistory = false;
     expandedNotes.clear();
 
@@ -582,7 +660,7 @@ async function autoSaveWorkout(): Promise<void> {
   }
 
   try {
-    const workoutData: CreateWorkoutRequest = {
+    const workoutData: CreateWorkoutRequest & { updated_at?: number } = {
       start_time: state.currentWorkout.startTime,
       // Keep workout active - don't set end_time for new workouts
       // For edited workouts, we need to preserve that it was already finished
@@ -597,21 +675,78 @@ async function autoSaveWorkout(): Promise<void> {
         // Preserve the original end_time for finished workouts being edited
         workoutData.end_time = originalWorkout.end_time;
       }
-      await api.updateWorkout(state.editingWorkoutId, workoutData);
+      // Send updated_at for optimistic locking
+      if (editingWorkoutUpdatedAt !== null) {
+        workoutData.updated_at = editingWorkoutUpdatedAt;
+      }
+      const savedWorkout = await api.updateWorkout(state.editingWorkoutId, workoutData);
+      editingWorkoutUpdatedAt = savedWorkout.updated_at;
     } else {
       // Creating a new workout - don't set end_time to keep it active
       const savedWorkout = await api.createWorkout(workoutData);
       // Set the editingWorkoutId so future auto-saves update this workout
       state.editingWorkoutId = savedWorkout.id;
+      editingWorkoutUpdatedAt = savedWorkout.updated_at;
     }
 
     // Reload data to refresh history, but keep current workout active
     await loadData();
+    autoSaveConflictRetries = 0; // Reset on success
     console.log('Workout auto-saved');
   } catch (error) {
-    console.error('Failed to auto-save workout:', error);
-    // Silently fail - don't interrupt user's workflow with alerts
+    if (error instanceof ConflictError) {
+      autoSaveConflictRetries++;
+      if (autoSaveConflictRetries > MAX_AUTO_SAVE_CONFLICT_RETRIES) {
+        console.error(`Auto-save conflict persists after ${MAX_AUTO_SAVE_CONFLICT_RETRIES} retries, giving up`);
+        autoSaveConflictRetries = 0;
+        alert('Your workout could not be saved due to repeated conflicts with another session. Your changes are still in the editor — please try saving manually.');
+        return;
+      }
+      // Another client updated this workout - merge their changes into local state
+      console.log(`Auto-save conflict detected (attempt ${autoSaveConflictRetries}/${MAX_AUTO_SAVE_CONFLICT_RETRIES}), merging server changes`);
+      mergeServerWorkout(error.currentWorkout);
+      // Retry auto-save with the merged state
+      scheduleAutoSave();
+    } else {
+      console.error('Failed to auto-save workout:', error);
+      // Silently fail - don't interrupt user's workflow with alerts
+    }
   }
+}
+
+function mergeServerWorkout(serverWorkout: Workout): void {
+  if (!state.currentWorkout) return;
+
+  // Update our version stamp to the server's
+  editingWorkoutUpdatedAt = serverWorkout.updated_at;
+
+  // Merge exercise-level data from server into local state.
+  // Strategy: keep local exercises/sets (user is actively editing those),
+  // but pull in server-side fields the user hasn't touched (e.g., notes from Coach Chaos).
+  const localExercises = state.currentWorkout.exercises;
+  const serverExercises = serverWorkout.exercises;
+
+  for (const localEx of localExercises) {
+    const serverEx = serverExercises.find(se => se.name === localEx.name);
+    if (!serverEx) continue;
+
+    // If server has notes and local doesn't, take server notes
+    // (external client like Coach Chaos added coaching notes)
+    if (serverEx.notes && !localEx.notes) {
+      localEx.notes = serverEx.notes;
+    }
+  }
+
+  // Check if server has exercises that local doesn't (externally added)
+  for (const serverEx of serverExercises) {
+    const localEx = localExercises.find(le => le.name === serverEx.name);
+    if (!localEx) {
+      // External client added a new exercise - append it
+      localExercises.push(JSON.parse(JSON.stringify(serverEx)));
+    }
+  }
+
+  renderWorkout();
 }
 
 function renderWorkout(): void {
@@ -728,7 +863,12 @@ function renderWorkout(): void {
           </div>
         </div>
         ${setsHtml}
-        <div class="flex justify-end mt-2">
+        <div class="flex justify-between items-center mt-2">
+          <button onclick="app.showExerciseNotes(${i})" class="${ex.notes ? 'text-blue-400' : 'text-gray-500'} hover:text-blue-300 transition-colors" title="${ex.notes ? 'Edit notes' : 'Add notes'}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+          </button>
           <button onclick="app.showPRHistory('${ex.name.replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-yellow-400 transition-colors" title="View PR history">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
@@ -740,7 +880,7 @@ function renderWorkout(): void {
   }).join('');
 }
 
-function getPreviousSets(exerciseName: string): Set[] {
+function getPreviousSets(exerciseName: string): WorkoutSet[] {
   for (const workout of state.history) {
     const ex = workout.exercises.find(e => e.name === exerciseName);
     if (ex && ex.sets.length > 0) return ex.sets;
@@ -832,7 +972,7 @@ function saveSetInline(exerciseIndex: number): void {
   const reps = parseInt(($('reps-' + exerciseIndex) as HTMLInputElement).value) || 0;
   const note = ($('note-' + exerciseIndex) as HTMLInputElement).value.trim();
 
-  const set: Set = { weight, reps };
+  const set: WorkoutSet = { weight, reps };
   if (note) set.note = note;
 
   state.currentWorkout!.exercises[exerciseIndex].sets.push(set);
@@ -948,12 +1088,21 @@ function renderAddExerciseCategories(): void {
   const container = $('add-exercise-categories');
   const targetCategories = state.currentWorkout?.targetCategories || [];
 
+  const categoryToMuscleGroup: Record<string, MuscleGroup> = {
+    'Chest': 'Upper', 'Shoulders': 'Upper', 'Triceps': 'Upper',
+    'Back': 'Upper', 'Biceps': 'Upper',
+    'Legs': 'Lower',
+    'Core': 'Core',
+    'Cardio': 'Cardio',
+    'Other': 'Other',
+  };
+
   container.innerHTML = mainCategories.map(main => {
     let exercises = allExercises.filter(e => main.subCategories.includes(e.category));
     if (exercises.length === 0) return '';
 
     exercises = sortAddExercises(exercises);
-    const isTargetCategory = targetCategories.includes(main.name as Category);
+    const isTargetCategory = targetCategories.includes(categoryToMuscleGroup[main.name] || 'Other');
     const isExpanded = expandedAddExerciseCategories.has(main.name);
 
     // Highlight target categories
@@ -982,10 +1131,17 @@ function renderAddExerciseCategories(): void {
             const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
             const latestPR = getLatestPRForExercise(e.name);
             const prText = latestPR ? `★ ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
+            const inWorkout = isExerciseInWorkout(e.name);
+            const buttonClass = inWorkout
+              ? 'w-full bg-gray-800 rounded-lg p-3 text-left opacity-50 cursor-not-allowed'
+              : 'w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600';
+            const inWorkoutBadge = inWorkout
+              ? '<span class="text-xs bg-gray-600 text-gray-400 px-2 py-0.5 rounded ml-2">In workout</span>'
+              : '';
             return `
-              <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600">
+              <button ${inWorkout ? 'disabled' : `onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')"`} class="${buttonClass}" data-exercise-in-workout="${inWorkout}">
                 <div class="flex justify-between items-center">
-                  <span class="font-medium">${e.name}</span>
+                  <span class="font-medium">${e.name}${inWorkoutBadge}</span>
                   ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
                 </div>
                 ${prText ? `<div class="text-xs text-yellow-400 mt-1">${prText}</div>` : ''}
@@ -1030,11 +1186,18 @@ function filterAddExerciseSearch(): void {
   results.innerHTML = filtered.map(e => {
     const lastLogged = getLastLoggedDate(e.name);
     const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
+    const inWorkout = isExerciseInWorkout(e.name);
+    const buttonClass = inWorkout
+      ? 'w-full bg-gray-800 rounded-lg p-3 text-left opacity-50 cursor-not-allowed'
+      : 'w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600';
+    const inWorkoutBadge = inWorkout
+      ? '<span class="text-xs bg-gray-600 text-gray-400 px-2 py-0.5 rounded ml-2">In workout</span>'
+      : '';
 
     return `
-      <button onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600">
+      <button ${inWorkout ? 'disabled' : `onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')"`} class="${buttonClass}" data-exercise-in-workout="${inWorkout}">
         <div class="flex justify-between items-center">
-          <span class="font-medium">${e.name}</span>
+          <span class="font-medium">${e.name}${inWorkoutBadge}</span>
           ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
         </div>
       </button>
@@ -1046,6 +1209,11 @@ function showAddExercise(): void {
   ($('add-exercise-search') as HTMLInputElement).value = '';
   addExerciseSort = { field: 'recent', asc: true };
   updateAddExerciseSortButtons();
+  // Reset category expansion state so all start collapsed
+  expandedAddExerciseCategories.clear();
+  // Reset search/categories visibility
+  $('add-exercise-categories').classList.remove('hidden');
+  $('add-exercise-search-results').classList.add('hidden');
   renderAddExerciseCategories();
   showWorkoutScreen('workout-add-exercise');
 }
@@ -1064,6 +1232,7 @@ function addExerciseToWorkout(name: string): void {
 function showCreateExerciseFromWorkout(): void {
   $input('workout-exercise-name-input').value = '';
   $select('workout-exercise-category-input').value = 'Other';
+  $select('workout-exercise-muscle-group-input').value = 'Other';
   document.querySelectorAll('input[name="workout-weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = false;
   });
@@ -1085,6 +1254,7 @@ function setWorkoutExerciseUnit(unit: 'lbs' | 'kg'): void {
 async function saveExerciseFromWorkout(): Promise<void> {
   const name = $input('workout-exercise-name-input').value.trim();
   const category = $select('workout-exercise-category-input').value;
+  const muscle_group = $select('workout-exercise-muscle-group-input').value;
   const typeInput = document.querySelector('input[name="workout-weight-type"]:checked') as HTMLInputElement | null;
   const unit = workoutExerciseUnit;
 
@@ -1100,7 +1270,7 @@ async function saveExerciseFromWorkout(): Promise<void> {
   const type = typeInput.value as 'total' | '/side' | '+bar' | 'bodyweight';
 
   try {
-    await api.createCustomExercise({ name, type, category, unit });
+    await api.createCustomExercise({ name, type, category, muscle_group, unit });
     await loadData();
 
     // Add the newly created exercise to the current workout
@@ -1127,6 +1297,31 @@ function getWorkoutsForDate(date: Date): Workout[] {
   const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const endOfDay = startOfDay + 86400000 - 1; // 24 hours - 1ms
   return state.history.filter(w => w.start_time >= startOfDay && w.start_time <= endOfDay);
+}
+
+function getMuscleGroupsForWorkouts(workouts: Workout[]): Set<MuscleGroup> {
+  const groups = new Set<MuscleGroup>();
+  const exercises = state.customExercises;
+
+  for (const workout of workouts) {
+    for (const workoutExercise of workout.exercises) {
+      const exercise = exercises.find(e => e.name === workoutExercise.name);
+      if (exercise) {
+        groups.add(exercise.muscle_group);
+      }
+    }
+  }
+
+  return groups;
+}
+
+function toggleCalendarFilter(category: MuscleGroup): void {
+  if (selectedCalendarFilters.has(category)) {
+    selectedCalendarFilters.delete(category);
+  } else {
+    selectedCalendarFilters.add(category);
+  }
+  renderHistory();
 }
 
 function changeCalendarMonth(offset: number): void {
@@ -1187,16 +1382,28 @@ function renderHistory(): void {
   }
 
   // Days of the month
+  const hasActiveFilter = selectedCalendarFilters.size > 0;
+
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day);
     const workouts = getWorkoutsForDate(date);
     const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
     const hasWorkouts = workouts.length > 0;
 
+    // Check if this day's workouts match any selected filter
+    const dayCategories = hasWorkouts ? getMuscleGroupsForWorkouts(workouts) : new Set<MuscleGroup>();
+    const matchesFilter = hasActiveFilter && Array.from(selectedCalendarFilters).some(cat => dayCategories.has(cat));
+
     let cellClass = 'aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative';
 
     if (hasWorkouts) {
-      cellClass += ' bg-blue-600 hover:bg-blue-700 cursor-pointer';
+      // Check if this workout matches an active filter - if so, highlight yellow
+      if (hasActiveFilter && matchesFilter) {
+        cellClass += ' bg-yellow-500 hover:bg-yellow-600 cursor-pointer';
+      } else {
+        // Default blue for workouts (whether no filter active, or filter doesn't match)
+        cellClass += ' bg-blue-600 hover:bg-blue-700 cursor-pointer';
+      }
     } else {
       cellClass += ' bg-gray-800';
     }
@@ -1214,6 +1421,17 @@ function renderHistory(): void {
     `;
   }
 
+  html += '</div>';
+
+  // Filter pills
+  html += '<div class="mt-4 flex flex-wrap gap-2">';
+  ALL_MUSCLE_GROUPS.forEach(category => {
+    const isSelected = selectedCalendarFilters.has(category);
+    const pillClass = isSelected
+      ? 'bg-yellow-500 text-black'
+      : 'bg-gray-700 text-gray-300 hover:bg-gray-600';
+    html += `<button onclick="app.toggleCalendarFilter('${category}')" class="px-3 py-1 rounded-full text-xs font-medium transition-colors ${pillClass}">${category}</button>`;
+  });
   html += '</div>';
 
   container.innerHTML = html;
@@ -1327,10 +1545,10 @@ function editWorkout(id: string): void {
     exercises: JSON.parse(JSON.stringify(source.exercises)),
   };
   state.editingWorkoutId = id;
+  editingWorkoutUpdatedAt = source.updated_at;
   isEditingFromHistory = true;
   expandedNotes.clear();
   updateWorkoutTitle();
-  $('workout-finish-btn').textContent = 'Save';
   switchTab('workout');
   showWorkoutScreen('workout-active');
   renderWorkout();
@@ -1496,6 +1714,8 @@ function showCreateExercise(): void {
   $input('exercise-name-input').disabled = false;
   $select('exercise-category-input').value = 'Other';
   $select('exercise-category-input').disabled = false;
+  $select('exercise-muscle-group-input').value = 'Other';
+  $select('exercise-muscle-group-input').disabled = false;
   document.querySelectorAll('input[name="weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = false;
     (r as HTMLInputElement).disabled = false;
@@ -1526,6 +1746,8 @@ function showEditExercise(exerciseName: string): void {
   $input('exercise-name-input').disabled = !isCustom;
   $select('exercise-category-input').value = exercise.category;
   $select('exercise-category-input').disabled = !isCustom;
+  $select('exercise-muscle-group-input').value = exercise.muscle_group || 'Other';
+  $select('exercise-muscle-group-input').disabled = !isCustom;
 
   document.querySelectorAll('input[name="weight-type"]').forEach(r => {
     (r as HTMLInputElement).checked = (r as HTMLInputElement).value === exercise.type;
@@ -1700,6 +1922,7 @@ function renderWeightChart(data: Array<{ date: number; maxWeight: number }>, uni
 function hideEditExercise(): void {
   $input('exercise-name-input').disabled = false;
   $select('exercise-category-input').disabled = false;
+  $select('exercise-muscle-group-input').disabled = false;
   document.querySelectorAll('input[name="weight-type"]').forEach(r => (r as HTMLInputElement).disabled = false);
 
   state.editingExercise = null;
@@ -1716,6 +1939,7 @@ function setExerciseUnit(unit: 'lbs' | 'kg'): void {
 async function saveExercise(): Promise<void> {
   const name = $input('exercise-name-input').value.trim();
   const category = $select('exercise-category-input').value;
+  const muscle_group = $select('exercise-muscle-group-input').value;
   const typeInput = document.querySelector('input[name="weight-type"]:checked') as HTMLInputElement | null;
   const unit = currentExerciseUnit;
 
@@ -1733,9 +1957,9 @@ async function saveExercise(): Promise<void> {
   try {
     const oldName = state.editingExercise?.name;
     if (state.editingExercise?.id) {
-      await api.updateCustomExercise(state.editingExercise.id, { name, type, category, unit });
+      await api.updateCustomExercise(state.editingExercise.id, { name, type, category, muscle_group, unit });
     } else {
-      await api.createCustomExercise({ name, type, category, unit });
+      await api.createCustomExercise({ name, type, category, muscle_group, unit });
     }
     await loadData();
 
@@ -1782,6 +2006,8 @@ async function clearAllData(): Promise<void> {
       await loadData();
       state.currentWorkout = null;
       state.editingWorkoutId = null;
+      editingWorkoutUpdatedAt = null;
+      autoSaveConflictRetries = 0;
       showWorkoutScreen('workout-empty');
     } catch (error) {
       console.error('Failed to clear data:', error);
@@ -1792,16 +2018,20 @@ async function clearAllData(): Promise<void> {
 
 // ==================== AUTH ====================
 function showAuthScreen(): void {
+  $('loading-screen').classList.add('hidden');
   $('auth-screen').classList.remove('hidden');
   $('main-app').classList.add('hidden');
 }
 
 function showMainApp(): void {
+  $('loading-screen').classList.add('hidden');
   $('auth-screen').classList.add('hidden');
   $('main-app').classList.remove('hidden');
   if (currentUser) {
     $('settings-username').textContent = currentUser.username;
   }
+  // Set up pull-to-refresh after main app is visible
+  setupPullToRefresh();
 }
 
 function showLoginForm(): void {
@@ -1872,10 +2102,192 @@ function logout(): void {
   state.customExercises = [];
   state.currentWorkout = null;
   state.editingWorkoutId = null;
+  editingWorkoutUpdatedAt = null;
+  autoSaveConflictRetries = 0;
   ($('auth-username') as HTMLInputElement).value = '';
   ($('auth-password') as HTMLInputElement).value = '';
   showLoginForm();
   showAuthScreen();
+}
+
+// ==================== REST TIMER ====================
+function formatTimerDisplay(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function getRestTimerSeconds(): number {
+  if (restTimerRunning && restTimerStartTime !== null) {
+    return restTimerAccumulated + Math.floor((Date.now() - restTimerStartTime) / 1000);
+  }
+  return restTimerAccumulated;
+}
+
+function updateTimerDisplay(): void {
+  const display = $('rest-timer-display');
+  if (display) {
+    display.textContent = formatTimerDisplay(getRestTimerSeconds());
+  }
+}
+
+function updateTimerButtons(): void {
+  const playBtn = $('rest-timer-play-btn');
+  const pauseBtn = $('rest-timer-pause-btn');
+  const stopBtn = $('rest-timer-stop-btn');
+
+  if (!playBtn || !pauseBtn || !stopBtn) return;
+
+  if (restTimerRunning) {
+    // Running: show pause and stop
+    playBtn.classList.add('hidden');
+    pauseBtn.classList.remove('hidden');
+    stopBtn.classList.remove('hidden');
+  } else if (getRestTimerSeconds() > 0) {
+    // Paused (has time but not running): show play and stop
+    playBtn.classList.remove('hidden');
+    pauseBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
+  } else {
+    // Stopped (no time): show only play
+    playBtn.classList.remove('hidden');
+    pauseBtn.classList.add('hidden');
+    stopBtn.classList.add('hidden');
+  }
+}
+
+function startRestTimer(): void {
+  if (restTimerRunning) return;
+
+  restTimerRunning = true;
+  restTimerStartTime = Date.now();
+  // Update display frequently to stay accurate even when backgrounded
+  restTimerIntervalId = setInterval(() => {
+    updateTimerDisplay();
+  }, 1000);
+  updateTimerDisplay();
+  updateTimerButtons();
+}
+
+function pauseRestTimer(): void {
+  if (!restTimerRunning) return;
+
+  // Save accumulated time before stopping
+  restTimerAccumulated = getRestTimerSeconds();
+  restTimerStartTime = null;
+  restTimerRunning = false;
+  if (restTimerIntervalId) {
+    clearInterval(restTimerIntervalId);
+    restTimerIntervalId = null;
+  }
+  updateTimerButtons();
+}
+
+function stopRestTimer(): void {
+  // Stop the timer if running
+  if (restTimerRunning) {
+    restTimerRunning = false;
+    if (restTimerIntervalId) {
+      clearInterval(restTimerIntervalId);
+      restTimerIntervalId = null;
+    }
+  }
+  // Reset to zero
+  restTimerStartTime = null;
+  restTimerAccumulated = 0;
+  updateTimerDisplay();
+  updateTimerButtons();
+}
+
+// ==================== PULL-TO-REFRESH ====================
+async function handleRefresh(): Promise<void> {
+  if (isRefreshing) return;
+
+  isRefreshing = true;
+  const pullIndicator = $('pull-to-refresh');
+  pullIndicator.classList.add('refreshing');
+  pullIndicator.classList.remove('pulling');
+
+  try {
+    await loadData();
+    // Re-render the current view
+    const activeTab = document.querySelector('.tab-content.active');
+    if (activeTab?.id === 'tab-history') {
+      renderHistory();
+    } else if (activeTab?.id === 'tab-exercises') {
+      renderExerciseCategories();
+    } else if (activeTab?.id === 'tab-workout' && state.currentWorkout) {
+      renderWorkout();
+    }
+    showToast('Refreshed');
+  } catch (error) {
+    console.error('Failed to refresh:', error);
+    showToast('Refresh failed');
+  } finally {
+    isRefreshing = false;
+    pullIndicator.classList.remove('refreshing');
+  }
+}
+
+function setupPullToRefresh(): void {
+  const mainApp = $('main-app');
+  const pullIndicator = $('pull-to-refresh');
+
+  mainApp.addEventListener('touchstart', (e: TouchEvent) => {
+    // Only start pull if scrolled to top
+    if (window.scrollY <= 0 && !isRefreshing) {
+      pullStartY = e.touches[0].clientY;
+      isPulling = true;
+    }
+  }, { passive: true });
+
+  mainApp.addEventListener('touchmove', (e: TouchEvent) => {
+    if (!isPulling || isRefreshing) return;
+
+    const currentY = e.touches[0].clientY;
+    const pullDistance = currentY - pullStartY;
+
+    if (pullDistance > 0 && window.scrollY <= 0) {
+      // Calculate progress (0 to 1)
+      const progress = Math.min(pullDistance / PULL_THRESHOLD, 1);
+      const translateY = Math.min(pullDistance * 0.5, 50) - 60;
+
+      pullIndicator.style.transform = `translateX(-50%) translateY(${translateY}px)`;
+      pullIndicator.style.opacity = String(progress);
+      pullIndicator.classList.add('pulling');
+
+      // Rotate spinner based on pull distance
+      const spinner = pullIndicator.querySelector('.pull-spinner') as HTMLElement;
+      if (spinner) {
+        spinner.style.transform = `rotate(${pullDistance * 2}deg)`;
+      }
+    }
+  }, { passive: true });
+
+  mainApp.addEventListener('touchend', () => {
+    if (!isPulling || isRefreshing) return;
+
+    const pullIndicator = $('pull-to-refresh');
+    const currentTransform = pullIndicator.style.transform;
+    const match = currentTransform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/);
+    const currentY = match ? parseFloat(match[1]) : -60;
+
+    // If pulled past threshold, trigger refresh
+    if (currentY > -10) {
+      handleRefresh();
+    } else {
+      // Reset
+      pullIndicator.classList.remove('pulling');
+      pullIndicator.style.transform = '';
+      pullIndicator.style.opacity = '';
+      const spinner = pullIndicator.querySelector('.pull-spinner') as HTMLElement;
+      if (spinner) {
+        spinner.style.transform = '';
+      }
+    }
+
+    isPulling = false;
+  }, { passive: true });
 }
 
 // ==================== INIT ====================
@@ -1937,6 +2349,9 @@ async function init(): Promise<void> {
   toggleExerciseCompleted,
   showPRHistory,
   hidePRHistory,
+  showExerciseNotes,
+  hideExerciseNotes,
+  saveExerciseNotes,
   toggleSetCompleted,
   toggleSetMissed,
   toggleNoteField,
@@ -1949,6 +2364,7 @@ async function init(): Promise<void> {
   goToToday,
   showDayWorkouts,
   renderHistory,
+  toggleCalendarFilter,
   toggleExerciseTabSort,
   toggleCategory,
   filterExercises,
@@ -1962,6 +2378,10 @@ async function init(): Promise<void> {
   showLoginForm,
   showRegisterForm,
   logout,
+  // Rest Timer
+  startRestTimer,
+  pauseRestTimer,
+  stopRestTimer,
 };
 
 init();

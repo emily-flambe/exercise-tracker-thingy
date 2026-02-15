@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "npm run build:frontend && wrangler dev --remote",
     "build:frontend": "vite build",
+    "build:mcp": "tsc -p src/mcp/tsconfig.json",
     "deploy": "npm run build:frontend && wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -21,12 +22,15 @@
     "@capacitor/android": "^8.0.0",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
-    "hono": "^4.6.0"
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "hono": "^4.6.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.1",
     "@cloudflare/workers-types": "^4.20241127.0",
     "@playwright/test": "^1.49.0",
+    "@types/node": "^25.2.3",
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
     "vitest": "3.2.x",

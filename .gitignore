@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-mcp/
+.mcp.json
 .wrangler/
 .dev.vars
 *.log

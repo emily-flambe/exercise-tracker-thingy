@@ -35,6 +35,7 @@ Mobile-first workout tracking web app with Android companion. Users log exercise
 | Build | Vite |
 | Testing | Vitest (unit), Playwright (e2e) |
 | Mobile | Capacitor (Android) |
+| MCP Server | @modelcontextprotocol/sdk + Zod (Node.js, stdio) |
 
 ## Key Commands
 
@@ -47,6 +48,9 @@ npm run build:frontend   # Build frontend with Vite
 npm test                 # Run unit tests (vitest)
 npm run test:e2e         # Run e2e tests against production
 npm run typecheck        # TypeScript type checking
+
+# MCP Server
+npm run build:mcp        # Build MCP server to dist-mcp/
 
 # Database
 npm run db:init          # Initialize local D1 database
@@ -80,22 +84,36 @@ src/
     api.ts           # Frontend API client
     index.html       # HTML template
     styles.css       # Tailwind CSS
+  shared/
+    schemas.ts       # Zod schemas (API contracts, used by MCP server)
+  mcp/
+    index.ts         # MCP server entry point (stdio transport)
+    client.ts        # HTTP client for workout API
+    tsconfig.json    # Node.js target tsconfig for MCP build
+    tools/
+      workouts.ts    # list, get, log, update workout tools
+      exercises.ts   # list exercises tool
+      prs.ts         # PR query tools
   middleware/
-    auth.ts          # JWT auth middleware
+    auth.ts          # JWT + API key auth middleware
 migrations/          # D1 database migrations
 e2e/                 # Playwright e2e tests
 android/             # Capacitor Android project
+.mcp.json            # Claude Code MCP server configuration
 ```
 
 ## Architecture
 
 ### Authentication
-- JWT-based auth stored in localStorage
-- Tokens validated via middleware on protected routes
+- JWT-based auth stored in localStorage (frontend)
+- Persistent API keys with `wt_` prefix (machine access, e.g. MCP server)
+- Auth middleware accepts both: `wt_` prefix → API key lookup, otherwise → JWT verification
+- API keys are SHA-256 hashed before storage; raw key returned only at creation
+- Create API keys: `POST /api/auth/api-keys` (JWT-protected, body: `{"name": "..."}`)
 - JWT_SECRET stored in Cloudflare secrets (`.dev.vars` locally)
 
 ### Database Schema
-Tables: `users`, `custom_exercises`, `workouts`, `workout_exercises`, `sets`, `personal_records`
+Tables: `users`, `custom_exercises`, `workouts`, `workout_exercises`, `sets`, `personal_records`, `api_keys`
 - Workouts contain exercises (via `workout_exercises`)
 - Each exercise has ordered sets
 - PRs detected when sets beat previous bests at same weight
@@ -110,9 +128,12 @@ Tables: `users`, `custom_exercises`, `workouts`, `workout_exercises`, `sets`, `p
 POST /api/auth/login        # Login
 POST /api/auth/register     # Register
 GET  /api/auth/me           # Get current user
+POST /api/auth/api-keys     # Create API key (JWT-protected)
 
-GET/POST        /api/workouts       # List/create workouts
-GET/PUT/DELETE  /api/workouts/:id   # Single workout operations
+GET/POST        /api/workouts          # List/create workouts
+GET/PUT/DELETE  /api/workouts/:id      # Single workout operations
+GET             /api/workouts/prs/all  # All personal records
+GET             /api/workouts/prs/:name # PRs for specific exercise
 
 GET/POST        /api/exercises      # List/create exercises
 GET/PUT/DELETE  /api/exercises/:id  # Single exercise operations
@@ -187,3 +208,73 @@ Common CI failures:
 1. Update types/state in `src/frontend/app.ts`
 2. Add API calls in `src/frontend/api.ts`
 3. Export functions to `window.app` for onclick handlers
+
+## MCP Server
+
+An MCP (Model Context Protocol) server allows Claude Code to interact with the workout API natively — listing workouts, logging new ones, checking PRs — without manual curl commands.
+
+### Architecture
+```
+Claude Code ◄──stdio──► MCP Server (Node.js) ──HTTPS──► Workout API (CF Workers)
+```
+
+- **Transport:** stdio (local process, zero-config)
+- **Auth:** Persistent API key (`wt_` prefix), read from `WORKOUT_API_KEY` env var
+- **Schemas:** Shared Zod schemas in `src/shared/schemas.ts` used for MCP input validation
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_exercises` | List all exercises with type, category, unit |
+| `list_workouts` | List workout history (newest first) |
+| `get_workout` | Get a specific workout with full details |
+| `log_workout` | Log a new workout with exercises and sets |
+| `update_workout` | Update an existing workout |
+| `get_all_prs` | Get all personal records |
+| `get_exercise_prs` | Get PRs for a specific exercise |
+
+### Setup
+1. Generate an API key (see below)
+2. Build: `npm run build:mcp`
+3. Create `.mcp.json` with the API key (see below)
+4. Restart Claude Code to pick up the MCP server
+
+### Generating a New API Key
+```bash
+# Login to get JWT
+TOKEN=$(curl -s https://workout.emilycogsdill.com/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"...","password":"..."}' | jq -r .token)
+
+# Create API key
+curl -s https://workout.emilycogsdill.com/api/auth/api-keys \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"claude-code"}'
+```
+
+### .mcp.json Configuration
+Create `.mcp.json` in the project root (gitignored — contains API key):
+```json
+{
+  "mcpServers": {
+    "workout-tracker": {
+      "command": "node",
+      "args": ["dist-mcp/mcp/index.js"],
+      "cwd": "/absolute/path/to/exercise-tracker-thingy",
+      "env": {
+        "WORKOUT_API_URL": "https://workout.emilycogsdill.com/api",
+        "WORKOUT_API_KEY": "wt_your_key_here"
+      }
+    }
+  }
+}
+```
+
+### Development
+- MCP source: `src/mcp/` (separate tsconfig targeting Node.js)
+- Shared schemas: `src/shared/schemas.ts` (Zod, used by MCP for validation)
+- Main app tsconfig excludes `src/mcp/` — the MCP server has its own build
+- Build output: `dist-mcp/` (gitignored)
+- **Never use `console.log` in MCP server code** — stdout is the JSON-RPC channel; use `console.error` instead

@@ -268,6 +268,8 @@ function getRecentSetsForExercise(exerciseName: string, limit: number): Array<{ 
     const ex = workout.exercises.find(e => e.name === exerciseName);
     if (ex) {
       for (const set of [...ex.sets].reverse()) {
+        // Skip sets explicitly marked as missed
+        if (set.missed === true) continue;
         sets.push({
           date: workout.start_time,
           weight: set.weight,
@@ -284,9 +286,13 @@ function getMaxWeightPerWorkout(exerciseName: string): Array<{ date: number; max
   const workoutMaxes: Array<{ date: number; maxWeight: number }> = [];
   for (const workout of state.history) {
     const ex = workout.exercises.find(e => e.name === exerciseName);
-    if (ex && ex.sets.length > 0) {
-      const maxWeight = Math.max(...ex.sets.map(s => s.weight));
-      workoutMaxes.push({ date: workout.start_time, maxWeight });
+    if (ex) {
+      // Only consider confirmed (non-missed) sets
+      const confirmedSets = ex.sets.filter(s => s.missed !== true);
+      if (confirmedSets.length > 0) {
+        const maxWeight = Math.max(...confirmedSets.map(s => s.weight));
+        workoutMaxes.push({ date: workout.start_time, maxWeight });
+      }
     }
   }
   return workoutMaxes.sort((a, b) => a.date - b.date);

@@ -53,6 +53,28 @@ export async function setupTestUserWithExercises(request: APIRequestContext): Pr
 }
 
 /**
+ * Create a workout via the API (bypasses UI).
+ */
+export async function createWorkoutViaApi(
+  request: APIRequestContext,
+  token: string,
+  workout: {
+    start_time: number;
+    end_time?: number;
+    exercises: Array<{
+      name: string;
+      sets: Array<{ weight: number; reps: number; completed?: boolean; missed?: boolean }>;
+    }>;
+  },
+) {
+  const res = await request.post('/api/workouts', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: workout,
+  });
+  return res.json();
+}
+
+/**
  * Inject the auth token into localStorage and navigate so the app picks it up.
  */
 export async function authenticatePage(page: Page, token: string) {

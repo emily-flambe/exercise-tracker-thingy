@@ -266,7 +266,7 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 8 },
+            { weight: 100, reps: 8, completed: true },
             { weight: 100, reps: 12, missed: true }  // Higher reps but missed
           ]
         }
@@ -282,7 +282,7 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 10 }
+            { weight: 100, reps: 10, completed: true }
           ]
         }
       ]
@@ -293,8 +293,8 @@ describe('PR Detection', () => {
     expect(result.exercises[0].sets[0].isPR).toBe(true);
   });
 
-  it('should count sets without completed flag toward PRs', async () => {
-    // First workout without completed flag (how sets are normally logged)
+  it('should NOT count sets without completed flag toward PRs', async () => {
+    // First workout without completed flag - should not count as PR history
     const workout1: CreateWorkoutRequest = {
       start_time: Date.now() - 86400000, // 1 day ago
       end_time: Date.now() - 86400000 + 3600000,
@@ -309,7 +309,7 @@ describe('PR Detection', () => {
     };
     await createWorkout(env.DB, userId, workout1);
 
-    // Second workout with same reps - should NOT be PR
+    // Second workout with more reps and completed: true
     const workout2: CreateWorkoutRequest = {
       start_time: Date.now(),
       end_time: Date.now() + 3600000,
@@ -317,15 +317,128 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 8 }  // Same reps as previous
+            { weight: 100, reps: 10, completed: true }  // More reps than previous
           ]
         }
       ]
     };
     const result = await createWorkout(env.DB, userId, workout2);
 
-    // Should NOT be PR - previous set at same weight/reps counts
+    // Should be PR - previous set without completed flag doesn't count as history
+    expect(result.exercises[0].sets[0].isPR).toBe(true);
+  });
+
+  it('should NOT count sets with completed: false toward PRs', async () => {
+    // First workout with explicit completed: false
+    const workout1: CreateWorkoutRequest = {
+      start_time: Date.now() - 86400000,
+      end_time: Date.now() - 86400000 + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 8, completed: false }
+          ]
+        }
+      ]
+    };
+    await createWorkout(env.DB, userId, workout1);
+
+    // Second workout with completed: true and fewer reps
+    const workout2: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 5, completed: true }
+          ]
+        }
+      ]
+    };
+    const result = await createWorkout(env.DB, userId, workout2);
+
+    // Should be PR - previous completed: false set doesn't count as history
+    expect(result.exercises[0].sets[0].isPR).toBe(true);
+  });
+
+  it('should NOT mark non-completed sets as PR candidates even with high reps', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 999 }  // High reps but no completed flag
+          ]
+        }
+      ]
+    };
+    const result = await createWorkout(env.DB, userId, workout);
+
+    // Should NOT be PR - set is not completed
     expect(result.exercises[0].sets[0].isPR).toBe(false);
+  });
+
+  it('should handle mixed completed and non-completed sets in same workout', async () => {
+    const workout: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 15 },                    // Not completed - skipped
+            { weight: 100, reps: 8, completed: true },     // Completed - should be PR (first completed at this weight)
+            { weight: 100, reps: 12, completed: false },   // Explicitly not completed - skipped
+            { weight: 100, reps: 10, completed: true },    // Completed - should be PR (10 > 8)
+          ]
+        }
+      ]
+    };
+    const result = await createWorkout(env.DB, userId, workout);
+    const sets = result.exercises[0].sets;
+
+    expect(sets[0].isPR).toBe(false);  // Not completed
+    expect(sets[1].isPR).toBe(true);   // First completed set at this weight
+    expect(sets[2].isPR).toBe(false);  // Not completed
+    expect(sets[3].isPR).toBe(true);   // 10 > 8 (ignoring the non-completed 15)
+  });
+
+  it('should NOT mark completed set as PR when previous completed set has equal or more reps', async () => {
+    const workout1: CreateWorkoutRequest = {
+      start_time: Date.now() - 86400000,
+      end_time: Date.now() - 86400000 + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 10, completed: true }
+          ]
+        }
+      ]
+    };
+    await createWorkout(env.DB, userId, workout1);
+
+    const workout2: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: 100, reps: 10, completed: true },  // Equal reps
+            { weight: 100, reps: 8, completed: true },    // Fewer reps
+          ]
+        }
+      ]
+    };
+    const result = await createWorkout(env.DB, userId, workout2);
+
+    expect(result.exercises[0].sets[0].isPR).toBe(false);  // Equal to previous best
+    expect(result.exercises[0].sets[1].isPR).toBe(false);  // Less than previous best
   });
 });
 

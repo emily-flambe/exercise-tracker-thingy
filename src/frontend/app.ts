@@ -7,7 +7,7 @@ import { startRestTimer, pauseRestTimer, stopRestTimer } from './rest-timer';
 import { showPRHistory, hidePRHistory } from './pr-calc';
 import { showLoginForm, showRegisterForm, showAuthScreen, showMainApp, createAuthSubmitHandler, logout, getCurrentUser, setCurrentUser } from './auth';
 import {
-  startWorkout, finishWorkout,
+  startWorkout,
   showDeleteCurrentWorkoutConfirm, cancelDeleteCurrentWorkout, confirmDeleteCurrentWorkout,
   showCategorySelection, showEditCategories, saveEditedCategories, cancelEditCategories,
   toggleTargetCategory, startWorkoutWithCategories, skipCategorySelection,
@@ -105,7 +105,6 @@ async function init(): Promise<void> {
 // Export app object to window for onclick handlers
 (window as unknown as Record<string, unknown>).app = {
   startWorkout,
-  finishWorkout,
   showDeleteCurrentWorkoutConfirm,
   cancelDeleteCurrentWorkout,
   confirmDeleteCurrentWorkout,

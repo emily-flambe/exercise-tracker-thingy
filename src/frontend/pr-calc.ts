@@ -13,7 +13,7 @@ export function calculateIsPR(exerciseName: string, weight: number, reps: number
     if (!exercise) continue;
 
     for (const set of exercise.sets) {
-      if (set.missed === true) continue;
+      if (set.missed === true || set.completed !== true) continue;
       if (set.weight === weight) {
         if (previousBestReps === null || set.reps > previousBestReps) {
           previousBestReps = set.reps;
@@ -33,7 +33,7 @@ export function calculateIsPR(exerciseName: string, weight: number, reps: number
 
     for (let j = 0; j < maxSetIndex; j++) {
       const set = ex.sets[j];
-      if (set.missed === true) continue;
+      if (set.missed === true || set.completed !== true) continue;
       if (set.weight === weight) {
         if (currentWorkoutBestReps === null || set.reps > currentWorkoutBestReps) {
           currentWorkoutBestReps = set.reps;
@@ -62,7 +62,7 @@ export function recalculateAllPRs(): void {
     const exercise = state.currentWorkout.exercises[i];
     for (let j = 0; j < exercise.sets.length; j++) {
       const set = exercise.sets[j];
-      set.isPR = calculateIsPR(exercise.name, set.weight, set.reps, i, j);
+      set.isPR = set.completed === true && set.missed !== true && calculateIsPR(exercise.name, set.weight, set.reps, i, j);
     }
   }
 }
@@ -75,6 +75,33 @@ export function showPRHistory(exerciseName: string): void {
   const prs = state.allPRs
     .filter(pr => pr.exercise_name === exerciseName)
     .sort((a, b) => b.achieved_at - a.achieved_at);
+
+  // Merge in real-time PRs from the current workout (not yet saved to server)
+  if (state.currentWorkout) {
+    for (const exercise of state.currentWorkout.exercises) {
+      if (exercise.name !== exerciseName) continue;
+      for (const set of exercise.sets) {
+        if (!set.isPR || set.missed === true || set.completed !== true) continue;
+        // Check if this PR already exists in server data (avoid duplicates)
+        const alreadyRecorded = prs.some(pr =>
+          pr.weight === set.weight && pr.reps === set.reps &&
+          pr.workout_id === state.editingWorkoutId
+        );
+        if (!alreadyRecorded) {
+          prs.push({
+            id: '',
+            user_id: '',
+            exercise_name: exerciseName,
+            weight: set.weight,
+            reps: set.reps,
+            workout_id: state.editingWorkoutId || '',
+            set_index: 0,
+            achieved_at: state.currentWorkout.startTime,
+          });
+        }
+      }
+    }
+  }
 
   title.textContent = `${exerciseName} PRs`;
 

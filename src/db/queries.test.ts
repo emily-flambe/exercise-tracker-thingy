@@ -266,7 +266,7 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 8 },
+            { weight: 100, reps: 8, completed: true },
             { weight: 100, reps: 12, missed: true }  // Higher reps but missed
           ]
         }
@@ -282,7 +282,7 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 10 }
+            { weight: 100, reps: 10, completed: true }
           ]
         }
       ]
@@ -293,8 +293,8 @@ describe('PR Detection', () => {
     expect(result.exercises[0].sets[0].isPR).toBe(true);
   });
 
-  it('should count sets without completed flag toward PRs', async () => {
-    // First workout without completed flag (how sets are normally logged)
+  it('should NOT count sets without completed flag toward PRs', async () => {
+    // First workout without completed flag - should not count as PR history
     const workout1: CreateWorkoutRequest = {
       start_time: Date.now() - 86400000, // 1 day ago
       end_time: Date.now() - 86400000 + 3600000,
@@ -309,7 +309,7 @@ describe('PR Detection', () => {
     };
     await createWorkout(env.DB, userId, workout1);
 
-    // Second workout with same reps - should NOT be PR
+    // Second workout with more reps and completed: true
     const workout2: CreateWorkoutRequest = {
       start_time: Date.now(),
       end_time: Date.now() + 3600000,
@@ -317,15 +317,15 @@ describe('PR Detection', () => {
         {
           name: 'Bench Press',
           sets: [
-            { weight: 100, reps: 8 }  // Same reps as previous
+            { weight: 100, reps: 10, completed: true }  // More reps than previous
           ]
         }
       ]
     };
     const result = await createWorkout(env.DB, userId, workout2);
 
-    // Should NOT be PR - previous set at same weight/reps counts
-    expect(result.exercises[0].sets[0].isPR).toBe(false);
+    // Should be PR - previous set without completed flag doesn't count as history
+    expect(result.exercises[0].sets[0].isPR).toBe(true);
   });
 });
 

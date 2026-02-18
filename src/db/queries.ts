@@ -473,8 +473,8 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
     for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
       const set = exercise.sets[setIndex];
 
-      // Skip sets explicitly marked as missed
-      if (set.missed === true) {
+      // Skip sets that aren't confirmed (missed or not yet completed)
+      if (set.missed === true || set.completed !== true) {
         continue;
       }
 
@@ -491,6 +491,7 @@ async function detectAndRecordPRs(db: D1Database, userId: string, workoutId: str
             AND s.weight = ?
             AND w.start_time < ?
             AND (s.missed = 0 OR s.missed IS NULL)
+            AND s.completed = 1
         `)
         .bind(userId, exercise.name, set.weight, startTime)
         .first<{ max_reps: number | null }>();

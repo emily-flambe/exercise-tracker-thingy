@@ -215,7 +215,7 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('button[title="Edit note"]').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show dim PR star for unconfirmed sets and bright star when confirmed', async ({ page }) => {
+  test('should show PR star only when set is confirmed', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -228,15 +228,18 @@ test.describe('Workout Tracker', () => {
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
+    // Unconfirmed set should have no PR star
+    await expect(page.locator('span').filter({ hasText: '★' })).toHaveCount(0);
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
+    // Confirmed set should show bright PR star
     await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
+    // Unconfirmed again - no PR star
+    await expect(page.locator('span').filter({ hasText: '★' })).toHaveCount(0);
   });
 
   test('should show bright PR star only when set beats previous record and is confirmed', async ({ page, request }) => {
@@ -266,10 +269,12 @@ test.describe('Workout Tracker', () => {
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
+    // Unconfirmed set should have no PR star
+    await expect(page.locator('span').filter({ hasText: '★' })).toHaveCount(0);
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
+    // Confirmed set that beats previous record should show bright PR star
     await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
   });
 });
@@ -592,7 +597,8 @@ test.describe('Exercise Rename During Active Workout', () => {
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    await expect(page.locator('#exercise-list span.opacity-40').filter({ hasText: '★' })).toBeVisible();
+    // Unconfirmed set should have no PR star (only confirmed sets can be PRs)
+    await expect(page.locator('#exercise-list span').filter({ hasText: '★' })).toHaveCount(0);
   });
 });
 

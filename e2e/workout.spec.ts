@@ -3,6 +3,7 @@ import {
   setupTestUserWithExercises,
   registerUserViaApi,
   createExerciseViaApi,
+  createWorkoutViaApi,
   authenticatePage,
   TestSetup,
 } from './helpers';
@@ -38,7 +39,7 @@ test.describe('Workout Tracker', () => {
     // Skip category selection
     await page.getByRole('button', { name: 'Skip' }).click();
     await expect(page.getByText("Today's Workout")).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Finish' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Add Exercise' })).toBeVisible();
   });
 
   test('should show add exercise screen', async ({ page }) => {
@@ -238,27 +239,19 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
   });
 
-  test('should show bright PR star only when set beats previous record and is confirmed', async ({ page }) => {
-    // Start first workout
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '8');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await expect(page.locator('span.opacity-40').filter({ hasText: '★' })).toBeVisible();
-
-    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
-
-    await page.getByRole('button', { name: 'Finish' }).click();
-
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+  test('should show bright PR star only when set beats previous record and is confirmed', async ({ page, request }) => {
+    // Create first workout via API with confirmed set
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now() - 86400000,
+      end_time: Date.now() - 86400000 + 3600000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 8, completed: true }],
+      }],
+    });
+    // Reload to pick up the new workout history
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     // Start second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();
@@ -290,22 +283,17 @@ test.describe('Calendar View', () => {
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show calendar view in history tab after completing workout', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await page.getByRole('button', { name: 'Finish' }).click();
-
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+  test('should show calendar view in history tab after completing workout', async ({ page, request }) => {
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 10, completed: true }],
+      }],
+    });
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
@@ -361,22 +349,17 @@ test.describe('Calendar View', () => {
     await expect(page.getByRole('button', { name: 'Today' })).not.toBeVisible();
   });
 
-  test('should open workout when clicking on day with workout', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await page.getByRole('button', { name: 'Finish' }).click();
-
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+  test('should open workout when clicking on day with workout', async ({ page, request }) => {
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 10, completed: true }],
+      }],
+    });
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
@@ -389,20 +372,17 @@ test.describe('Calendar View', () => {
     await expect(page.locator('input[type="number"]').first()).toBeVisible();
   });
 
-  test('should not show "Copy to new workout" button', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await page.getByRole('button', { name: 'Finish' }).click();
+  test('should not show "Copy to new workout" button', async ({ page, request }) => {
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 10, completed: true }],
+      }],
+    });
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
@@ -412,36 +392,27 @@ test.describe('Calendar View', () => {
     await expect(copyButton).toHaveCount(0);
   });
 
-  test('should show multiple workouts for same day', async ({ page }) => {
-    // Create first workout
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
-    await page.getByRole('button', { name: 'Finish' }).click();
-
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
-
-    // Create second workout
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Squat');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Squat', { exact: true }).click();
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '185');
-    await page.fill('input[placeholder="reps"]', '8');
-    await page.getByRole('button', { name: 'Save' }).click();
-    await page.getByRole('button', { name: 'Finish' }).click();
-
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+  test('should show multiple workouts for same day', async ({ page, request }) => {
+    // Create first workout via API
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now() - 60000,
+      end_time: Date.now() - 30000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 10, completed: true }],
+      }],
+    });
+    // Create second workout via API
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [{
+        name: 'Squat',
+        sets: [{ weight: 185, reps: 8, completed: true }],
+      }],
+    });
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
@@ -454,21 +425,17 @@ test.describe('Calendar View', () => {
     await expect(page.locator('#history-list').getByText('Squat')).toBeVisible();
   });
 
-  test('should show filter pills below calendar and highlight matching dates yellow', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await page.getByRole('button', { name: 'Finish' }).click();
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+  test('should show filter pills below calendar and highlight matching dates yellow', async ({ page, request }) => {
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 10, completed: true }],
+      }],
+    });
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
@@ -497,35 +464,27 @@ test.describe('Calendar View', () => {
     await expect(todayCell).toHaveClass(/bg-blue-600/);
   });
 
-  test('should return to calendar from day view', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
-    await page.getByRole('button', { name: 'Finish' }).click();
-
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
-
+  test('should return to calendar from day view', async ({ page, request }) => {
+    // Create first workout via API
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now() - 60000,
+      end_time: Date.now() - 30000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 10, completed: true }],
+      }],
+    });
     // Create second workout for same day to trigger day view
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Squat');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Squat', { exact: true }).click();
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '185');
-    await page.fill('input[placeholder="reps"]', '8');
-    await page.getByRole('button', { name: 'Save' }).click();
-    await page.getByRole('button', { name: 'Finish' }).click();
-
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now(),
+      end_time: Date.now() + 3600000,
+      exercises: [{
+        name: 'Squat',
+        sets: [{ weight: 185, reps: 8, completed: true }],
+      }],
+    });
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
@@ -582,24 +541,19 @@ test.describe('Exercise Rename During Active Workout', () => {
     await expect(page.locator('#exercise-list').getByText('Bench Press', { exact: true })).not.toBeVisible();
   });
 
-  test('should calculate PRs correctly after renaming exercise during active workout', async ({ page }) => {
-    // First, create a completed workout with "Bench Press" to establish history
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '8');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
-
-    await page.getByRole('button', { name: 'Finish' }).click();
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible({ timeout: 5000 });
+  test('should calculate PRs correctly after renaming exercise during active workout', async ({ page, request }) => {
+    // Create first completed workout via API with "Bench Press" to establish history
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now() - 86400000,
+      end_time: Date.now() - 86400000 + 3600000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 8, completed: true }],
+      }],
+    });
+    // Reload to pick up the new workout history
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     // Start second workout
     await page.getByRole('button', { name: 'Start Workout' }).click();

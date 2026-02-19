@@ -215,7 +215,7 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('button[title="Edit note"]').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show PR star only when set is confirmed', async ({ page }) => {
+  test('should show faded PR star when unconfirmed and bright when confirmed', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Workout' }).click();
     await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: '+ Add Exercise' }).click();
@@ -228,18 +228,21 @@ test.describe('Workout Tracker', () => {
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Unconfirmed set should have no PR star
-    await expect(page.locator('span').filter({ hasText: '★' })).toHaveCount(0);
+    // Unconfirmed set should show faded PR star (opacity-40)
+    const fadedStar = page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' });
+    await expect(fadedStar).toBeVisible();
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Confirmed set should show bright PR star
-    await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
+    // Confirmed set should show bright PR star (no opacity-40)
+    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' });
+    await expect(brightStar).toBeVisible();
+    await expect(page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' })).toHaveCount(0);
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Unconfirmed again - no PR star
-    await expect(page.locator('span').filter({ hasText: '★' })).toHaveCount(0);
+    // Unconfirmed again - faded PR star returns
+    await expect(page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' })).toBeVisible();
   });
 
   test('should show bright PR star only when set beats previous record and is confirmed', async ({ page, request }) => {
@@ -269,13 +272,16 @@ test.describe('Workout Tracker', () => {
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Unconfirmed set should have no PR star
-    await expect(page.locator('span').filter({ hasText: '★' })).toHaveCount(0);
+    // Unconfirmed set that beats previous record should show faded PR star (opacity-40)
+    const fadedStar = page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' });
+    await expect(fadedStar).toBeVisible();
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
-    // Confirmed set that beats previous record should show bright PR star
-    await expect(page.locator('span.text-yellow-400').filter({ hasText: '★' }).and(page.locator(':not(.opacity-40)'))).toBeVisible();
+    // Confirmed set that beats previous record should show bright PR star (no opacity-40)
+    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' });
+    await expect(brightStar).toBeVisible();
+    await expect(page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' })).toHaveCount(0);
   });
 });
 
@@ -592,13 +598,17 @@ test.describe('Exercise Rename During Active Workout', () => {
     await expect(prStarsAfterRename).toHaveCount(0);
 
     // Now add a set that DOES beat the record (10 reps vs previous 8)
+    // Server-side rename propagated to historical workouts, so "Barbell Bench Press"
+    // now has history of 135x8. Only the new set (10 reps) beats it.
     await page.getByRole('button', { name: '+ Add set' }).click();
     await page.fill('input[placeholder="wt"]', '135');
     await page.fill('input[placeholder="reps"]', '10');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Unconfirmed set should have no PR star (only confirmed sets can be PRs)
-    await expect(page.locator('#exercise-list span').filter({ hasText: '★' })).toHaveCount(0);
+    // Only the second set (10 reps) should show a faded PR star — the first set
+    // (8 reps) ties the renamed history record and is NOT a PR (8 > 8 is false)
+    const fadedStars = page.locator('#exercise-list span.text-yellow-400.opacity-40').filter({ hasText: '★' });
+    await expect(fadedStars).toHaveCount(1);
   });
 });
 

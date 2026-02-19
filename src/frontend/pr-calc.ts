@@ -62,7 +62,7 @@ export function recalculateAllPRs(): void {
     const exercise = state.currentWorkout.exercises[i];
     for (let j = 0; j < exercise.sets.length; j++) {
       const set = exercise.sets[j];
-      set.isPR = set.completed === true && set.missed !== true && calculateIsPR(exercise.name, set.weight, set.reps, i, j);
+      set.isPR = set.missed !== true && calculateIsPR(exercise.name, set.weight, set.reps, i, j);
     }
   }
 }

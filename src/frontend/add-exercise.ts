@@ -47,14 +47,14 @@ function updateAddExerciseSortButtons(): void {
   const recentBtn = $('add-exercise-sort-recent');
 
   if (addExerciseSort.field === 'alpha') {
-    alphaBtn.className = 'text-blue-400';
+    alphaBtn.className = 'text-swiss-red font-bold';
     alphaBtn.textContent = addExerciseSort.asc ? 'A-Z' : 'Z-A';
-    recentBtn.className = 'text-gray-400';
+    recentBtn.className = 'text-gray-500';
     recentBtn.textContent = 'Recent';
   } else {
-    recentBtn.className = 'text-blue-400';
+    recentBtn.className = 'text-swiss-red font-bold';
     recentBtn.textContent = addExerciseSort.asc ? 'Recent' : 'Oldest';
-    alphaBtn.className = 'text-gray-400';
+    alphaBtn.className = 'text-gray-500';
     alphaBtn.textContent = 'A-Z';
   }
 }
@@ -83,10 +83,10 @@ function renderAddExerciseCategories(): void {
     const isExpanded = expandedAddExerciseCategories.has(main.name);
 
     const categoryLabelClass = isTargetCategory
-      ? 'font-medium text-blue-400'
-      : 'font-medium text-gray-300';
+      ? 'font-bold text-swiss-red uppercase tracking-wider'
+      : 'font-bold text-black uppercase tracking-wider';
     const targetBadge = isTargetCategory
-      ? '<span class="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Target</span>'
+      ? '<span class="ml-2 text-xs bg-swiss-red text-white px-2 py-0.5 rounded-sm font-bold uppercase">Target</span>'
       : '';
 
     return `
@@ -98,7 +98,7 @@ function renderAddExerciseCategories(): void {
           </div>
           <div class="flex items-center">
             <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
-            <span id="add-${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+            <span id="add-${main.name}-arrow" class="text-black">${isExpanded ? '&#9660;' : '&#9654;'}</span>
           </div>
         </button>
         <div id="add-${main.name}-exercises" class="space-y-2 mt-2 ${isExpanded ? '' : 'hidden'}">
@@ -109,18 +109,18 @@ function renderAddExerciseCategories(): void {
             const prText = latestPR ? `★ ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
             const inWorkout = isExerciseInWorkout(e.name);
             const buttonClass = inWorkout
-              ? 'w-full bg-gray-800 rounded-lg p-3 text-left opacity-50 cursor-not-allowed'
-              : 'w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600';
+              ? 'w-full bg-gray-100 border-2 border-gray-300 rounded-sm p-3 text-left opacity-50 cursor-not-allowed'
+              : 'w-full bg-white border-2 border-black rounded-sm p-3 text-left hover:bg-gray-50';
             const inWorkoutBadge = inWorkout
-              ? '<span class="text-xs bg-gray-600 text-gray-400 px-2 py-0.5 rounded ml-2">In workout</span>'
+              ? '<span class="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-sm ml-2 uppercase font-bold">In workout</span>'
               : '';
             return `
               <button ${inWorkout ? 'disabled' : `onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')"`} class="${buttonClass}" data-exercise-in-workout="${inWorkout}">
                 <div class="flex justify-between items-center">
-                  <span class="font-medium">${e.name}${inWorkoutBadge}</span>
+                  <span class="font-bold">${e.name}${inWorkoutBadge}</span>
                   ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
                 </div>
-                ${prText ? `<div class="text-xs text-yellow-400 mt-1">${prText}</div>` : ''}
+                ${prText ? `<div class="text-xs text-swiss-red mt-1">${prText}</div>` : ''}
               </button>
             `;
           }).join('')}
@@ -164,16 +164,16 @@ export function filterAddExerciseSearch(): void {
     const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
     const inWorkout = isExerciseInWorkout(e.name);
     const buttonClass = inWorkout
-      ? 'w-full bg-gray-800 rounded-lg p-3 text-left opacity-50 cursor-not-allowed'
-      : 'w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600';
+      ? 'w-full bg-gray-100 border-2 border-gray-300 rounded-sm p-3 text-left opacity-50 cursor-not-allowed'
+      : 'w-full bg-white border-2 border-black rounded-sm p-3 text-left hover:bg-gray-50';
     const inWorkoutBadge = inWorkout
-      ? '<span class="text-xs bg-gray-600 text-gray-400 px-2 py-0.5 rounded ml-2">In workout</span>'
+      ? '<span class="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-sm ml-2 uppercase font-bold">In workout</span>'
       : '';
 
     return `
       <button ${inWorkout ? 'disabled' : `onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')"`} class="${buttonClass}" data-exercise-in-workout="${inWorkout}">
         <div class="flex justify-between items-center">
-          <span class="font-medium">${e.name}${inWorkoutBadge}</span>
+          <span class="font-bold">${e.name}${inWorkoutBadge}</span>
           ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
         </div>
       </button>
@@ -223,8 +223,8 @@ export function cancelCreateExerciseFromWorkout(): void {
 
 export function setWorkoutExerciseUnit(unit: 'lbs' | 'kg'): void {
   workoutExerciseUnit = unit;
-  $('workout-exercise-unit-lbs').className = unit === 'lbs' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
-  $('workout-exercise-unit-kg').className = unit === 'kg' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+  $('workout-exercise-unit-lbs').className = unit === 'lbs' ? 'bg-black text-white px-4 py-2 rounded-sm text-sm font-bold uppercase' : 'bg-white border-2 border-black px-4 py-2 rounded-sm text-sm font-bold uppercase hover:bg-gray-100';
+  $('workout-exercise-unit-kg').className = unit === 'kg' ? 'bg-black text-white px-4 py-2 rounded-sm text-sm font-bold uppercase' : 'bg-white border-2 border-black px-4 py-2 rounded-sm text-sm font-bold uppercase hover:bg-gray-100';
 }
 
 export async function saveExerciseFromWorkout(): Promise<void> {

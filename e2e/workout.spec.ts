@@ -229,20 +229,20 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Save' }).click();
 
     // Unconfirmed set should show faded PR star (opacity-40)
-    const fadedStar = page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' });
+    const fadedStar = page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' });
     await expect(fadedStar).toBeVisible();
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
     // Confirmed set should show bright PR star (no opacity-40)
-    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' });
+    const brightStar = page.locator('span.text-\\[\\#FFD700\\]').filter({ hasText: '★' });
     await expect(brightStar).toBeVisible();
-    await expect(page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' })).toHaveCount(0);
+    await expect(page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' })).toHaveCount(0);
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
     // Unconfirmed again - faded PR star returns
-    await expect(page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' })).toBeVisible();
+    await expect(page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' })).toBeVisible();
   });
 
   test('should show bright PR star only when set beats previous record and is confirmed', async ({ page, request }) => {
@@ -273,15 +273,15 @@ test.describe('Workout Tracker', () => {
     await page.getByRole('button', { name: 'Save' }).click();
 
     // Unconfirmed set that beats previous record should show faded PR star (opacity-40)
-    const fadedStar = page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' });
+    const fadedStar = page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' });
     await expect(fadedStar).toBeVisible();
 
     await page.evaluate(() => (window as any).app.toggleSetCompleted(0, 0));
 
     // Confirmed set that beats previous record should show bright PR star (no opacity-40)
-    const brightStar = page.locator('span.text-yellow-400').filter({ hasText: '★' });
+    const brightStar = page.locator('span.text-\\[\\#FFD700\\]').filter({ hasText: '★' });
     await expect(brightStar).toBeVisible();
-    await expect(page.locator('span.text-yellow-400.opacity-40').filter({ hasText: '★' })).toHaveCount(0);
+    await expect(page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' })).toHaveCount(0);
   });
 });
 
@@ -308,7 +308,7 @@ test.describe('Calendar View', () => {
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ring-2.ring-white')).toBeVisible({ timeout: 5000 });
 
     const currentMonth = new Date().toLocaleString('default', { month: 'long' });
     const currentYear = new Date().getFullYear();
@@ -318,8 +318,8 @@ test.describe('Calendar View', () => {
     await expect(page.getByText('Mon', { exact: true })).toBeVisible();
     await expect(page.getByText('Tue', { exact: true })).toBeVisible();
 
-    const todayCell = page.locator('.ring-2.ring-green-400');
-    await expect(todayCell).toHaveClass(/bg-blue-600/);
+    const todayCell = page.locator('.ring-2.ring-white');
+    await expect(todayCell).toHaveClass(/bg-\[#FF0000\]/);
   });
 
   test('should navigate between months in calendar', async ({ page }) => {
@@ -374,9 +374,9 @@ test.describe('Calendar View', () => {
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ring-2.ring-white')).toBeVisible({ timeout: 5000 });
 
-    await page.locator('.ring-2.ring-green-400').click();
+    await page.locator('.ring-2.ring-white').click();
 
     await expect(page.locator('#tab-workout.tab-content.active')).toBeVisible();
     await expect(page.locator('#workout-active').getByText('Bench Press')).toBeVisible();
@@ -427,9 +427,9 @@ test.describe('Calendar View', () => {
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ring-2.ring-white')).toBeVisible({ timeout: 5000 });
 
-    await page.locator('.ring-2.ring-green-400').click();
+    await page.locator('.ring-2.ring-white').click();
 
     await expect(page.getByText('Back to calendar')).toBeVisible();
     await expect(page.locator('#history-list').getByText('Bench Press')).toBeVisible();
@@ -450,29 +450,29 @@ test.describe('Calendar View', () => {
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ring-2.ring-white')).toBeVisible({ timeout: 5000 });
 
     await expect(page.getByRole('button', { name: 'Upper' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Lower' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Core' })).toBeVisible();
 
-    const todayCell = page.locator('.ring-2.ring-green-400');
-    await expect(todayCell).toHaveClass(/bg-blue-600/);
+    const todayCell = page.locator('.ring-2.ring-white');
+    await expect(todayCell).toHaveClass(/bg-\[#FF0000\]/);
 
     await page.getByRole('button', { name: 'Upper' }).click();
 
-    await expect(page.getByRole('button', { name: 'Upper' })).toHaveClass(/bg-yellow-500/);
+    await expect(page.getByRole('button', { name: 'Upper' })).toHaveClass(/bg-white/);
 
-    await expect(todayCell).toHaveClass(/bg-yellow-500/);
+    await expect(todayCell).toHaveClass(/bg-\[#FF0000\]/);
 
     await page.getByRole('button', { name: 'Upper' }).click();
     await page.getByRole('button', { name: 'Lower' }).click();
 
-    await expect(todayCell).toHaveClass(/bg-blue-600/);
+    await expect(todayCell).toHaveClass(/bg-\[#FF0000\]/);
 
     await page.getByRole('button', { name: 'Lower' }).click();
 
-    await expect(todayCell).toHaveClass(/bg-blue-600/);
+    await expect(todayCell).toHaveClass(/bg-\[#FF0000\]/);
   });
 
   test('should return to calendar from day view', async ({ page, request }) => {
@@ -499,9 +499,9 @@ test.describe('Calendar View', () => {
 
     await page.getByRole('button', { name: 'History', exact: true }).click();
 
-    await expect(page.locator('.ring-2.ring-green-400')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ring-2.ring-white')).toBeVisible({ timeout: 5000 });
 
-    await page.locator('.ring-2.ring-green-400').click();
+    await page.locator('.ring-2.ring-white').click();
 
     await expect(page.getByText('Back to calendar')).toBeVisible();
 
@@ -607,7 +607,7 @@ test.describe('Exercise Rename During Active Workout', () => {
 
     // Only the second set (10 reps) should show a faded PR star — the first set
     // (8 reps) ties the renamed history record and is NOT a PR (8 > 8 is false)
-    const fadedStars = page.locator('#exercise-list span.text-yellow-400.opacity-40').filter({ hasText: '★' });
+    const fadedStars = page.locator('#exercise-list span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' });
     await expect(fadedStars).toHaveCount(1);
   });
 });

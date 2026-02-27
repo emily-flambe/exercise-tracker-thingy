@@ -3,7 +3,104 @@
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* Pull-to-refresh */
+/* ==================== CRT EFFECTS ==================== */
+
+/* Scanline overlay */
+.scanline-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15) 0px,
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Vignette effect (screen curvature simulation) */
+.vignette-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 60%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* CRT text glow */
+.crt-glow {
+  text-shadow: 0 0 5px #00FF41, 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+/* CRT box glow (for buttons) */
+.crt-glow-box {
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.3), inset 0 0 8px rgba(0, 255, 65, 0.1);
+}
+
+/* Subtle flicker animation */
+@keyframes flicker {
+  0% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.95; }
+  94% { opacity: 1; }
+  96% { opacity: 0.97; }
+  97% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+body {
+  animation: flicker 4s infinite;
+}
+
+/* Green cursor for inputs */
+input, textarea, select {
+  caret-color: #00FF41;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.3);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 65, 0.5);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 255, 65, 0.3) #000000;
+}
+
+/* Selection highlight */
+::selection {
+  background: rgba(0, 255, 65, 0.3);
+  color: #00FF41;
+}
+
+/* ==================== PULL TO REFRESH ==================== */
+
 .pull-to-refresh {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 56px);
@@ -32,8 +129,8 @@
 .pull-spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid rgba(0, 255, 65, 0.2);
+  border-top-color: #00FF41;
   border-radius: 50%;
 }
 
@@ -45,15 +142,18 @@
   to { transform: rotate(360deg); }
 }
 
-/* Loading screen spinner */
+/* ==================== LOADING SPINNER ==================== */
+
 .loading-spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid rgba(0, 255, 65, 0.2);
+  border-top-color: #00FF41;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+/* ==================== LAYOUT ==================== */
 
 .phone-frame {
   max-width: 390px;
@@ -75,4 +175,28 @@
   max-width: 390px;
   width: 100%;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+
+/* ==================== TERMINAL ACCENTS ==================== */
+
+/* Active nav item underline indicator */
+.nav-active-indicator {
+  border-bottom: 2px solid #00FF41;
+}
+
+/* Placeholder color override */
+input::placeholder,
+textarea::placeholder {
+  color: rgba(0, 170, 42, 0.5);
+}
+
+/* Select dropdown styling */
+select option {
+  background: #000000;
+  color: #00FF41;
+}
+
+/* Radio button accent */
+input[type="radio"] {
+  accent-color: #00FF41;
 }

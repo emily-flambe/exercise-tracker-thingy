@@ -76,16 +76,16 @@ export function renderHistory(): void {
 
   let html = `
     <div class="mb-4 flex items-center justify-between">
-      <button onclick="app.changeCalendarMonth(-1)" class="text-blue-400 hover:text-blue-300 p-2">
+      <button onclick="app.changeCalendarMonth(-1)" class="text-terminal-green hover:text-terminal-dim p-2">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
       <div class="flex flex-col items-center">
-        <h2 class="text-xl font-bold">${monthNames[month]} ${year}</h2>
-        ${!isCurrentMonth ? '<button onclick="app.goToToday()" class="text-xs text-blue-400 hover:text-blue-300 mt-1">Today</button>' : ''}
+        <h2 class="text-lg font-bold crt-glow">${monthNames[month]} ${year}</h2>
+        ${!isCurrentMonth ? '<button onclick="app.goToToday()" class="text-xs text-terminal-green hover:text-terminal-dim mt-1 font-mono">[Today]</button>' : ''}
       </div>
-      <button onclick="app.changeCalendarMonth(1)" class="text-blue-400 hover:text-blue-300 p-2">
+      <button onclick="app.changeCalendarMonth(1)" class="text-terminal-green hover:text-terminal-dim p-2">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>
@@ -95,7 +95,7 @@ export function renderHistory(): void {
 
   html += '<div class="grid grid-cols-7 gap-1 mb-2">';
   ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
-    html += `<div class="text-center text-xs text-gray-500 py-1">${day}</div>`;
+    html += `<div class="text-center text-xs text-terminal-dim py-1 font-mono">${day}</div>`;
   });
   html += '</div>';
 
@@ -116,20 +116,20 @@ export function renderHistory(): void {
     const dayCategories = hasWorkouts ? getMuscleGroupsForWorkouts(workouts) : new Set<MuscleGroup>();
     const matchesFilter = hasActiveFilter && Array.from(selectedCalendarFilters).some(cat => dayCategories.has(cat));
 
-    let cellClass = 'aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative';
+    let cellClass = 'aspect-square flex flex-col items-center justify-center rounded-none text-sm relative font-mono';
 
     if (hasWorkouts) {
       if (hasActiveFilter && matchesFilter) {
-        cellClass += ' bg-yellow-500 hover:bg-yellow-600 cursor-pointer';
+        cellClass += ' bg-terminal-amber/30 border border-terminal-amber hover:bg-terminal-amber/50 cursor-pointer text-terminal-amber';
       } else {
-        cellClass += ' bg-blue-600 hover:bg-blue-700 cursor-pointer';
+        cellClass += ' bg-terminal-green/20 border border-terminal-green hover:bg-terminal-green/30 cursor-pointer';
       }
     } else {
-      cellClass += ' bg-gray-800';
+      cellClass += ' bg-terminal-surface border border-terminal-border';
     }
 
     if (isToday) {
-      cellClass += ' ring-2 ring-green-400';
+      cellClass += ' ring-2 ring-terminal-amber';
     }
 
     const onclick = hasWorkouts ? `onclick="app.showDayWorkouts('${date.toISOString()}')"` : '';
@@ -147,9 +147,9 @@ export function renderHistory(): void {
   ALL_MUSCLE_GROUPS.forEach(category => {
     const isSelected = selectedCalendarFilters.has(category);
     const pillClass = isSelected
-      ? 'bg-yellow-500 text-black'
-      : 'bg-gray-700 text-gray-300 hover:bg-gray-600';
-    html += `<button onclick="app.toggleCalendarFilter('${category}')" class="px-3 py-1 rounded-full text-xs font-medium transition-colors ${pillClass}">${category}</button>`;
+      ? 'bg-terminal-amber text-black font-bold'
+      : 'bg-terminal-surface border border-terminal-border text-terminal-green hover:border-terminal-green';
+    html += `<button onclick="app.toggleCalendarFilter('${category}')" class="px-3 py-1 rounded-none text-xs font-medium transition-colors font-mono ${pillClass}">${isSelected ? '[' + category + ']' : category}</button>`;
   });
   html += '</div>';
 
@@ -173,13 +173,13 @@ export function showDayWorkouts(dateStr: string): void {
 
   let html = `
     <div>
-      <button onclick="app.renderHistory()" class="text-blue-400 hover:text-blue-300 mb-4 flex items-center gap-2">
+      <button onclick="app.renderHistory()" class="text-terminal-green hover:text-terminal-dim mb-4 flex items-center gap-2 font-mono">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
-        Back to calendar
+        &lt; Back to calendar
       </button>
-      <h2 class="text-xl font-bold mb-4">${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}</h2>
+      <h2 class="text-lg font-bold mb-4 crt-glow">&gt; ${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}</h2>
       <div class="space-y-3">
   `;
 
@@ -190,19 +190,19 @@ export function showDayWorkouts(dateStr: string): void {
     const time = new Date(w.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     html += `
-      <div class="bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600" onclick="app.editWorkout('${w.id}')">
+      <div class="bg-terminal-surface border border-terminal-border rounded-none p-4 cursor-pointer hover:border-terminal-green" onclick="app.editWorkout('${w.id}')">
         <div class="font-medium">${time}</div>
-        <div class="text-sm text-gray-400">${w.exercises.length} exercises</div>
-        <div class="text-xs text-gray-500 mt-1">${exerciseNames}${more}</div>
-        <div class="mt-3 pt-3 border-t border-gray-600 flex justify-end">
+        <div class="text-sm text-terminal-dim">${w.exercises.length} exercises</div>
+        <div class="text-xs text-terminal-dim mt-1">${exerciseNames}${more}</div>
+        <div class="mt-3 pt-3 border-t border-terminal-border flex justify-end">
           ${isDeleting ? `
             <div class="flex items-center gap-2" onclick="event.stopPropagation()">
-              <span class="text-red-400 text-sm">Delete?</span>
-              <button onclick="app.confirmDeleteWorkout('${w.id}')" class="bg-red-600 hover:bg-red-700 text-white text-sm px-2 py-1 rounded">Yes</button>
-              <button onclick="app.cancelDeleteWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+              <span class="text-terminal-red text-sm">Delete?</span>
+              <button onclick="app.confirmDeleteWorkout('${w.id}')" class="bg-terminal-red hover:bg-terminal-red/80 text-black text-sm px-2 py-1 rounded-none font-bold">Yes</button>
+              <button onclick="app.cancelDeleteWorkout()" class="text-terminal-dim text-sm hover:text-terminal-green">No</button>
             </div>
           ` : `
-            <button onclick="event.stopPropagation(); app.showDeleteWorkoutConfirm('${w.id}')" class="text-gray-500 text-sm hover:text-red-400">Delete</button>
+            <button onclick="event.stopPropagation(); app.showDeleteWorkoutConfirm('${w.id}')" class="text-terminal-dim text-sm hover:text-terminal-red">Delete</button>
           `}
         </div>
       </div>

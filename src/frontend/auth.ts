@@ -34,22 +34,22 @@ export function showMainApp(onRefresh: () => Promise<void>): void {
 
 export function showLoginForm(): void {
   isRegisterMode = false;
-  $('auth-login-tab').classList.add('border-blue-500', 'text-blue-400');
-  $('auth-login-tab').classList.remove('border-gray-700', 'text-gray-400');
-  $('auth-register-tab').classList.remove('border-blue-500', 'text-blue-400');
-  $('auth-register-tab').classList.add('border-gray-700', 'text-gray-400');
-  $('auth-submit-btn').textContent = 'Login';
+  $('auth-login-tab').classList.add('border-terminal-green', 'text-terminal-green');
+  $('auth-login-tab').classList.remove('border-terminal-border', 'text-terminal-dim');
+  $('auth-register-tab').classList.remove('border-terminal-green', 'text-terminal-green');
+  $('auth-register-tab').classList.add('border-terminal-border', 'text-terminal-dim');
+  $('auth-submit-btn').textContent = '[ Login ]';
   ($('auth-password') as HTMLInputElement).autocomplete = 'current-password';
   hideAuthError();
 }
 
 export function showRegisterForm(): void {
   isRegisterMode = true;
-  $('auth-register-tab').classList.add('border-blue-500', 'text-blue-400');
-  $('auth-register-tab').classList.remove('border-gray-700', 'text-gray-400');
-  $('auth-login-tab').classList.remove('border-blue-500', 'text-blue-400');
-  $('auth-login-tab').classList.add('border-gray-700', 'text-gray-400');
-  $('auth-submit-btn').textContent = 'Create Account';
+  $('auth-register-tab').classList.add('border-terminal-green', 'text-terminal-green');
+  $('auth-register-tab').classList.remove('border-terminal-border', 'text-terminal-dim');
+  $('auth-login-tab').classList.remove('border-terminal-green', 'text-terminal-green');
+  $('auth-login-tab').classList.add('border-terminal-border', 'text-terminal-dim');
+  $('auth-submit-btn').textContent = '[ Create Account ]';
   ($('auth-password') as HTMLInputElement).autocomplete = 'new-password';
   hideAuthError();
 }

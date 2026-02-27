@@ -47,14 +47,14 @@ function updateAddExerciseSortButtons(): void {
   const recentBtn = $('add-exercise-sort-recent');
 
   if (addExerciseSort.field === 'alpha') {
-    alphaBtn.className = 'text-blue-400';
+    alphaBtn.className = 'text-terminal-green';
     alphaBtn.textContent = addExerciseSort.asc ? 'A-Z' : 'Z-A';
-    recentBtn.className = 'text-gray-400';
+    recentBtn.className = 'text-terminal-dim';
     recentBtn.textContent = 'Recent';
   } else {
-    recentBtn.className = 'text-blue-400';
+    recentBtn.className = 'text-terminal-green';
     recentBtn.textContent = addExerciseSort.asc ? 'Recent' : 'Oldest';
-    alphaBtn.className = 'text-gray-400';
+    alphaBtn.className = 'text-terminal-dim';
     alphaBtn.textContent = 'A-Z';
   }
 }
@@ -83,10 +83,10 @@ function renderAddExerciseCategories(): void {
     const isExpanded = expandedAddExerciseCategories.has(main.name);
 
     const categoryLabelClass = isTargetCategory
-      ? 'font-medium text-blue-400'
-      : 'font-medium text-gray-300';
+      ? 'font-medium text-terminal-green'
+      : 'font-medium text-terminal-green';
     const targetBadge = isTargetCategory
-      ? '<span class="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Target</span>'
+      ? '<span class="ml-2 text-xs bg-terminal-green text-black px-2 py-0.5 rounded-none font-bold font-mono">Target</span>'
       : '';
 
     return `
@@ -97,8 +97,8 @@ function renderAddExerciseCategories(): void {
             ${targetBadge}
           </div>
           <div class="flex items-center">
-            <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
-            <span id="add-${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+            <span class="text-terminal-dim text-sm mr-2">${exercises.length}</span>
+            <span id="add-${main.name}-arrow" class="text-terminal-dim">${isExpanded ? '&#9660;' : '&#9654;'}</span>
           </div>
         </button>
         <div id="add-${main.name}-exercises" class="space-y-2 mt-2 ${isExpanded ? '' : 'hidden'}">
@@ -106,21 +106,21 @@ function renderAddExerciseCategories(): void {
             const lastLogged = getLastLoggedDate(e.name);
             const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
             const latestPR = getLatestPRForExercise(e.name);
-            const prText = latestPR ? `★ ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
+            const prText = latestPR ? `* ${latestPR.weight}${e.unit} x ${latestPR.reps}` : '';
             const inWorkout = isExerciseInWorkout(e.name);
             const buttonClass = inWorkout
-              ? 'w-full bg-gray-800 rounded-lg p-3 text-left opacity-50 cursor-not-allowed'
-              : 'w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600';
+              ? 'w-full bg-terminal-bg border border-terminal-border rounded-none p-3 text-left opacity-50 cursor-not-allowed'
+              : 'w-full bg-terminal-surface border border-terminal-border rounded-none p-3 text-left hover:border-terminal-green';
             const inWorkoutBadge = inWorkout
-              ? '<span class="text-xs bg-gray-600 text-gray-400 px-2 py-0.5 rounded ml-2">In workout</span>'
+              ? '<span class="text-xs bg-terminal-surface text-terminal-dim px-2 py-0.5 rounded-none ml-2 border border-terminal-border font-mono">In workout</span>'
               : '';
             return `
               <button ${inWorkout ? 'disabled' : `onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')"`} class="${buttonClass}" data-exercise-in-workout="${inWorkout}">
                 <div class="flex justify-between items-center">
                   <span class="font-medium">${e.name}${inWorkoutBadge}</span>
-                  ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+                  ${lastLoggedText ? `<span class="text-xs text-terminal-dim">${lastLoggedText}</span>` : ''}
                 </div>
-                ${prText ? `<div class="text-xs text-yellow-400 mt-1">${prText}</div>` : ''}
+                ${prText ? `<div class="text-xs text-terminal-amber mt-1">${prText}</div>` : ''}
               </button>
             `;
           }).join('')}
@@ -164,17 +164,17 @@ export function filterAddExerciseSearch(): void {
     const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
     const inWorkout = isExerciseInWorkout(e.name);
     const buttonClass = inWorkout
-      ? 'w-full bg-gray-800 rounded-lg p-3 text-left opacity-50 cursor-not-allowed'
-      : 'w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600';
+      ? 'w-full bg-terminal-bg border border-terminal-border rounded-none p-3 text-left opacity-50 cursor-not-allowed'
+      : 'w-full bg-terminal-surface border border-terminal-border rounded-none p-3 text-left hover:border-terminal-green';
     const inWorkoutBadge = inWorkout
-      ? '<span class="text-xs bg-gray-600 text-gray-400 px-2 py-0.5 rounded ml-2">In workout</span>'
+      ? '<span class="text-xs bg-terminal-surface text-terminal-dim px-2 py-0.5 rounded-none ml-2 border border-terminal-border font-mono">In workout</span>'
       : '';
 
     return `
       <button ${inWorkout ? 'disabled' : `onclick="app.addExerciseToWorkout('${e.name.replace(/'/g, "\\'")}')"`} class="${buttonClass}" data-exercise-in-workout="${inWorkout}">
         <div class="flex justify-between items-center">
           <span class="font-medium">${e.name}${inWorkoutBadge}</span>
-          ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+          ${lastLoggedText ? `<span class="text-xs text-terminal-dim">${lastLoggedText}</span>` : ''}
         </div>
       </button>
     `;
@@ -223,8 +223,8 @@ export function cancelCreateExerciseFromWorkout(): void {
 
 export function setWorkoutExerciseUnit(unit: 'lbs' | 'kg'): void {
   workoutExerciseUnit = unit;
-  $('workout-exercise-unit-lbs').className = unit === 'lbs' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
-  $('workout-exercise-unit-kg').className = unit === 'kg' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+  $('workout-exercise-unit-lbs').className = unit === 'lbs' ? 'bg-terminal-green text-black px-4 py-2 rounded-none text-sm font-bold font-mono' : 'bg-terminal-surface border border-terminal-border text-terminal-green px-4 py-2 rounded-none text-sm hover:bg-terminal-green hover:text-black font-mono';
+  $('workout-exercise-unit-kg').className = unit === 'kg' ? 'bg-terminal-green text-black px-4 py-2 rounded-none text-sm font-bold font-mono' : 'bg-terminal-surface border border-terminal-border text-terminal-green px-4 py-2 rounded-none text-sm hover:bg-terminal-green hover:text-black font-mono';
 }
 
 export async function saveExerciseFromWorkout(): Promise<void> {

@@ -68,10 +68,10 @@ export function isExerciseInWorkout(exerciseName: string): boolean {
 }
 
 export function getTypeColor(type: string): string {
-  if (type === '+bar') return 'text-yellow-500';
-  if (type === '/side') return 'text-purple-400';
-  if (type === 'bodyweight') return 'text-green-400';
-  return 'text-cyan-400';
+  if (type === '+bar') return 'text-terminal-amber';
+  if (type === '/side') return 'text-terminal-amber';
+  if (type === 'bodyweight') return 'text-terminal-green';
+  return 'text-terminal-green';
 }
 
 export function getTypeLabel(type: string): string {

@@ -45,14 +45,14 @@ function updateExerciseTabSortButtons(): void {
   const recentBtn = $('exercise-tab-sort-recent');
 
   if (exerciseTabSort.field === 'alpha') {
-    alphaBtn.className = 'text-blue-400';
+    alphaBtn.className = 'text-warm-primary';
     alphaBtn.textContent = exerciseTabSort.asc ? 'A-Z' : 'Z-A';
-    recentBtn.className = 'text-gray-400';
+    recentBtn.className = 'text-warm-text-secondary';
     recentBtn.textContent = 'Recent';
   } else {
-    recentBtn.className = 'text-blue-400';
+    recentBtn.className = 'text-warm-primary';
     recentBtn.textContent = exerciseTabSort.asc ? 'Recent' : 'Oldest';
-    alphaBtn.className = 'text-gray-400';
+    alphaBtn.className = 'text-warm-text-secondary';
     alphaBtn.textContent = 'A-Z';
   }
 }
@@ -72,19 +72,19 @@ export function renderExerciseCategories(): void {
     return `
       <div class="mb-4">
         <button onclick="app.toggleCategory('${main.name}')" class="flex justify-between items-center w-full py-2 text-left">
-          <span class="font-medium text-gray-300">${main.name}</span>
-          <span class="text-gray-500 text-sm mr-2">${exercises.length}</span>
-          <span id="${main.name}-arrow" class="text-gray-400">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+          <span class="font-medium text-warm-text">${main.name}</span>
+          <span class="text-warm-text-secondary text-sm mr-2">${exercises.length}</span>
+          <span id="${main.name}-arrow" class="text-warm-text-secondary">${isExpanded ? '&#9660;' : '&#9654;'}</span>
         </button>
         <div id="${main.name}-exercises" class="space-y-2 mt-2 ${isExpanded ? '' : 'hidden'}">
           ${exercises.map(e => {
             const lastLogged = getLastLoggedDate(e.name);
             const lastLoggedText = lastLogged ? formatDate(lastLogged) : '';
             return `
-              <button onclick="app.showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
+              <button onclick="app.showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-warm-card rounded-2xl p-3 text-left hover:bg-warm-bg shadow-warm-sm flex justify-between items-center transition-colors">
                 <span class="font-medium">${e.name}</span>
                 <div class="text-right">
-                  ${lastLoggedText ? `<span class="text-xs text-gray-500">${lastLoggedText}</span>` : ''}
+                  ${lastLoggedText ? `<span class="text-xs text-warm-text-secondary">${lastLoggedText}</span>` : ''}
                 </div>
               </button>
             `;
@@ -126,12 +126,12 @@ export function filterExercises(): void {
   const filtered = getAllExercises().filter(e => e.name.toLowerCase().includes(query));
   results.innerHTML = filtered.map(e => {
     return `
-      <button onclick="app.showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-gray-700 rounded-lg p-3 text-left hover:bg-gray-600 flex justify-between items-center">
+      <button onclick="app.showEditExercise('${e.name.replace(/'/g, "\\'")}')" class="w-full bg-warm-card rounded-2xl p-3 text-left hover:bg-warm-bg shadow-warm-sm flex justify-between items-center transition-colors">
         <div>
           <div class="font-medium">${e.name}</div>
           <div class="text-xs ${getTypeColor(e.type)}">${getTypeLabel(e.type)}</div>
         </div>
-        <span class="text-gray-500 text-xs">&#9654;</span>
+        <span class="text-warm-text-secondary text-xs">&#9654;</span>
       </button>
     `;
   }).join('');
@@ -210,15 +210,15 @@ export function showEditExercise(exerciseName: string): void {
   if (exercisePRs.length > 0) {
     historyHTML += `
       <div class="mb-3">
-        <div class="text-yellow-400 text-xs font-medium mb-2">★ PERSONAL RECORDS</div>
-        <div class="flex text-gray-500 text-xs mb-1">
+        <div class="text-warm-secondary text-xs font-medium mb-2">Personal Records</div>
+        <div class="flex text-warm-text-secondary text-xs mb-1">
           <span class="w-20">DATE</span>
           <span class="w-16">WEIGHT</span>
           <span class="flex-1">REPS</span>
         </div>
         ${exercisePRs.sort((a, b) => b.achieved_at - a.achieved_at).slice(0, 5).map(pr => `
           <div class="flex text-sm py-1">
-            <span class="w-20 text-gray-400">${formatDate(pr.achieved_at)}</span>
+            <span class="w-20 text-warm-text-secondary">${formatDate(pr.achieved_at)}</span>
             <span class="w-16">${pr.weight} ${exercise.unit}</span>
             <span class="flex-1">${pr.reps}</span>
           </div>
@@ -230,17 +230,17 @@ export function showEditExercise(exerciseName: string): void {
   if (recentSets.length > 0) {
     historyHTML += `
       <div>
-        <div class="text-gray-400 text-xs font-medium mb-2">RECENT SETS</div>
-        <div class="flex text-gray-500 text-xs mb-1">
+        <div class="text-warm-text-secondary text-xs font-medium mb-2">Recent Sets</div>
+        <div class="flex text-warm-text-secondary text-xs mb-1">
           <span class="w-20">DATE</span>
           <span class="w-16">WEIGHT</span>
           <span class="flex-1">REPS</span>
         </div>
         ${recentSets.map(s => `
           <div class="flex text-sm py-1">
-            <span class="w-20 text-gray-400">${formatDate(s.date)}</span>
+            <span class="w-20 text-warm-text-secondary">${formatDate(s.date)}</span>
             <span class="w-16">${s.weight} ${exercise.unit}</span>
-            <span class="flex-1">${s.reps}${s.note ? ` <span class="text-gray-500 text-xs">${s.note}</span>` : ''}</span>
+            <span class="flex-1">${s.reps}${s.note ? ` <span class="text-warm-text-secondary text-xs">${s.note}</span>` : ''}</span>
           </div>
         `).join('')}
       </div>
@@ -250,7 +250,7 @@ export function showEditExercise(exerciseName: string): void {
   if (historyHTML) {
     historyList.innerHTML = historyHTML;
   } else {
-    historyList.innerHTML = '<p class="text-gray-500 text-sm">No history yet</p>';
+    historyList.innerHTML = '<p class="text-warm-text-secondary text-sm">No history yet</p>';
   }
 
   if (isCustom) {
@@ -337,22 +337,22 @@ function renderWeightChart(data: Array<{ date: number; maxWeight: number }>, uni
   const svg = `
     <svg width="${width}" height="${height}" class="w-full">
       <!-- Grid lines -->
-      ${yLabels.map(v => `<line x1="${padding.left}" y1="${yScale(v)}" x2="${width - padding.right}" y2="${yScale(v)}" stroke="#374151" stroke-width="1"/>`).join('')}
+      ${yLabels.map(v => `<line x1="${padding.left}" y1="${yScale(v)}" x2="${width - padding.right}" y2="${yScale(v)}" stroke="#E8E0D8" stroke-width="1"/>`).join('')}
 
       <!-- Y-axis labels -->
-      ${yLabels.map(v => `<text x="${padding.left - 5}" y="${yScale(v) + 4}" text-anchor="end" fill="#9CA3AF" font-size="10">${v}</text>`).join('')}
+      ${yLabels.map(v => `<text x="${padding.left - 5}" y="${yScale(v) + 4}" text-anchor="end" fill="#8C7B6B" font-size="10">${v}</text>`).join('')}
 
       <!-- X-axis labels -->
-      <text x="${padding.left}" y="${height - 5}" text-anchor="start" fill="#9CA3AF" font-size="10">${formatShortDate(data[0].date)}</text>
-      <text x="${width - padding.right}" y="${height - 5}" text-anchor="end" fill="#9CA3AF" font-size="10">${formatShortDate(data[data.length - 1].date)}</text>
+      <text x="${padding.left}" y="${height - 5}" text-anchor="start" fill="#8C7B6B" font-size="10">${formatShortDate(data[0].date)}</text>
+      <text x="${width - padding.right}" y="${height - 5}" text-anchor="end" fill="#8C7B6B" font-size="10">${formatShortDate(data[data.length - 1].date)}</text>
 
       <!-- Line -->
-      <path d="${pathPoints}" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="${pathPoints}" fill="none" stroke="#C2703E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 
       <!-- Points -->
-      ${data.map((d, i) => `<circle cx="${xScale(i)}" cy="${yScale(d.maxWeight)}" r="3" fill="#3B82F6"/>`).join('')}
+      ${data.map((d, i) => `<circle cx="${xScale(i)}" cy="${yScale(d.maxWeight)}" r="3" fill="#C2703E"/>`).join('')}
     </svg>
-    <div class="text-center text-xs text-gray-500 mt-1">Max weight (${unit}) over time</div>
+    <div class="text-center text-xs text-warm-text-secondary mt-1">Max weight (${unit}) over time</div>
   `;
 
   container.innerHTML = svg;
@@ -371,8 +371,8 @@ export function hideEditExercise(): void {
 
 export function setExerciseUnit(unit: 'lbs' | 'kg'): void {
   currentExerciseUnit = unit;
-  $('exercise-unit-lbs').className = unit === 'lbs' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
-  $('exercise-unit-kg').className = unit === 'kg' ? 'bg-blue-600 px-4 py-2 rounded-lg text-sm' : 'bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500';
+  $('exercise-unit-lbs').className = unit === 'lbs' ? 'bg-warm-primary text-white px-4 py-2 rounded-xl text-sm' : 'bg-warm-border text-warm-text px-4 py-2 rounded-xl text-sm hover:bg-warm-border/80';
+  $('exercise-unit-kg').className = unit === 'kg' ? 'bg-warm-primary text-white px-4 py-2 rounded-xl text-sm' : 'bg-warm-border text-warm-text px-4 py-2 rounded-xl text-sm hover:bg-warm-border/80';
 }
 
 export async function saveExercise(): Promise<void> {

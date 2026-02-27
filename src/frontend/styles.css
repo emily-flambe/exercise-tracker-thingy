@@ -3,7 +3,90 @@
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* Pull-to-refresh */
+/* ==================== Sunset Gradient Utilities ==================== */
+.sunset-gradient {
+  background: linear-gradient(135deg, #F97316, #F43F5E, #A855F7);
+}
+
+.sunset-gradient-text {
+  background: linear-gradient(135deg, #F97316, #F43F5E, #A855F7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sunset-glow {
+  box-shadow: 0 4px 15px rgba(244, 63, 94, 0.3), 0 2px 8px rgba(249, 115, 22, 0.2);
+}
+
+.sunset-glow:hover {
+  box-shadow: 0 6px 20px rgba(244, 63, 94, 0.4), 0 3px 12px rgba(249, 115, 22, 0.3);
+}
+
+/* Gradient border technique for modals */
+.modal-gradient-top {
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(to right, #F97316, #F43F5E, #A855F7) 1;
+}
+
+/* Gradient border for selected category items */
+.gradient-border-selected {
+  border: 2px solid transparent;
+  background-image: linear-gradient(#241E2A, #241E2A), linear-gradient(135deg, #F97316, #F43F5E, #A855F7);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+/* Exercise card gradient top border */
+.exercise-card-gradient {
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(to right, #F97316, #F43F5E, #A855F7) 1;
+}
+
+/* Subtle warm background gradient */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(ellipse at top left, rgba(249, 115, 22, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.phone-frame {
+  position: relative;
+  z-index: 1;
+}
+
+/* ==================== Custom Scrollbar ==================== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1A1520;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(244, 63, 94, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 63, 94, 0.5);
+}
+
+/* ==================== Smooth Transitions ==================== */
+button, a, input, select, textarea {
+  transition: all 0.2s ease;
+}
+
+/* ==================== Pull-to-refresh ==================== */
 .pull-to-refresh {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 56px);
@@ -32,8 +115,8 @@
 .pull-spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: #F43F5E;
   border-radius: 50%;
 }
 
@@ -49,8 +132,8 @@
 .loading-spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: #F43F5E;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -75,4 +158,39 @@
   max-width: 390px;
   width: 100%;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+
+/* Bottom nav active indicator - sunset gradient bar */
+.nav-active {
+  position: relative;
+}
+
+.nav-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, #F97316, #F43F5E, #A855F7);
+}
+
+/* ==================== Select dropdown styling ==================== */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239CA3AF' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+select option {
+  background: #241E2A;
+  color: #FDF2F8;
+}
+
+/* ==================== PR Star warm glow ==================== */
+.pr-star-glow {
+  text-shadow: 0 0 8px rgba(249, 115, 22, 0.6), 0 0 16px rgba(249, 115, 22, 0.3);
 }

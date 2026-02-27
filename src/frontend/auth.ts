@@ -34,10 +34,10 @@ export function showMainApp(onRefresh: () => Promise<void>): void {
 
 export function showLoginForm(): void {
   isRegisterMode = false;
-  $('auth-login-tab').classList.add('border-blue-500', 'text-blue-400');
-  $('auth-login-tab').classList.remove('border-gray-700', 'text-gray-400');
-  $('auth-register-tab').classList.remove('border-blue-500', 'text-blue-400');
-  $('auth-register-tab').classList.add('border-gray-700', 'text-gray-400');
+  $('auth-login-tab').classList.add('border-sunset-rose', 'text-sunset-rose');
+  $('auth-login-tab').classList.remove('border-white/10', 'text-sunset-muted');
+  $('auth-register-tab').classList.remove('border-sunset-rose', 'text-sunset-rose');
+  $('auth-register-tab').classList.add('border-white/10', 'text-sunset-muted');
   $('auth-submit-btn').textContent = 'Login';
   ($('auth-password') as HTMLInputElement).autocomplete = 'current-password';
   hideAuthError();
@@ -45,10 +45,10 @@ export function showLoginForm(): void {
 
 export function showRegisterForm(): void {
   isRegisterMode = true;
-  $('auth-register-tab').classList.add('border-blue-500', 'text-blue-400');
-  $('auth-register-tab').classList.remove('border-gray-700', 'text-gray-400');
-  $('auth-login-tab').classList.remove('border-blue-500', 'text-blue-400');
-  $('auth-login-tab').classList.add('border-gray-700', 'text-gray-400');
+  $('auth-register-tab').classList.add('border-sunset-rose', 'text-sunset-rose');
+  $('auth-register-tab').classList.remove('border-white/10', 'text-sunset-muted');
+  $('auth-login-tab').classList.remove('border-sunset-rose', 'text-sunset-rose');
+  $('auth-login-tab').classList.add('border-white/10', 'text-sunset-muted');
   $('auth-submit-btn').textContent = 'Create Account';
   ($('auth-password') as HTMLInputElement).autocomplete = 'new-password';
   hideAuthError();

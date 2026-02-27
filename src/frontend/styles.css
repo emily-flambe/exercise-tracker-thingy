@@ -32,8 +32,8 @@
 .pull-spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid #F0E4E0;
+  border-top-color: #F43F5E;
   border-radius: 50%;
 }
 
@@ -49,8 +49,8 @@
 .loading-spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid #F0E4E0;
+  border-top-color: #F43F5E;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -75,4 +75,40 @@
   max-width: 390px;
   width: 100%;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+
+/* Custom selection highlight */
+::selection {
+  background-color: rgba(244, 63, 94, 0.15);
+  color: #1F1315;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(244, 63, 94, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 63, 94, 0.35);
+}
+
+/* Smooth transitions on interactive elements */
+button, a, input, select, textarea {
+  transition: all 0.2s ease;
+}
+
+/* Warm shadow utility for cards (used via inline styles in templates) */
+.warm-card {
+  background: #FFFFFF;
+  border-radius: 1rem;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.06);
 }

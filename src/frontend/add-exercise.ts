@@ -120,7 +120,7 @@ function renderAddExerciseCategories(): void {
                   <span class="font-medium">${e.name}${inWorkoutBadge}</span>
                   ${lastLoggedText ? `<span class="text-xs text-[#888888]">${lastLoggedText}</span>` : ''}
                 </div>
-                ${prText ? `<div class="text-xs text-[#FF0000] mt-1">${prText}</div>` : ''}
+                ${prText ? `<div class="text-xs text-[#FFD700] mt-1">${prText}</div>` : ''}
               </button>
             `;
           }).join('')}

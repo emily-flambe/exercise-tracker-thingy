@@ -210,7 +210,7 @@ export function showEditExercise(exerciseName: string): void {
   if (exercisePRs.length > 0) {
     historyHTML += `
       <div class="mb-3">
-        <div class="text-[#FF0000] text-xs font-bold mb-2 uppercase tracking-wider">★ PERSONAL RECORDS</div>
+        <div class="text-[#FFD700] text-xs font-bold mb-2 uppercase tracking-wider">★ PERSONAL RECORDS</div>
         <div class="flex text-[#888888] text-xs mb-1 uppercase tracking-wider">
           <span class="w-20">DATE</span>
           <span class="w-16">WEIGHT</span>

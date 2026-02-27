@@ -316,7 +316,7 @@ export function renderWorkout(): void {
                 <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-1 text-center text-sm font-mono focus:outline-none focus:border-[#FF0000] text-white ${isSetCompleted ? 'opacity-50' : ''}">
                 <span class="text-[#888888] ${isSetCompleted ? 'line-through' : ''}">x</span>
                 <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-1 text-center text-sm font-mono focus:outline-none focus:border-[#FF0000] text-white ${isSetCompleted ? 'opacity-50' : ''}">
-                ${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-[#FF0000] text-lg">★</span>' : '<span class="text-[#FF0000] text-lg opacity-40">★</span>') : ''}
+                ${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-[#FFD700] text-lg">★</span>' : '<span class="text-[#FFD700] text-lg opacity-40">★</span>') : ''}
                 <button onclick="app.toggleSetMissed(${i}, ${si})" class="flex-shrink-0 hover:opacity-80 transition-opacity" title="${isSetMissed ? 'Mark as not missed' : 'Mark as missed'}">
                   ${missIcon}
                 </button>

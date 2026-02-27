@@ -75,10 +75,10 @@ function renderCategorySelectionGrid(): void {
   grid.innerHTML = ALL_MUSCLE_GROUPS.map(category => {
     const isSelected = selectedTargetCategories.has(category);
     const selectedClass = isSelected
-      ? 'bg-blue-600 border-blue-500 text-white'
-      : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600';
+      ? 'bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] border-[#8B5CF6] text-white shadow-[0_0_10px_rgba(139,92,246,0.3)]'
+      : 'bg-white/5 border-white/10 text-[#F1F5F9]/70 hover:bg-white/10';
     return `
-      <button onclick="app.toggleTargetCategory('${category}')" class="p-3 rounded-lg border-2 text-sm font-medium transition-colors ${selectedClass}">
+      <button onclick="app.toggleTargetCategory('${category}')" class="p-3 rounded-xl border-2 text-sm font-medium transition-all duration-200 ${selectedClass}">
         ${category}
       </button>
     `;
@@ -296,27 +296,27 @@ export function renderWorkout(): void {
             const isSetMissed = set.missed || false;
             const setCheckmarkIcon = isSetCompleted
               ? '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>'
-              : '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+              : '<svg class="w-4 h-4 text-[#64748B]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
             const missIcon = isSetMissed
               ? '<svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>'
-              : '<svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 7v6m0 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+              : '<svg class="w-4 h-4 text-[#64748B]" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 7v6m0 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
             const hasNote = !!set.note;
             const isNoteExpanded = expandedNotes.has(i + '-' + si);
-            const pencilColor = hasNote ? 'text-blue-400' : 'text-gray-500';
+            const pencilColor = hasNote ? 'text-[#8B5CF6]' : 'text-[#64748B]';
             const noteInput = isNoteExpanded ? `
-              <input type="text" value="${set.note || ''}" onchange="app.updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600 ${isSetCompleted ? 'opacity-50' : ''}">
+              <input type="text" value="${set.note || ''}" onchange="app.updateSet(${i}, ${si}, 'note', this.value)" placeholder="note" class="mt-1 ml-6 w-32 bg-transparent border-b border-white/10 px-1 py-0.5 text-xs text-[#64748B] focus:outline-none focus:border-[#8B5CF6] placeholder-[#64748B]/50 ${isSetCompleted ? 'opacity-50' : ''}">
               ` : '';
             return `
-            <div class="py-1 border-b border-gray-600">
+            <div class="py-1 border-b border-white/5">
               <div class="flex items-center gap-2">
                 <button onclick="app.toggleSetCompleted(${i}, ${si})" class="flex-shrink-0 hover:opacity-80 transition-opacity">
                   ${setCheckmarkIcon}
                 </button>
-                <span class="w-6 text-gray-400 text-xs ${isSetCompleted ? 'line-through' : ''}">${si + 1}</span>
-                <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
-                <span class="text-gray-400 ${isSetCompleted ? 'line-through' : ''}">x</span>
-                <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500 ${isSetCompleted ? 'opacity-50' : ''}">
-                ${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-yellow-400 text-lg">★</span>' : '<span class="text-yellow-400 text-lg opacity-40">★</span>') : ''}
+                <span class="w-6 text-[#64748B] text-xs ${isSetCompleted ? 'line-through' : ''}">${si + 1}</span>
+                <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-center text-sm text-[#F1F5F9] focus:outline-none focus:border-[#8B5CF6] ${isSetCompleted ? 'opacity-50' : ''}">
+                <span class="text-[#64748B] ${isSetCompleted ? 'line-through' : ''}">x</span>
+                <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-center text-sm text-[#F1F5F9] focus:outline-none focus:border-[#8B5CF6] ${isSetCompleted ? 'opacity-50' : ''}">
+                ${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-yellow-400 text-lg pr-star-glow">★</span>' : '<span class="text-yellow-400 text-lg opacity-40">★</span>') : ''}
                 <button onclick="app.toggleSetMissed(${i}, ${si})" class="flex-shrink-0 hover:opacity-80 transition-opacity" title="${isSetMissed ? 'Mark as not missed' : 'Mark as missed'}">
                   ${missIcon}
                 </button>
@@ -336,19 +336,19 @@ export function renderWorkout(): void {
           `;}).join('')}
         ` : ''}
 
-        <div id="add-set-collapsed-${i}" class="mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-gray-600' : ''}">
-          <button onclick="app.showAddSetForm(${i})" class="text-blue-400 text-sm">+ Add set</button>
+        <div id="add-set-collapsed-${i}" class="mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-white/5' : ''}">
+          <button onclick="app.showAddSetForm(${i})" class="text-[#8B5CF6] text-sm hover:text-[#A78BFA] transition-colors">+ Add set</button>
         </div>
-        <div id="add-set-expanded-${i}" class="hidden mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-gray-600' : ''}">
+        <div id="add-set-expanded-${i}" class="hidden mt-2 pt-2 ${ex.sets.length > 0 ? 'border-t border-white/5' : ''}">
           <div class="flex items-center gap-2">
-            <span class="text-gray-400 text-xs w-6">${nextSetNum}</span>
-            <input type="number" id="weight-${i}" class="w-16 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500" placeholder="wt">
-            <span class="text-gray-400">x</span>
-            <input type="number" id="reps-${i}" class="w-14 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-blue-500" placeholder="reps">
-            <button onclick="app.saveSetInline(${i})" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Save</button>
-            <button onclick="app.hideAddSetForm(${i})" class="text-gray-400 text-sm">Cancel</button>
+            <span class="text-[#64748B] text-xs w-6">${nextSetNum}</span>
+            <input type="number" id="weight-${i}" class="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-center text-sm text-[#F1F5F9] focus:outline-none focus:border-[#8B5CF6]" placeholder="wt">
+            <span class="text-[#64748B]">x</span>
+            <input type="number" id="reps-${i}" class="w-14 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-center text-sm text-[#F1F5F9] focus:outline-none focus:border-[#8B5CF6]" placeholder="reps">
+            <button onclick="app.saveSetInline(${i})" class="bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] hover:shadow-[0_0_10px_rgba(139,92,246,0.3)] text-white px-3 py-1 rounded-lg text-sm transition-all">Save</button>
+            <button onclick="app.hideAddSetForm(${i})" class="text-[#64748B] text-sm hover:text-[#F1F5F9] transition-colors">Cancel</button>
           </div>
-          <input type="text" id="note-${i}" placeholder="note (optional)" class="mt-2 ml-6 w-40 bg-transparent border-b border-gray-600 px-1 py-0.5 text-xs text-gray-400 focus:outline-none focus:border-blue-500 placeholder-gray-600">
+          <input type="text" id="note-${i}" placeholder="note (optional)" class="mt-2 ml-6 w-40 bg-transparent border-b border-white/10 px-1 py-0.5 text-xs text-[#64748B] focus:outline-none focus:border-[#8B5CF6] placeholder-[#64748B]/50">
         </div>
       </div>
     `;
@@ -356,42 +356,42 @@ export function renderWorkout(): void {
     const isCompleted = ex.completed || false;
     const checkmarkIcon = isCompleted
       ? '<svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>'
-      : '<svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+      : '<svg class="w-6 h-6 text-[#64748B]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
 
     return `
-      <div class="bg-gray-700 rounded-lg p-4 mb-3">
+      <div class="glass-card rounded-xl p-4 mb-3">
         <div class="flex justify-between items-start mb-3">
           <div class="flex items-center gap-3">
             <button onclick="app.toggleExerciseCompleted(${i})" class="flex-shrink-0 hover:opacity-80 transition-opacity">
               ${checkmarkIcon}
             </button>
             <div>
-              <span class="font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}">${ex.name}</span>
+              <span class="font-medium ${isCompleted ? 'text-[#64748B] line-through' : ''}">${ex.name}</span>
               <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button onclick="app.moveExerciseUp(${i})" class="text-gray-400 hover:text-blue-400 transition-colors ${i === 0 ? 'opacity-30 cursor-not-allowed' : ''}" ${i === 0 ? 'disabled' : ''} title="Move up">
+            <button onclick="app.moveExerciseUp(${i})" class="text-[#64748B] hover:text-[#8B5CF6] transition-colors ${i === 0 ? 'opacity-30 cursor-not-allowed' : ''}" ${i === 0 ? 'disabled' : ''} title="Move up">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
               </svg>
             </button>
-            <button onclick="app.moveExerciseDown(${i})" class="text-gray-400 hover:text-blue-400 transition-colors ${i === exerciseCount - 1 ? 'opacity-30 cursor-not-allowed' : ''}" ${i === exerciseCount - 1 ? 'disabled' : ''} title="Move down">
+            <button onclick="app.moveExerciseDown(${i})" class="text-[#64748B] hover:text-[#8B5CF6] transition-colors ${i === exerciseCount - 1 ? 'opacity-30 cursor-not-allowed' : ''}" ${i === exerciseCount - 1 ? 'disabled' : ''} title="Move down">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>
             </button>
-            <button onclick="app.removeExercise(${i})" class="text-red-400 text-sm px-2 hover:text-red-300">x</button>
+            <button onclick="app.removeExercise(${i})" class="text-red-400 text-sm px-2 hover:text-red-300 transition-colors">x</button>
           </div>
         </div>
         ${setsHtml}
         <div class="flex justify-between items-center mt-2">
-          <button onclick="app.showExerciseNotes(${i})" class="${ex.notes ? 'text-blue-400' : 'text-gray-500'} hover:text-blue-300 transition-colors" title="${ex.notes ? 'Edit notes' : 'Add notes'}">
+          <button onclick="app.showExerciseNotes(${i})" class="${ex.notes ? 'text-[#8B5CF6]' : 'text-[#64748B]'} hover:text-[#A78BFA] transition-colors" title="${ex.notes ? 'Edit notes' : 'Add notes'}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
           </button>
-          <button onclick="app.showPRHistory('${ex.name.replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-yellow-400 transition-colors" title="View PR history">
+          <button onclick="app.showPRHistory('${ex.name.replace(/'/g, "\\'")}')" class="text-[#64748B] hover:text-yellow-400 transition-colors" title="View PR history">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
             </svg>
@@ -589,11 +589,11 @@ function switchTabDirect(tabName: string): void {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   $('tab-' + tabName).classList.add('active');
   document.querySelectorAll('nav button').forEach(btn => {
-    btn.classList.remove('text-blue-400');
-    btn.classList.add('text-gray-400');
+    btn.classList.remove('text-[#8B5CF6]', 'nav-active');
+    btn.classList.add('text-[#64748B]');
   });
-  $('nav-' + tabName).classList.remove('text-gray-400');
-  $('nav-' + tabName).classList.add('text-blue-400');
+  $('nav-' + tabName).classList.remove('text-[#64748B]');
+  $('nav-' + tabName).classList.add('text-[#8B5CF6]', 'nav-active');
 }
 
 // ==================== RESET HELPERS ====================

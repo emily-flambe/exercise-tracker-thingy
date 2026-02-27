@@ -3,7 +3,100 @@
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* Pull-to-refresh */
+/* ==================== Glassmorphism Utilities ==================== */
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-nav {
+  background: rgba(11, 15, 26, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ==================== Neon Unit Toggle Buttons ==================== */
+.neon-unit-active {
+  background: linear-gradient(135deg, #8B5CF6, #06B6D4);
+  color: white;
+}
+
+.neon-unit-inactive {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #64748B;
+}
+
+.neon-unit-inactive:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #F1F5F9;
+}
+
+/* ==================== Nav Active Indicator ==================== */
+.nav-btn {
+  position: relative;
+}
+
+.nav-btn.nav-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #8B5CF6, #06B6D4);
+}
+
+/* ==================== Background Mesh Gradient ==================== */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(139, 92, 246, 0.02) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ==================== Custom Scrollbar ==================== */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.3) transparent;
+}
+
+/* ==================== Pull-to-refresh ==================== */
 .pull-to-refresh {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 56px);
@@ -32,8 +125,8 @@
 .pull-spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #8B5CF6;
   border-radius: 50%;
 }
 
@@ -45,16 +138,17 @@
   to { transform: rotate(360deg); }
 }
 
-/* Loading screen spinner */
+/* ==================== Loading screen spinner ==================== */
 .loading-spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #8B5CF6;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
+/* ==================== Phone Frame ==================== */
 .phone-frame {
   max-width: 390px;
   margin: 0 auto;
@@ -75,4 +169,25 @@
   max-width: 390px;
   width: 100%;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+
+/* ==================== Select dropdown styling ==================== */
+select option {
+  background: #1a1f2e;
+  color: #F1F5F9;
+}
+
+/* ==================== Glow Animations ==================== */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+  }
+}
+
+/* ==================== PR Star Glow ==================== */
+.pr-star-glow {
+  text-shadow: 0 0 8px rgba(250, 204, 21, 0.5);
 }

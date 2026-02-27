@@ -3,6 +3,32 @@
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
+/* Swiss Dark Theme - Custom Styles */
+
+/* Selection highlight */
+::selection {
+  background: #FF0000;
+  color: #FFFFFF;
+}
+
+/* Monochrome scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2A2A2A;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #888888;
+}
+
 /* Pull-to-refresh */
 .pull-to-refresh {
   position: fixed;
@@ -32,8 +58,8 @@
 .pull-spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid #2A2A2A;
+  border-top-color: #FF0000;
   border-radius: 50%;
 }
 
@@ -49,8 +75,8 @@
 .loading-spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #374151;
-  border-top-color: #3b82f6;
+  border: 3px solid #2A2A2A;
+  border-top-color: #FF0000;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -75,4 +101,29 @@
   max-width: 390px;
   width: 100%;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+
+/* Input placeholder color for dark theme */
+input::placeholder,
+textarea::placeholder {
+  color: #888888;
+}
+
+/* Select option styling for dark theme */
+select option {
+  background: #141414;
+  color: #FFFFFF;
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid #FF0000;
+  outline-offset: 2px;
+}
+
+/* Disabled inputs */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.4;
 }

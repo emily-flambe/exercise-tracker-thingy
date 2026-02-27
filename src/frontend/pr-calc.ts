@@ -107,9 +107,9 @@ export function showPRHistory(exerciseName: string): void {
 
   if (prs.length === 0) {
     content.innerHTML = `
-      <div class="text-center text-gray-400 py-8">
-        <p>No PRs recorded yet.</p>
-        <p class="text-sm mt-2">PRs are tracked when you beat your best reps at a given weight.</p>
+      <div class="text-center text-gray-500 py-8">
+        <p class="uppercase tracking-wider">No PRs recorded yet.</p>
+        <p class="text-sm mt-2 text-gray-600">PRs are tracked when you beat your best reps at a given weight.</p>
       </div>
     `;
   } else {
@@ -125,9 +125,9 @@ export function showPRHistory(exerciseName: string): void {
     const unit = getExerciseUnit(exerciseName);
 
     content.innerHTML = `
-      <table class="w-full text-sm">
+      <table class="w-full text-sm font-mono">
         <thead>
-          <tr class="text-gray-400 text-left">
+          <tr class="text-gray-500 text-left uppercase tracking-wider text-xs">
             <th class="pb-2">Weight</th>
             <th class="pb-2">Best Reps</th>
             <th class="pb-2">Date</th>
@@ -143,9 +143,9 @@ export function showPRHistory(exerciseName: string): void {
             const dateStr = date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
             return `
               <tr>
-                <td class="py-2 font-medium">${weight} ${unit}</td>
+                <td class="py-2 font-bold">${weight} ${unit}</td>
                 <td class="py-2">${best.reps}</td>
-                <td class="py-2 text-gray-400">${dateStr}</td>
+                <td class="py-2 text-gray-500">${dateStr}</td>
               </tr>
             `;
           }).join('')}

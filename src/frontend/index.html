@@ -5,15 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Workout Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            lime: {
+              400: '#BFFF00',
+              500: '#BFFF00',
+              600: '#a6dd00',
+            },
+            surface: '#111111',
+            danger: '#FF3333',
+          },
+          fontFamily: {
+            heading: ['Oswald', 'sans-serif'],
+            body: ['Inter', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
-<body class="bg-gray-900 text-gray-100">
-  <div class="phone-frame bg-gray-800">
+<body class="bg-black text-gray-100 font-body">
+  <div class="phone-frame bg-black">
 
     <!-- LOADING SCREEN -->
     <div id="loading-screen" class="p-4">
       <div class="flex flex-col items-center justify-center py-24">
-        <h1 class="text-2xl font-bold mb-6">Workout Tracker</h1>
+        <h1 class="text-3xl font-heading font-bold uppercase tracking-wider mb-6">Workout Tracker</h1>
         <div class="loading-spinner"></div>
       </div>
     </div>
@@ -21,26 +45,26 @@
     <!-- AUTH SCREEN -->
     <div id="auth-screen" class="hidden p-4">
       <div class="flex flex-col items-center justify-center py-12">
-        <h1 class="text-2xl font-bold mb-8">Workout Tracker</h1>
+        <h1 class="text-3xl font-heading font-bold uppercase tracking-wider mb-8">Workout Tracker</h1>
 
         <div class="w-full max-w-sm">
           <div class="flex mb-6">
-            <button onclick="app.showLoginForm()" id="auth-login-tab" class="flex-1 py-2 text-center border-b-2 border-blue-500 text-blue-400">Login</button>
-            <button onclick="app.showRegisterForm()" id="auth-register-tab" class="flex-1 py-2 text-center border-b-2 border-gray-700 text-gray-400">Register</button>
+            <button onclick="app.showLoginForm()" id="auth-login-tab" class="flex-1 py-2 text-center border-b-2 border-lime-400 text-lime-400 uppercase tracking-wider text-sm font-semibold">Login</button>
+            <button onclick="app.showRegisterForm()" id="auth-register-tab" class="flex-1 py-2 text-center border-b-2 border-gray-700 text-gray-400 uppercase tracking-wider text-sm font-semibold">Register</button>
           </div>
 
-          <div id="auth-error" class="hidden bg-red-900/50 text-red-300 p-3 rounded-lg mb-4 text-sm"></div>
+          <div id="auth-error" class="hidden bg-red-900/50 text-danger p-3 rounded-none mb-4 text-sm border-2 border-danger"></div>
 
           <form id="auth-form" class="space-y-4">
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Username</label>
-              <input type="text" id="auth-username" autocomplete="username" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Username</label>
+              <input type="text" id="auth-username" autocomplete="username" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
             </div>
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Password</label>
-              <input type="password" id="auth-password" autocomplete="current-password" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Password</label>
+              <input type="password" id="auth-password" autocomplete="current-password" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
             </div>
-            <button type="submit" id="auth-submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg">
+            <button type="submit" id="auth-submit-btn" class="w-full bg-lime-400 hover:bg-lime-600 text-black font-bold py-3 rounded-none uppercase tracking-wider">
               Login
             </button>
           </form>
@@ -55,16 +79,16 @@
     </div>
 
     <!-- Auto-save toast notification -->
-    <div id="save-toast" class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300">
+    <div id="save-toast" class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 bg-lime-400 text-black font-bold px-4 py-2 rounded-none z-50 transition-opacity duration-300 uppercase tracking-wider text-sm">
       Saved
     </div>
 
     <!-- Exercise Notes Modal -->
     <div id="exercise-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
-      <div class="absolute inset-0 bg-black/70" onclick="app.hideExerciseNotes()"></div>
-      <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-sm w-full mx-4 max-h-[80vh] overflow-hidden">
-        <div class="flex justify-between items-center p-4 border-b border-gray-700">
-          <h2 class="text-lg font-semibold" id="exercise-notes-title">Exercise Notes</h2>
+      <div class="absolute inset-0 bg-black/80" onclick="app.hideExerciseNotes()"></div>
+      <div class="relative bg-surface rounded-none max-w-sm w-full mx-4 max-h-[80vh] overflow-hidden border-2 border-lime-400">
+        <div class="flex justify-between items-center p-4 border-b-2 border-gray-700">
+          <h2 class="text-lg font-heading font-bold uppercase tracking-wider" id="exercise-notes-title">Exercise Notes</h2>
           <button onclick="app.hideExerciseNotes()" class="text-gray-400 hover:text-white">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -72,9 +96,9 @@
           </button>
         </div>
         <div class="p-4">
-          <textarea id="exercise-notes-textarea" rows="6" placeholder="Add notes for this exercise..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500 resize-none"></textarea>
+          <textarea id="exercise-notes-textarea" rows="6" placeholder="Add notes for this exercise..." class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 text-sm focus:outline-none focus:border-lime-400 resize-none"></textarea>
           <div class="flex justify-end mt-3">
-            <button onclick="app.saveExerciseNotes()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm">Save</button>
+            <button onclick="app.saveExerciseNotes()" class="bg-lime-400 hover:bg-lime-600 text-black font-bold px-4 py-2 rounded-none text-sm uppercase tracking-wider">Save</button>
           </div>
         </div>
       </div>
@@ -82,10 +106,10 @@
 
     <!-- PR History Modal -->
     <div id="pr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
-      <div class="absolute inset-0 bg-black/70" onclick="app.hidePRHistory()"></div>
-      <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-sm w-full mx-4 max-h-[80vh] overflow-hidden">
-        <div class="flex justify-between items-center p-4 border-b border-gray-700">
-          <h2 class="text-lg font-semibold" id="pr-modal-title">PR History</h2>
+      <div class="absolute inset-0 bg-black/80" onclick="app.hidePRHistory()"></div>
+      <div class="relative bg-surface rounded-none max-w-sm w-full mx-4 max-h-[80vh] overflow-hidden border-2 border-lime-400">
+        <div class="flex justify-between items-center p-4 border-b-2 border-gray-700">
+          <h2 class="text-lg font-heading font-bold uppercase tracking-wider" id="pr-modal-title">PR History</h2>
           <button onclick="app.hidePRHistory()" class="text-gray-400 hover:text-white">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -102,7 +126,7 @@
       <div id="tab-workout" class="tab-content active">
         <div id="workout-empty" class="screen active p-4">
           <div class="flex flex-col items-center justify-center py-24">
-            <button onclick="app.showCategorySelection()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-lg">
+            <button onclick="app.showCategorySelection()" class="bg-lime-400 hover:bg-lime-600 text-black font-bold py-4 px-8 rounded-none uppercase tracking-wider text-lg font-heading">
               Start Workout
             </button>
           </div>
@@ -110,51 +134,51 @@
 
         <div id="workout-category-select" class="screen p-4">
           <header class="mb-4 pt-2">
-            <h1 class="text-xl font-bold" id="category-select-title">What are you training today?</h1>
-            <p class="text-sm text-gray-400 mt-1" id="category-select-subtitle">Select muscle groups to focus on (optional)</p>
+            <h1 class="text-xl font-heading font-bold uppercase tracking-wider" id="category-select-title">What are you training today?</h1>
+            <p class="text-sm text-gray-500 mt-1" id="category-select-subtitle">Select muscle groups to focus on (optional)</p>
           </header>
           <div id="category-select-grid" class="grid grid-cols-3 gap-2 mb-6"></div>
           <div id="category-select-new-buttons" class="space-y-3">
-            <button onclick="app.startWorkoutWithCategories()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg">
+            <button onclick="app.startWorkoutWithCategories()" class="w-full bg-lime-400 hover:bg-lime-600 text-black font-bold py-4 rounded-none uppercase tracking-wider font-heading">
               Start Workout
             </button>
-            <button onclick="app.skipCategorySelection()" class="w-full text-gray-400 hover:text-gray-300 py-2 text-sm">
+            <button onclick="app.skipCategorySelection()" class="w-full text-gray-500 hover:text-gray-300 py-2 text-sm uppercase tracking-wider">
               Skip
             </button>
           </div>
           <div id="category-select-edit-buttons" class="space-y-3 hidden">
-            <button onclick="app.saveEditedCategories()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg">
+            <button onclick="app.saveEditedCategories()" class="w-full bg-lime-400 hover:bg-lime-600 text-black font-bold py-4 rounded-none uppercase tracking-wider font-heading">
               Save
             </button>
-            <button onclick="app.cancelEditCategories()" class="w-full text-gray-400 hover:text-gray-300 py-2 text-sm">
+            <button onclick="app.cancelEditCategories()" class="w-full text-gray-500 hover:text-gray-300 py-2 text-sm uppercase tracking-wider">
               Cancel
             </button>
           </div>
         </div>
 
         <div id="workout-active" class="screen">
-          <header class="sticky top-0 z-10 bg-gray-800 flex justify-between items-center px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 border-b border-gray-700">
-            <button onclick="app.showEditCategories()" class="text-left hover:text-blue-400 transition-colors">
-              <h1 class="text-xl font-bold" id="workout-title">Today's Workout</h1>
+          <header class="sticky top-0 z-10 bg-black flex justify-between items-center px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 border-b-2 border-gray-700">
+            <button onclick="app.showEditCategories()" class="text-left hover:text-lime-400 transition-colors">
+              <h1 class="text-xl font-heading font-bold uppercase tracking-wider" id="workout-title">Today's Workout</h1>
             </button>
             <div class="flex items-center gap-2">
               <!-- Rest Timer Inline -->
               <div id="rest-timer-container" class="flex items-center gap-1">
-                <span id="rest-timer-display" class="font-mono text-lg font-bold min-w-[52px] text-center">00:00</span>
+                <span id="rest-timer-display" class="font-mono text-lg font-bold min-w-[52px] text-center text-lime-400">00:00</span>
                 <!-- Play button (shown when stopped or paused) -->
-                <button id="rest-timer-play-btn" onclick="app.startRestTimer()" class="bg-green-600 hover:bg-green-700 text-white p-1.5 rounded-lg" title="Start">
+                <button id="rest-timer-play-btn" onclick="app.startRestTimer()" class="bg-lime-400 hover:bg-lime-600 text-black p-1.5 rounded-none" title="Start">
                   <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z"/>
                   </svg>
                 </button>
                 <!-- Pause button (shown when running) -->
-                <button id="rest-timer-pause-btn" onclick="app.pauseRestTimer()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-white p-1.5 rounded-lg" title="Pause">
+                <button id="rest-timer-pause-btn" onclick="app.pauseRestTimer()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-black p-1.5 rounded-none" title="Pause">
                   <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
                   </svg>
                 </button>
                 <!-- Stop button (shown when running or paused) -->
-                <button id="rest-timer-stop-btn" onclick="app.stopRestTimer()" class="hidden bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-lg" title="Stop">
+                <button id="rest-timer-stop-btn" onclick="app.stopRestTimer()" class="hidden bg-danger hover:bg-red-700 text-white p-1.5 rounded-none" title="Stop">
                   <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M6 6h12v12H6z"/>
                   </svg>
@@ -164,19 +188,19 @@
           </header>
           <div class="p-4">
             <div id="exercise-list"></div>
-            <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-lg hover:border-blue-500 hover:text-blue-400 mt-2">
+            <button onclick="app.showAddExercise()" class="w-full border-2 border-dashed border-gray-600 text-gray-400 py-4 rounded-none hover:border-lime-400 hover:text-lime-400 mt-2 uppercase tracking-wider text-sm font-semibold">
               + Add Exercise
             </button>
             <div id="delete-workout-btn" class="w-full text-center py-4 mt-4">
-              <button onclick="app.showDeleteCurrentWorkoutConfirm()" class="text-red-400 hover:text-red-300 text-sm">
+              <button onclick="app.showDeleteCurrentWorkoutConfirm()" class="text-danger hover:text-red-300 text-sm uppercase tracking-wider">
                 Delete Workout
               </button>
             </div>
             <div id="delete-workout-confirm" class="hidden w-full text-center py-4 mt-4">
               <div class="flex items-center justify-center gap-3">
-                <span class="text-red-400 text-sm">Delete this workout?</span>
-                <button onclick="app.confirmDeleteCurrentWorkout()" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded">Yes</button>
-                <button onclick="app.cancelDeleteCurrentWorkout()" class="text-gray-400 text-sm hover:text-gray-300">No</button>
+                <span class="text-danger text-sm">Delete this workout?</span>
+                <button onclick="app.confirmDeleteCurrentWorkout()" class="bg-danger hover:bg-red-700 text-white text-sm px-3 py-1 rounded-none uppercase font-bold">Yes</button>
+                <button onclick="app.cancelDeleteCurrentWorkout()" class="text-gray-400 text-sm hover:text-gray-300 uppercase">No</button>
               </div>
             </div>
           </div>
@@ -184,38 +208,38 @@
 
         <div id="workout-add-exercise" class="screen p-4">
           <header class="flex justify-between items-center mb-4 pt-2">
-            <button onclick="app.hideAddExercise()" class="text-blue-400">Cancel</button>
-            <h1 class="text-lg font-semibold">Add Exercise</h1>
-            <button onclick="app.showCreateExerciseFromWorkout()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-3 py-1 rounded text-sm">
+            <button onclick="app.hideAddExercise()" class="text-lime-400 uppercase tracking-wider text-sm font-semibold">Cancel</button>
+            <h1 class="text-lg font-heading font-bold uppercase tracking-wider">Add Exercise</h1>
+            <button onclick="app.showCreateExerciseFromWorkout()" class="bg-lime-400 hover:bg-lime-600 text-black font-bold px-3 py-1 rounded-none text-sm uppercase tracking-wider">
               + New
             </button>
           </header>
           <div class="flex gap-2 mb-3 text-xs">
-            <span class="text-gray-500">Sort:</span>
-            <button onclick="app.toggleAddExerciseSort('alpha')" id="add-exercise-sort-alpha" class="text-gray-400">A-Z</button>
-            <button onclick="app.toggleAddExerciseSort('recent')" id="add-exercise-sort-recent" class="text-blue-400">Recent</button>
+            <span class="text-gray-500 uppercase tracking-wider">Sort:</span>
+            <button onclick="app.toggleAddExerciseSort('alpha')" id="add-exercise-sort-alpha" class="text-gray-400 uppercase tracking-wider">A-Z</button>
+            <button onclick="app.toggleAddExerciseSort('recent')" id="add-exercise-sort-recent" class="text-lime-400 uppercase tracking-wider">Recent</button>
           </div>
-          <input type="text" id="add-exercise-search" placeholder="Search exercises..." oninput="app.filterAddExerciseSearch()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-blue-500">
+          <input type="text" id="add-exercise-search" placeholder="Search exercises..." oninput="app.filterAddExerciseSearch()" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 mb-4 focus:outline-none focus:border-lime-400">
           <div id="add-exercise-categories"></div>
           <div id="add-exercise-search-results" class="space-y-2 hidden"></div>
         </div>
 
         <div id="workout-create-exercise" class="screen p-4 hidden">
           <header class="flex justify-between items-center mb-6 pt-2">
-            <button onclick="app.cancelCreateExerciseFromWorkout()" class="text-blue-400">Cancel</button>
-            <h1 class="text-lg font-semibold">New Exercise</h1>
-            <button onclick="app.saveExerciseFromWorkout()" class="text-green-400 font-medium">Save</button>
+            <button onclick="app.cancelCreateExerciseFromWorkout()" class="text-lime-400 uppercase tracking-wider text-sm font-semibold">Cancel</button>
+            <h1 class="text-lg font-heading font-bold uppercase tracking-wider">New Exercise</h1>
+            <button onclick="app.saveExerciseFromWorkout()" class="text-lime-400 font-bold uppercase tracking-wider text-sm">Save</button>
           </header>
 
           <div class="space-y-6">
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Exercise Name</label>
-              <input type="text" id="workout-exercise-name-input" placeholder="e.g., Bicep Curl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Exercise Name</label>
+              <input type="text" id="workout-exercise-name-input" placeholder="e.g., Bicep Curl" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
             </div>
 
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Category</label>
-              <select id="workout-exercise-category-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Category</label>
+              <select id="workout-exercise-category-input" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
                 <option value="Chest">Chest</option>
                 <option value="Shoulders">Shoulders</option>
                 <option value="Triceps">Triceps</option>
@@ -229,8 +253,8 @@
             </div>
 
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Muscle Group</label>
-              <select id="workout-exercise-muscle-group-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Muscle Group</label>
+              <select id="workout-exercise-muscle-group-input" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
                 <option value="Upper">Upper</option>
                 <option value="Lower">Lower</option>
                 <option value="Core">Core</option>
@@ -240,42 +264,42 @@
             </div>
 
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Unit</label>
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Unit</label>
               <div class="flex gap-2 mb-6">
-                <button type="button" onclick="app.setWorkoutExerciseUnit('lbs')" id="workout-exercise-unit-lbs" class="bg-blue-600 px-4 py-2 rounded-lg text-sm">lbs</button>
-                <button type="button" onclick="app.setWorkoutExerciseUnit('kg')" id="workout-exercise-unit-kg" class="bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500">kg</button>
+                <button type="button" onclick="app.setWorkoutExerciseUnit('lbs')" id="workout-exercise-unit-lbs" class="bg-lime-400 text-black font-bold px-4 py-2 rounded-none text-sm uppercase">lbs</button>
+                <button type="button" onclick="app.setWorkoutExerciseUnit('kg')" id="workout-exercise-unit-kg" class="bg-surface border-2 border-gray-600 px-4 py-2 rounded-none text-sm hover:bg-gray-800 uppercase">kg</button>
               </div>
             </div>
 
             <div>
-              <label class="text-sm text-gray-400 block mb-3">Weight Type</label>
+              <label class="text-sm text-gray-400 block mb-3 uppercase tracking-wider">Weight Type</label>
               <div class="space-y-2">
-                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
-                  <input type="radio" name="workout-weight-type" value="total" class="mr-3 accent-blue-500">
+                <label class="flex items-center bg-surface border-2 border-gray-700 rounded-none p-4 cursor-pointer hover:border-gray-500">
+                  <input type="radio" name="workout-weight-type" value="total" class="mr-3 accent-lime-400">
                   <div>
                     <div class="font-medium text-cyan-400">Total Weight</div>
-                    <div class="text-xs text-gray-400">Log the total weight (e.g., cable machines)</div>
+                    <div class="text-xs text-gray-500">Log the total weight (e.g., cable machines)</div>
                   </div>
                 </label>
-                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
-                  <input type="radio" name="workout-weight-type" value="/side" class="mr-3 accent-blue-500">
+                <label class="flex items-center bg-surface border-2 border-gray-700 rounded-none p-4 cursor-pointer hover:border-gray-500">
+                  <input type="radio" name="workout-weight-type" value="/side" class="mr-3 accent-lime-400">
                   <div>
                     <div class="font-medium text-purple-400">Per Side</div>
-                    <div class="text-xs text-gray-400">Weight on each side (e.g., dumbbells)</div>
+                    <div class="text-xs text-gray-500">Weight on each side (e.g., dumbbells)</div>
                   </div>
                 </label>
-                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
-                  <input type="radio" name="workout-weight-type" value="+bar" class="mr-3 accent-blue-500">
+                <label class="flex items-center bg-surface border-2 border-gray-700 rounded-none p-4 cursor-pointer hover:border-gray-500">
+                  <input type="radio" name="workout-weight-type" value="+bar" class="mr-3 accent-lime-400">
                   <div>
                     <div class="font-medium text-yellow-500">Added Weight (+bar)</div>
-                    <div class="text-xs text-gray-400">Plates added to bar (e.g., bench press)</div>
+                    <div class="text-xs text-gray-500">Plates added to bar (e.g., bench press)</div>
                   </div>
                 </label>
-                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
-                  <input type="radio" name="workout-weight-type" value="bodyweight" class="mr-3 accent-blue-500">
+                <label class="flex items-center bg-surface border-2 border-gray-700 rounded-none p-4 cursor-pointer hover:border-gray-500">
+                  <input type="radio" name="workout-weight-type" value="bodyweight" class="mr-3 accent-lime-400">
                   <div>
-                    <div class="font-medium text-green-400">Bodyweight</div>
-                    <div class="text-xs text-gray-400">No external weight (e.g., pull-ups)</div>
+                    <div class="font-medium text-lime-400">Bodyweight</div>
+                    <div class="text-xs text-gray-500">No external weight (e.g., pull-ups)</div>
                   </div>
                 </label>
               </div>
@@ -288,7 +312,7 @@
       <div id="tab-history" class="tab-content">
         <div class="p-4">
           <header class="mb-6 pt-2">
-            <h1 class="text-2xl font-bold">History</h1>
+            <h1 class="text-2xl font-heading font-bold uppercase tracking-wider">History</h1>
           </header>
           <div id="history-list" class="space-y-3"></div>
         </div>
@@ -299,17 +323,17 @@
         <div id="exercises-list-view" class="p-4">
           <header class="mb-4 pt-2">
             <div class="flex justify-between items-center mb-4">
-              <h1 class="text-2xl font-bold">Exercises</h1>
-              <button onclick="app.showCreateExercise()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm">
+              <h1 class="text-2xl font-heading font-bold uppercase tracking-wider">Exercises</h1>
+              <button onclick="app.showCreateExercise()" class="bg-lime-400 hover:bg-lime-600 text-black font-bold px-4 py-2 rounded-none text-sm uppercase tracking-wider">
                 + New
               </button>
             </div>
             <div class="flex gap-2 mb-3 text-xs">
-              <span class="text-gray-500">Sort:</span>
-              <button onclick="app.toggleExerciseTabSort('alpha')" id="exercise-tab-sort-alpha" class="text-gray-400">A-Z</button>
-              <button onclick="app.toggleExerciseTabSort('recent')" id="exercise-tab-sort-recent" class="text-blue-400">Recent</button>
+              <span class="text-gray-500 uppercase tracking-wider">Sort:</span>
+              <button onclick="app.toggleExerciseTabSort('alpha')" id="exercise-tab-sort-alpha" class="text-gray-400 uppercase tracking-wider">A-Z</button>
+              <button onclick="app.toggleExerciseTabSort('recent')" id="exercise-tab-sort-recent" class="text-lime-400 uppercase tracking-wider">Recent</button>
             </div>
-            <input type="text" id="exercise-search" placeholder="Search exercises..." oninput="app.filterExercises()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+            <input type="text" id="exercise-search" placeholder="Search exercises..." oninput="app.filterExercises()" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
           </header>
           <div id="exercise-categories"></div>
           <div id="exercise-search-results" class="space-y-2 hidden"></div>
@@ -317,20 +341,20 @@
 
         <div id="exercises-edit-view" class="p-4 hidden">
           <header class="flex justify-between items-center mb-6 pt-2">
-            <button onclick="app.hideEditExercise()" class="text-blue-400">Cancel</button>
-            <h1 class="text-lg font-semibold" id="edit-exercise-title">New Exercise</h1>
-            <button onclick="app.saveExercise()" class="text-green-400 font-medium">Save</button>
+            <button onclick="app.hideEditExercise()" class="text-lime-400 uppercase tracking-wider text-sm font-semibold">Cancel</button>
+            <h1 class="text-lg font-heading font-bold uppercase tracking-wider" id="edit-exercise-title">New Exercise</h1>
+            <button onclick="app.saveExercise()" class="text-lime-400 font-bold uppercase tracking-wider text-sm">Save</button>
           </header>
 
           <div class="space-y-6">
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Exercise Name</label>
-              <input type="text" id="exercise-name-input" placeholder="e.g., Bicep Curl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Exercise Name</label>
+              <input type="text" id="exercise-name-input" placeholder="e.g., Bicep Curl" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
             </div>
 
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Category</label>
-              <select id="exercise-category-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Category</label>
+              <select id="exercise-category-input" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
                 <option value="Chest">Chest</option>
                 <option value="Shoulders">Shoulders</option>
                 <option value="Triceps">Triceps</option>
@@ -344,8 +368,8 @@
             </div>
 
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Muscle Group</label>
-              <select id="exercise-muscle-group-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500">
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Muscle Group</label>
+              <select id="exercise-muscle-group-input" class="w-full bg-black border-2 border-gray-600 rounded-none px-4 py-3 focus:outline-none focus:border-lime-400">
                 <option value="Upper">Upper</option>
                 <option value="Lower">Lower</option>
                 <option value="Core">Core</option>
@@ -355,56 +379,56 @@
             </div>
 
             <div>
-              <label class="text-sm text-gray-400 block mb-2">Unit</label>
+              <label class="text-sm text-gray-400 block mb-2 uppercase tracking-wider">Unit</label>
               <div class="flex gap-2 mb-6">
-                <button type="button" onclick="app.setExerciseUnit('lbs')" id="exercise-unit-lbs" class="bg-blue-600 px-4 py-2 rounded-lg text-sm">lbs</button>
-                <button type="button" onclick="app.setExerciseUnit('kg')" id="exercise-unit-kg" class="bg-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-500">kg</button>
+                <button type="button" onclick="app.setExerciseUnit('lbs')" id="exercise-unit-lbs" class="bg-lime-400 text-black font-bold px-4 py-2 rounded-none text-sm uppercase">lbs</button>
+                <button type="button" onclick="app.setExerciseUnit('kg')" id="exercise-unit-kg" class="bg-surface border-2 border-gray-600 px-4 py-2 rounded-none text-sm hover:bg-gray-800 uppercase">kg</button>
               </div>
             </div>
 
             <div>
-              <label class="text-sm text-gray-400 block mb-3">Weight Type</label>
+              <label class="text-sm text-gray-400 block mb-3 uppercase tracking-wider">Weight Type</label>
               <div class="space-y-2">
-                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
-                  <input type="radio" name="weight-type" value="total" class="mr-3 accent-blue-500">
+                <label class="flex items-center bg-surface border-2 border-gray-700 rounded-none p-4 cursor-pointer hover:border-gray-500">
+                  <input type="radio" name="weight-type" value="total" class="mr-3 accent-lime-400">
                   <div>
                     <div class="font-medium text-cyan-400">Total Weight</div>
-                    <div class="text-xs text-gray-400">Log the total weight (e.g., cable machines)</div>
+                    <div class="text-xs text-gray-500">Log the total weight (e.g., cable machines)</div>
                   </div>
                 </label>
-                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
-                  <input type="radio" name="weight-type" value="/side" class="mr-3 accent-blue-500">
+                <label class="flex items-center bg-surface border-2 border-gray-700 rounded-none p-4 cursor-pointer hover:border-gray-500">
+                  <input type="radio" name="weight-type" value="/side" class="mr-3 accent-lime-400">
                   <div>
                     <div class="font-medium text-purple-400">Per Side</div>
-                    <div class="text-xs text-gray-400">Weight on each side (e.g., dumbbells)</div>
+                    <div class="text-xs text-gray-500">Weight on each side (e.g., dumbbells)</div>
                   </div>
                 </label>
-                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
-                  <input type="radio" name="weight-type" value="+bar" class="mr-3 accent-blue-500">
+                <label class="flex items-center bg-surface border-2 border-gray-700 rounded-none p-4 cursor-pointer hover:border-gray-500">
+                  <input type="radio" name="weight-type" value="+bar" class="mr-3 accent-lime-400">
                   <div>
                     <div class="font-medium text-yellow-500">Added Weight (+bar)</div>
-                    <div class="text-xs text-gray-400">Plates added to bar (e.g., bench press)</div>
+                    <div class="text-xs text-gray-500">Plates added to bar (e.g., bench press)</div>
                   </div>
                 </label>
-                <label class="flex items-center bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600">
-                  <input type="radio" name="weight-type" value="bodyweight" class="mr-3 accent-blue-500">
+                <label class="flex items-center bg-surface border-2 border-gray-700 rounded-none p-4 cursor-pointer hover:border-gray-500">
+                  <input type="radio" name="weight-type" value="bodyweight" class="mr-3 accent-lime-400">
                   <div>
-                    <div class="font-medium text-green-400">Bodyweight</div>
-                    <div class="text-xs text-gray-400">No external weight (e.g., pull-ups)</div>
+                    <div class="font-medium text-lime-400">Bodyweight</div>
+                    <div class="text-xs text-gray-500">No external weight (e.g., pull-ups)</div>
                   </div>
                 </label>
               </div>
             </div>
           </div>
 
-          <div id="exercise-history-section" class="mt-6 pt-6 border-t border-gray-700">
+          <div id="exercise-history-section" class="mt-6 pt-6 border-t-2 border-gray-700">
             <div id="exercise-weight-chart" class="mb-4"></div>
-            <div class="text-sm text-gray-400 mb-3">Recent Sets</div>
+            <div class="text-sm text-gray-400 mb-3 uppercase tracking-wider">Recent Sets</div>
             <div id="exercise-history-list" class="space-y-1"></div>
           </div>
 
-          <div id="delete-exercise-section" class="mt-8 pt-6 border-t border-gray-700 hidden">
-            <button onclick="app.deleteExercise()" class="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium py-3 rounded-lg">
+          <div id="delete-exercise-section" class="mt-8 pt-6 border-t-2 border-gray-700 hidden">
+            <button onclick="app.deleteExercise()" class="w-full bg-danger/20 hover:bg-danger/30 text-danger font-bold py-3 rounded-none border-2 border-danger uppercase tracking-wider">
               Delete Exercise
             </button>
           </div>
@@ -415,26 +439,26 @@
       <div id="tab-settings" class="tab-content">
         <div class="p-4">
           <header class="mb-6 pt-2">
-            <h1 class="text-2xl font-bold">Settings</h1>
+            <h1 class="text-2xl font-heading font-bold uppercase tracking-wider">Settings</h1>
           </header>
           <div class="space-y-4">
-            <div class="bg-gray-700 rounded-lg p-4">
-              <div class="font-medium mb-1">Logged in as</div>
-              <div class="text-sm text-blue-400" id="settings-username"></div>
+            <div class="bg-surface border-2 border-gray-700 rounded-none p-4">
+              <div class="font-medium mb-1 uppercase tracking-wider text-sm">Logged in as</div>
+              <div class="text-sm text-lime-400 font-mono" id="settings-username"></div>
             </div>
-            <div class="bg-gray-700 rounded-lg p-4">
-              <div class="font-medium mb-1">Clear All Data</div>
-              <div class="text-sm text-gray-400 mb-3">This will delete all workout history</div>
-              <button onclick="app.clearAllData()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">
+            <div class="bg-surface border-2 border-gray-700 rounded-none p-4">
+              <div class="font-medium mb-1 uppercase tracking-wider text-sm">Clear All Data</div>
+              <div class="text-sm text-gray-500 mb-3">This will delete all workout history</div>
+              <button onclick="app.clearAllData()" class="bg-danger hover:bg-red-700 text-white font-bold px-4 py-2 rounded-none text-sm uppercase tracking-wider">
                 Clear Data
               </button>
             </div>
-            <div class="bg-gray-700 rounded-lg p-4">
-              <button onclick="app.logout()" class="w-full text-red-400 font-medium">
+            <div class="bg-surface border-2 border-gray-700 rounded-none p-4">
+              <button onclick="app.logout()" class="w-full text-danger font-bold uppercase tracking-wider">
                 Logout
               </button>
             </div>
-            <div class="text-center text-gray-500 text-sm mt-8">
+            <div class="text-center text-gray-600 text-sm mt-8 font-mono">
               Workout Tracker <span id="app-version"></span>
             </div>
           </div>
@@ -444,22 +468,22 @@
     </div>
 
     <!-- BOTTOM NAV -->
-    <nav class="bottom-nav bg-gray-900 border-t border-gray-700 px-2 py-2 flex justify-around items-center">
-      <button onclick="app.switchTab('workout')" id="nav-workout" class="flex flex-col items-center py-2 px-4 text-blue-400">
+    <nav class="bottom-nav bg-black border-t-2 border-gray-700 px-2 py-2 flex justify-around items-center">
+      <button onclick="app.switchTab('workout')" id="nav-workout" class="flex flex-col items-center py-2 px-4 text-lime-400">
         <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        <span class="text-xs">Workout</span>
+        <span class="text-xs uppercase tracking-wider font-semibold">Workout</span>
       </button>
       <button onclick="app.switchTab('history')" id="nav-history" class="flex flex-col items-center py-2 px-4 text-gray-400">
         <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="text-xs">History</span>
+        <span class="text-xs uppercase tracking-wider font-semibold">History</span>
       </button>
       <button onclick="app.switchTab('exercises')" id="nav-exercises" class="flex flex-col items-center py-2 px-4 text-gray-400">
         <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-        <span class="text-xs">Exercises</span>
+        <span class="text-xs uppercase tracking-wider font-semibold">Exercises</span>
       </button>
       <button onclick="app.switchTab('settings')" id="nav-settings" class="flex flex-col items-center py-2 px-4 text-gray-400">
         <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        <span class="text-xs">Settings</span>
+        <span class="text-xs uppercase tracking-wider font-semibold">Settings</span>
       </button>
     </nav>
     </div>

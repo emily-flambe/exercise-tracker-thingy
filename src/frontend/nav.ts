@@ -12,11 +12,11 @@ export function switchTab(tabName: string): void {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   $('tab-' + tabName).classList.add('active');
   document.querySelectorAll('nav button').forEach(btn => {
-    btn.classList.remove('text-blue-400');
-    btn.classList.add('text-gray-400');
+    btn.classList.remove('text-[#E63B57]');
+    btn.classList.add('text-[#8A7B72]');
   });
-  $('nav-' + tabName).classList.remove('text-gray-400');
-  $('nav-' + tabName).classList.add('text-blue-400');
+  $('nav-' + tabName).classList.remove('text-[#8A7B72]');
+  $('nav-' + tabName).classList.add('text-[#E63B57]');
 
   if (onTabSwitchCallback) {
     onTabSwitchCallback(tabName);

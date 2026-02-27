@@ -107,7 +107,7 @@ export function showPRHistory(exerciseName: string): void {
 
   if (prs.length === 0) {
     content.innerHTML = `
-      <div class="text-center text-gray-400 py-8">
+      <div class="text-center text-[#8A7B72] py-8">
         <p>No PRs recorded yet.</p>
         <p class="text-sm mt-2">PRs are tracked when you beat your best reps at a given weight.</p>
       </div>
@@ -127,13 +127,13 @@ export function showPRHistory(exerciseName: string): void {
     content.innerHTML = `
       <table class="w-full text-sm">
         <thead>
-          <tr class="text-gray-400 text-left">
+          <tr class="text-[#8A7B72] text-left">
             <th class="pb-2">Weight</th>
             <th class="pb-2">Best Reps</th>
             <th class="pb-2">Date</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-700">
+        <tbody class="divide-y divide-[#DDD5CB]">
           ${sortedWeights.map(weight => {
             const entries = prsByWeight.get(weight)!;
             const best = entries.reduce((best, curr) =>
@@ -145,7 +145,7 @@ export function showPRHistory(exerciseName: string): void {
               <tr>
                 <td class="py-2 font-medium">${weight} ${unit}</td>
                 <td class="py-2">${best.reps}</td>
-                <td class="py-2 text-gray-400">${dateStr}</td>
+                <td class="py-2 text-[#8A7B72]">${dateStr}</td>
               </tr>
             `;
           }).join('')}

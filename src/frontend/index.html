@@ -311,9 +311,15 @@
       <!-- TAB: HISTORY -->
       <div id="tab-history" class="tab-content">
         <div class="p-4">
-          <header class="mb-6 pt-2">
+          <header class="mb-4 pt-2">
             <h1 class="text-lg font-bold uppercase tracking-[0.2em]">History</h1>
           </header>
+          <div class="flex gap-2 mb-4 items-center">
+            <input type="text" id="history-exercise-search" placeholder="Search exercises..." oninput="app.filterHistoryExercise(this.value)" class="flex-1 min-w-0 bg-[#141414] border border-[#2A2A2A] rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-[#FF0000] text-white placeholder-[#888888]">
+            <input type="date" id="history-date-from" onchange="app.setHistoryDateFrom(this.value)" style="color-scheme: dark" class="bg-[#141414] border border-[#2A2A2A] rounded-sm px-2 py-2 text-sm focus:outline-none focus:border-[#FF0000] text-white w-[130px]">
+            <input type="date" id="history-date-to" onchange="app.setHistoryDateTo(this.value)" style="color-scheme: dark" class="bg-[#141414] border border-[#2A2A2A] rounded-sm px-2 py-2 text-sm focus:outline-none focus:border-[#FF0000] text-white w-[130px]">
+            <button id="history-clear-btn" onclick="app.clearHistoryFilters()" class="hidden text-[#888888] text-xs hover:text-white uppercase tracking-wider font-bold whitespace-nowrap">Clear</button>
+          </div>
           <div id="history-list" class="space-y-3"></div>
         </div>
       </div>

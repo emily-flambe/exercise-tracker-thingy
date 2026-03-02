@@ -27,6 +27,7 @@ import {
   renderHistory, changeCalendarMonth, goToToday, showDayWorkouts,
   showDeleteWorkoutConfirm, cancelDeleteWorkout, confirmDeleteWorkout,
   toggleCalendarFilter,
+  filterHistoryExercise, setHistoryDateFrom, setHistoryDateTo, clearHistoryFilters,
 } from './history';
 import {
   renderExerciseCategories, toggleExerciseTabSort, toggleCategory, filterExercises,
@@ -156,6 +157,10 @@ async function init(): Promise<void> {
   showDayWorkouts,
   renderHistory,
   toggleCalendarFilter,
+  filterHistoryExercise,
+  setHistoryDateFrom,
+  setHistoryDateTo,
+  clearHistoryFilters,
   toggleExerciseTabSort,
   toggleCategory,
   filterExercises,

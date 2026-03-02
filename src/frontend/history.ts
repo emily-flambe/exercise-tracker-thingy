@@ -1,7 +1,7 @@
 import * as api from './api';
 import type { Workout, MuscleGroup } from './api';
 import { state, ALL_MUSCLE_GROUPS } from './state';
-import { $ } from './helpers';
+import { $, escapeHtml } from './helpers';
 import { loadData } from './data';
 import { editWorkout } from './workout';
 
@@ -9,6 +9,9 @@ import { editWorkout } from './workout';
 let currentCalendarDate = new Date();
 let selectedCalendarFilters = new Set<MuscleGroup>();
 let pendingDeleteWorkoutId: string | null = null;
+let historyExerciseSearch = '';
+let historyDateFrom = '';
+let historyDateTo = '';
 
 // ==================== CALENDAR HELPERS ====================
 function getDaysInMonth(date: Date): number {
@@ -61,10 +64,115 @@ export function goToToday(): void {
   renderHistory();
 }
 
+// ==================== HISTORY FILTERS ====================
+function hasActiveSearchFilter(): boolean {
+  return historyExerciseSearch.trim() !== '' || historyDateFrom !== '' || historyDateTo !== '';
+}
+
+function updateFilterClearButton(): void {
+  const clearBtn = document.getElementById('history-clear-btn');
+  if (!clearBtn) return;
+  clearBtn.classList.toggle('hidden', !hasActiveSearchFilter());
+}
+
+export function filterHistoryExercise(value: string): void {
+  historyExerciseSearch = value;
+  updateFilterClearButton();
+  renderHistory();
+}
+
+export function setHistoryDateFrom(value: string): void {
+  historyDateFrom = value;
+  updateFilterClearButton();
+  renderHistory();
+}
+
+export function setHistoryDateTo(value: string): void {
+  historyDateTo = value;
+  updateFilterClearButton();
+  renderHistory();
+}
+
+export function clearHistoryFilters(): void {
+  historyExerciseSearch = '';
+  historyDateFrom = '';
+  historyDateTo = '';
+  const searchInput = document.getElementById('history-exercise-search') as HTMLInputElement | null;
+  const fromInput = document.getElementById('history-date-from') as HTMLInputElement | null;
+  const toInput = document.getElementById('history-date-to') as HTMLInputElement | null;
+  if (searchInput) searchInput.value = '';
+  if (fromInput) fromInput.value = '';
+  if (toInput) toInput.value = '';
+  updateFilterClearButton();
+  renderHistory();
+}
+
 // ==================== RENDER HISTORY ====================
 export function renderHistory(): void {
   const container = $('history-list');
 
+  if (hasActiveSearchFilter()) {
+    // Filtered list view
+    const searchLower = historyExerciseSearch.trim().toLowerCase();
+
+    let fromTs = 0;
+    let toTs = Infinity;
+    if (historyDateFrom) {
+      const [fy, fm, fd] = historyDateFrom.split('-').map(Number);
+      fromTs = new Date(fy, fm - 1, fd).getTime();
+    }
+    if (historyDateTo) {
+      const [ty, tm, td] = historyDateTo.split('-').map(Number);
+      toTs = new Date(ty, tm - 1, td).getTime() + 86400000 - 1;
+    }
+
+    const filtered = state.history
+      .filter(w => {
+        if (searchLower && !w.exercises.some(e => e.name.toLowerCase().includes(searchLower))) return false;
+        if (w.start_time < fromTs || w.start_time > toTs) return false;
+        return true;
+      })
+      .sort((a, b) => b.start_time - a.start_time);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div class="text-[#888888] text-sm text-center py-8">No workouts found</div>`;
+      return;
+    }
+
+    let listHtml = '<div class="space-y-3">';
+    filtered.forEach(w => {
+      const date = new Date(w.start_time);
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const exerciseNames = w.exercises.map(e => escapeHtml(e.name)).slice(0, 3).join(', ');
+      const more = w.exercises.length > 3 ? ` +${w.exercises.length - 3} more` : '';
+      const isDeleting = pendingDeleteWorkoutId === w.id;
+
+      listHtml += `
+        <div class="bg-[#141414] border border-[#2A2A2A] rounded-sm p-4 cursor-pointer hover:border-[#888888]" onclick="app.editWorkout('${w.id}')">
+          <div class="font-bold text-sm">${dateStr} &middot; ${timeStr}</div>
+          <div class="text-xs text-[#888888] mt-1">${exerciseNames}${more}</div>
+          <div class="mt-3 pt-3 border-t border-[#2A2A2A] flex justify-end">
+            ${isDeleting ? `
+              <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                <span class="text-[#FF0000] text-sm">Delete?</span>
+                <button onclick="app.confirmDeleteWorkout('${w.id}')" class="bg-[#FF0000] hover:bg-red-700 text-white text-sm px-2 py-1 rounded-sm">Yes</button>
+                <button onclick="app.cancelDeleteWorkout()" class="text-[#888888] text-sm hover:text-white">No</button>
+              </div>
+            ` : `
+              <button onclick="event.stopPropagation(); app.showDeleteWorkoutConfirm('${w.id}')" class="text-[#888888] text-sm hover:text-[#FF0000]">Delete</button>
+            `}
+          </div>
+        </div>
+      `;
+    });
+    listHtml += '</div>';
+
+    container.innerHTML = listHtml;
+    return;
+  }
+
+  // Default: calendar view
   const today = new Date();
   const year = currentCalendarDate.getFullYear();
   const month = currentCalendarDate.getMonth();
@@ -216,12 +324,20 @@ export function showDayWorkouts(dateStr: string): void {
 // ==================== DELETE WORKOUT ====================
 export function showDeleteWorkoutConfirm(id: string): void {
   pendingDeleteWorkoutId = id;
+  if (hasActiveSearchFilter()) {
+    renderHistory();
+    return;
+  }
   showDayWorkouts(new Date(state.history.find(w => w.id === id)!.start_time).toISOString());
 }
 
 export function cancelDeleteWorkout(): void {
   const workoutId = pendingDeleteWorkoutId;
   pendingDeleteWorkoutId = null;
+  if (hasActiveSearchFilter()) {
+    renderHistory();
+    return;
+  }
   const workout = state.history.find(w => w.id === workoutId);
   if (workout) {
     showDayWorkouts(new Date(workout.start_time).toISOString());
@@ -236,6 +352,11 @@ export async function confirmDeleteWorkout(id: string): Promise<void> {
     await api.deleteWorkout(id);
     pendingDeleteWorkoutId = null;
     await loadData();
+
+    if (hasActiveSearchFilter()) {
+      renderHistory();
+      return;
+    }
 
     if (workout) {
       const workoutsOnDay = getWorkoutsForDate(new Date(workout.start_time));

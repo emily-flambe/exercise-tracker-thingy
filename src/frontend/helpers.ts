@@ -7,6 +7,15 @@ export function $(id: string): HTMLElement {
   return document.getElementById(id)!;
 }
 
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function $input(id: string): HTMLInputElement {
   return document.getElementById(id) as HTMLInputElement;
 }

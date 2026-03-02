@@ -292,7 +292,7 @@ export function showDayWorkouts(dateStr: string): void {
   `;
 
   workouts.forEach(w => {
-    const exerciseNames = w.exercises.map(e => e.name).slice(0, 3).join(', ');
+    const exerciseNames = w.exercises.map(e => escapeHtml(e.name)).slice(0, 3).join(', ');
     const more = w.exercises.length > 3 ? ` +${w.exercises.length - 3} more` : '';
     const isDeleting = pendingDeleteWorkoutId === w.id;
     const time = new Date(w.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });

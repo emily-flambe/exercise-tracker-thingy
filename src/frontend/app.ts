@@ -33,6 +33,7 @@ import {
   showCreateExercise, showEditExercise, hideEditExercise,
   saveExercise, deleteExercise, setExerciseUnit,
 } from './exercises-tab';
+import { renderPRsTab } from './prs-tab';
 
 // Injected by Vite at build time
 declare const __APP_VERSION__: string;
@@ -63,6 +64,8 @@ async function handleRefresh(): Promise<void> {
       renderHistory();
     } else if (activeTab?.id === 'tab-exercises') {
       renderExerciseCategories();
+    } else if (activeTab?.id === 'tab-prs') {
+      renderPRsTab();
     } else if (activeTab?.id === 'tab-workout' && state.currentWorkout) {
       renderWorkout();
     }
@@ -77,6 +80,7 @@ async function handleRefresh(): Promise<void> {
 onTabSwitch((tabName: string) => {
   if (tabName === 'history') renderHistory();
   if (tabName === 'exercises') renderExerciseCategories();
+  if (tabName === 'prs') renderPRsTab();
 });
 
 // ==================== INIT ====================

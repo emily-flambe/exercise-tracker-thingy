@@ -15,6 +15,13 @@ app.get('/', async (c) => {
   return c.json(exercises);
 });
 
+// GET /api/exercises/deleted - List soft-deleted exercises (MUST be before /:id)
+app.get('/deleted', async (c) => {
+  const userId = c.get('userId');
+  const exercises = await queries.getDeletedCustomExercises(c.env.DB, userId);
+  return c.json(exercises);
+});
+
 // GET /api/exercises/:id - Get single custom exercise
 app.get('/:id', async (c) => {
   const userId = c.get('userId');
@@ -41,6 +48,19 @@ app.post('/', async (c) => {
   return c.json(exercise, 201);
 });
 
+// POST /api/exercises/:id/restore - Restore a soft-deleted exercise
+app.post('/:id/restore', async (c) => {
+  const userId = c.get('userId');
+  const id = c.req.param('id');
+  const restored = await queries.restoreCustomExercise(c.env.DB, id, userId);
+
+  if (!restored) {
+    return c.json({ error: 'Deleted exercise not found' }, 404);
+  }
+
+  return c.json({ success: true });
+});
+
 // PUT /api/exercises/:id - Update custom exercise
 app.put('/:id', async (c) => {
   const userId = c.get('userId');
@@ -60,7 +80,7 @@ app.put('/:id', async (c) => {
   return c.json(exercise);
 });
 
-// DELETE /api/exercises/:id - Delete custom exercise
+// DELETE /api/exercises/:id - Soft delete custom exercise
 app.delete('/:id', async (c) => {
   const userId = c.get('userId');
   const id = c.req.param('id');

@@ -95,6 +95,8 @@ export interface CustomExerciseRow {
   muscle_group: string;
   unit: string;
   created_at: number;
+  deleted?: number;
+  deleted_at?: number;
 }
 
 export interface PersonalRecord {

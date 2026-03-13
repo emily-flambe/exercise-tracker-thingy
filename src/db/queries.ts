@@ -298,7 +298,7 @@ export async function deleteWorkout(db: D1Database, id: string, userId: string):
 
 export async function getAllCustomExercises(db: D1Database, userId: string): Promise<CustomExercise[]> {
   const rows = await db
-    .prepare('SELECT * FROM custom_exercises WHERE user_id = ? ORDER BY name')
+    .prepare('SELECT * FROM custom_exercises WHERE user_id = ? AND (deleted = 0 OR deleted IS NULL) ORDER BY name')
     .bind(userId)
     .all<CustomExerciseRow>();
 
@@ -316,7 +316,7 @@ export async function getAllCustomExercises(db: D1Database, userId: string): Pro
 
 export async function getCustomExercise(db: D1Database, id: string, userId: string): Promise<CustomExercise | null> {
   const row = await db
-    .prepare('SELECT * FROM custom_exercises WHERE id = ? AND user_id = ?')
+    .prepare('SELECT * FROM custom_exercises WHERE id = ? AND user_id = ? AND (deleted = 0 OR deleted IS NULL)')
     .bind(id, userId)
     .first<CustomExerciseRow>();
 
@@ -392,12 +392,41 @@ export async function updateCustomExercise(db: D1Database, id: string, userId: s
 }
 
 export async function deleteCustomExercise(db: D1Database, id: string, userId: string): Promise<boolean> {
+  // Soft delete - set deleted flag instead of removing
+  const now = Date.now();
   const result = await db
-    .prepare('DELETE FROM custom_exercises WHERE id = ? AND user_id = ?')
+    .prepare('UPDATE custom_exercises SET deleted = 1, deleted_at = ? WHERE id = ? AND user_id = ? AND (deleted = 0 OR deleted IS NULL)')
+    .bind(now, id, userId)
+    .run();
+
+  return result.meta.changes > 0;
+}
+
+export async function restoreCustomExercise(db: D1Database, id: string, userId: string): Promise<boolean> {
+  const result = await db
+    .prepare('UPDATE custom_exercises SET deleted = 0, deleted_at = NULL WHERE id = ? AND user_id = ? AND deleted = 1')
     .bind(id, userId)
     .run();
 
   return result.meta.changes > 0;
+}
+
+export async function getDeletedCustomExercises(db: D1Database, userId: string): Promise<CustomExercise[]> {
+  const rows = await db
+    .prepare('SELECT * FROM custom_exercises WHERE user_id = ? AND deleted = 1 ORDER BY deleted_at DESC')
+    .bind(userId)
+    .all<CustomExerciseRow>();
+
+  return rows.results.map(row => ({
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    type: row.type as CustomExercise['type'],
+    category: row.category as CustomExercise['category'],
+    muscle_group: (row.muscle_group || 'Other') as CustomExercise['muscle_group'],
+    unit: row.unit as CustomExercise['unit'],
+    created_at: row.created_at,
+  }));
 }
 
 // ==================== PERSONAL RECORDS ====================

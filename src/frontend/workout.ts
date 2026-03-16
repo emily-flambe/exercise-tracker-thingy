@@ -8,6 +8,7 @@ import { $, formatDate, getAllExercises, getTypeColor, getTypeLabel } from './he
 import { loadData } from './data';
 import { showWorkoutScreen } from './nav';
 import { recalculateAllPRs } from './pr-calc';
+import { setAutoSaveInProgress } from './sync-state';
 
 // ==================== WORKOUT STATE ====================
 let isEditingFromHistory = false;
@@ -199,6 +200,7 @@ async function autoSaveWorkout(): Promise<void> {
     return;
   }
 
+  setAutoSaveInProgress(true);
   try {
     const workoutData: CreateWorkoutRequest & { updated_at?: number } = {
       start_time: state.currentWorkout.startTime,
@@ -240,10 +242,12 @@ async function autoSaveWorkout(): Promise<void> {
     } else {
       console.error('Failed to auto-save workout:', error);
     }
+  } finally {
+    setAutoSaveInProgress(false);
   }
 }
 
-function mergeServerWorkout(serverWorkout: Workout): void {
+export function mergeServerWorkout(serverWorkout: Workout): void {
   if (!state.currentWorkout) return;
 
   editingWorkoutUpdatedAt = serverWorkout.updated_at;
@@ -600,4 +604,13 @@ function switchTabDirect(tabName: string): void {
 export function resetWorkoutState(): void {
   editingWorkoutUpdatedAt = null;
   autoSaveConflictRetries = 0;
+}
+
+// ==================== SYNC ACCESSORS ====================
+export function getEditingWorkoutUpdatedAt(): number | null {
+  return editingWorkoutUpdatedAt;
+}
+
+export function setEditingWorkoutUpdatedAt(val: number): void {
+  editingWorkoutUpdatedAt = val;
 }

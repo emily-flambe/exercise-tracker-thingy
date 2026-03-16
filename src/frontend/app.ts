@@ -35,6 +35,7 @@ import {
   saveExercise, deleteExercise, setExerciseUnit,
 } from './exercises-tab';
 import { renderPRsTab } from './prs-tab';
+import { startSync } from './sync';
 
 // Injected by Vite at build time
 declare const __APP_VERSION__: string;
@@ -90,6 +91,7 @@ async function init(): Promise<void> {
 
   $('auth-form').addEventListener('submit', createAuthSubmitHandler(() => {
     showMainApp(handleRefresh);
+    startSync();
   }));
 
   if (api.isAuthenticated()) {
@@ -98,6 +100,7 @@ async function init(): Promise<void> {
       setCurrentUser(user);
       await loadData();
       showMainApp(handleRefresh);
+      startSync();
     } catch {
       api.logout();
       showAuthScreen();

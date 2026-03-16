@@ -4,6 +4,7 @@ import { state } from './state';
 import { $, showToast } from './helpers';
 import { loadData } from './data';
 import { setupPullToRefresh } from './pull-to-refresh';
+import { stopSync } from './sync';
 
 let currentUser: User | null = null;
 let isRegisterMode = false;
@@ -118,6 +119,7 @@ export function createAuthSubmitHandler(onLoginSuccess: () => void): (e: Event) 
 }
 
 export function logout(): void {
+  stopSync();
   api.logout();
   currentUser = null;
   state.history = [];

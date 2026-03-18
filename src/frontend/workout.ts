@@ -14,6 +14,7 @@ import { setAutoSaveInProgress } from './sync-state';
 let isEditingFromHistory = false;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let editingWorkoutUpdatedAt: number | null = null;
+let editingWorkoutEndTime: number | undefined = undefined;
 let autoSaveConflictRetries = 0;
 const MAX_AUTO_SAVE_CONFLICT_RETRIES = 3;
 let expandedNotes = new Set<string>();
@@ -115,6 +116,7 @@ function startWorkoutInternal(targetCategories?: MuscleGroup[]): void {
   };
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
+  editingWorkoutEndTime = undefined;
   autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
@@ -141,6 +143,7 @@ export function startWorkout(): void {
   };
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
+  editingWorkoutEndTime = undefined;
   autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
@@ -170,6 +173,7 @@ export async function confirmDeleteCurrentWorkout(): Promise<void> {
     state.currentWorkout = null;
     state.editingWorkoutId = null;
     editingWorkoutUpdatedAt = null;
+    editingWorkoutEndTime = undefined;
     autoSaveConflictRetries = 0;
     isEditingFromHistory = false;
     expandedNotes.clear();
@@ -209,9 +213,8 @@ async function autoSaveWorkout(): Promise<void> {
     };
 
     if (state.editingWorkoutId) {
-      const originalWorkout = state.history.find(w => w.id === state.editingWorkoutId);
-      if (originalWorkout?.end_time) {
-        workoutData.end_time = originalWorkout.end_time;
+      if (editingWorkoutEndTime !== undefined) {
+        workoutData.end_time = editingWorkoutEndTime;
       }
       if (editingWorkoutUpdatedAt !== null) {
         workoutData.updated_at = editingWorkoutUpdatedAt;
@@ -579,6 +582,7 @@ export function editWorkout(id: string): void {
   };
   state.editingWorkoutId = id;
   editingWorkoutUpdatedAt = source.updated_at;
+  editingWorkoutEndTime = source.end_time ?? undefined;
   isEditingFromHistory = true;
   expandedNotes.clear();
   updateWorkoutTitle();
@@ -603,6 +607,7 @@ function switchTabDirect(tabName: string): void {
 // ==================== RESET HELPERS ====================
 export function resetWorkoutState(): void {
   editingWorkoutUpdatedAt = null;
+  editingWorkoutEndTime = undefined;
   autoSaveConflictRetries = 0;
 }
 

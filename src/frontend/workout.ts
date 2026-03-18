@@ -1,5 +1,5 @@
 import * as api from './api';
-import { ConflictError } from './api';
+import { ApiError, ConflictError } from './api';
 import type { Workout, Set as WorkoutSet } from './api';
 import type { MuscleGroup } from './api';
 import type { CreateWorkoutRequest } from '../types';
@@ -275,10 +275,8 @@ function mergeServerWorkout(serverWorkout: Workout): void {
 
   state.currentWorkout.exercises = merged;
 
-  // Also update target categories from server
-  if (serverWorkout.target_categories) {
-    state.currentWorkout.targetCategories = serverWorkout.target_categories;
-  }
+  // Always take server's target categories (including when cleared)
+  state.currentWorkout.targetCategories = serverWorkout.target_categories;
 
   renderWorkout();
 }
@@ -577,17 +575,40 @@ export function saveExerciseNotes(): void {
 }
 
 // ==================== REFRESH CURRENT WORKOUT ====================
-export async function refreshCurrentWorkout(): Promise<void> {
-  if (!state.editingWorkoutId) return;
+export async function refreshCurrentWorkout(): Promise<boolean> {
+  if (!state.editingWorkoutId) return false;
 
-  const workout = await api.getWorkout(state.editingWorkoutId);
-  state.currentWorkout = {
-    startTime: workout.start_time,
-    targetCategories: workout.target_categories,
-    exercises: JSON.parse(JSON.stringify(workout.exercises)),
-  };
-  editingWorkoutUpdatedAt = workout.updated_at;
-  renderWorkout();
+  // Cancel any pending auto-save so it doesn't overwrite the fresh server data
+  if (autoSaveTimeout) {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = null;
+  }
+
+  try {
+    const workout = await api.getWorkout(state.editingWorkoutId);
+    state.currentWorkout = {
+      startTime: workout.start_time,
+      targetCategories: workout.target_categories,
+      exercises: JSON.parse(JSON.stringify(workout.exercises)),
+    };
+    editingWorkoutUpdatedAt = workout.updated_at;
+    renderWorkout();
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      // Workout was deleted on the server — clean up local state
+      state.currentWorkout = null;
+      state.editingWorkoutId = null;
+      editingWorkoutUpdatedAt = null;
+      autoSaveConflictRetries = 0;
+      isEditingFromHistory = false;
+      expandedNotes.clear();
+      showWorkoutScreen('workout-empty');
+      return true;
+    } else {
+      throw error;
+    }
+  }
 }
 
 // ==================== EDIT FROM HISTORY ====================

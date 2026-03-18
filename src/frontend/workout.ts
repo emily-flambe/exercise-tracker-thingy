@@ -251,20 +251,33 @@ function mergeServerWorkout(serverWorkout: Workout): void {
   const localExercises = state.currentWorkout.exercises;
   const serverExercises = serverWorkout.exercises;
 
+  // Build merged exercise list (server-biased)
+  const merged = [];
+
+  // Start with server exercises (preserves server ordering and data)
+  for (const serverEx of serverExercises) {
+    const localEx = localExercises.find(le => le.name === serverEx.name);
+    const mergedEx = JSON.parse(JSON.stringify(serverEx));
+    // Keep local notes if server has none
+    if (localEx?.notes && !serverEx.notes) {
+      mergedEx.notes = localEx.notes;
+    }
+    merged.push(mergedEx);
+  }
+
+  // Add any exercises that only exist locally (user added new ones)
   for (const localEx of localExercises) {
     const serverEx = serverExercises.find(se => se.name === localEx.name);
-    if (!serverEx) continue;
-
-    if (serverEx.notes && !localEx.notes) {
-      localEx.notes = serverEx.notes;
+    if (!serverEx) {
+      merged.push(JSON.parse(JSON.stringify(localEx)));
     }
   }
 
-  for (const serverEx of serverExercises) {
-    const localEx = localExercises.find(le => le.name === serverEx.name);
-    if (!localEx) {
-      localExercises.push(JSON.parse(JSON.stringify(serverEx)));
-    }
+  state.currentWorkout.exercises = merged;
+
+  // Also update target categories from server
+  if (serverWorkout.target_categories) {
+    state.currentWorkout.targetCategories = serverWorkout.target_categories;
   }
 
   renderWorkout();
@@ -561,6 +574,20 @@ export function saveExerciseNotes(): void {
   hideExerciseNotes();
   renderWorkout();
   scheduleAutoSave();
+}
+
+// ==================== REFRESH CURRENT WORKOUT ====================
+export async function refreshCurrentWorkout(): Promise<void> {
+  if (!state.editingWorkoutId) return;
+
+  const workout = await api.getWorkout(state.editingWorkoutId);
+  state.currentWorkout = {
+    startTime: workout.start_time,
+    targetCategories: workout.target_categories,
+    exercises: JSON.parse(JSON.stringify(workout.exercises)),
+  };
+  editingWorkoutUpdatedAt = workout.updated_at;
+  renderWorkout();
 }
 
 // ==================== EDIT FROM HISTORY ====================

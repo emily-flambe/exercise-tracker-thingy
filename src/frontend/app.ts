@@ -16,6 +16,7 @@ import {
   showAddSetForm, hideAddSetForm, saveSetInline, updateSet, deleteSet,
   showExerciseNotes, hideExerciseNotes, saveExerciseNotes,
   renderWorkout, scheduleAutoSave, editWorkout, resetWorkoutState,
+  refreshCurrentWorkout,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -60,6 +61,7 @@ async function clearAllData(): Promise<void> {
 async function handleRefresh(): Promise<void> {
   try {
     await loadData();
+    await refreshCurrentWorkout();
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab?.id === 'tab-history') {
       renderHistory();

@@ -1,6 +1,8 @@
-import { state } from './state';
+import { state, mainCategories } from './state';
 import type { Exercise } from './state';
 import type { PersonalRecord } from './api';
+
+const validCategories = new Set(mainCategories.map(c => c.name));
 
 // ==================== DOM HELPERS ====================
 export function $(id: string): HTMLElement {
@@ -60,7 +62,7 @@ export function getAllExercises(): Exercise[] {
   return state.customExercises.map(c => ({
     name: c.name,
     type: c.type,
-    category: c.category,
+    category: validCategories.has(c.category) ? c.category : 'Other',
     muscle_group: c.muscle_group || 'Other',
     unit: c.unit,
   }));

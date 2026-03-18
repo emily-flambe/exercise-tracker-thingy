@@ -16,6 +16,7 @@ import {
   showAddSetForm, hideAddSetForm, saveSetInline, updateSet, deleteSet,
   showExerciseNotes, hideExerciseNotes, saveExerciseNotes,
   renderWorkout, scheduleAutoSave, editWorkout, resetWorkoutState,
+  refreshCurrentWorkout,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -60,6 +61,7 @@ async function clearAllData(): Promise<void> {
 async function handleRefresh(): Promise<void> {
   try {
     await loadData();
+    const refreshedFromServer = await refreshCurrentWorkout();
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab?.id === 'tab-history') {
       renderHistory();
@@ -67,7 +69,7 @@ async function handleRefresh(): Promise<void> {
       renderExerciseCategories();
     } else if (activeTab?.id === 'tab-prs') {
       renderPRsTab();
-    } else if (activeTab?.id === 'tab-workout' && state.currentWorkout) {
+    } else if (activeTab?.id === 'tab-workout' && state.currentWorkout && !refreshedFromServer) {
       renderWorkout();
     }
     showToast('Refreshed');

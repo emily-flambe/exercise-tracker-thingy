@@ -1,5 +1,5 @@
 import * as api from './api';
-import { ConflictError } from './api';
+import { ApiError, ConflictError } from './api';
 import type { Workout, Set as WorkoutSet } from './api';
 import type { MuscleGroup } from './api';
 import type { CreateWorkoutRequest } from '../types';
@@ -251,21 +251,32 @@ function mergeServerWorkout(serverWorkout: Workout): void {
   const localExercises = state.currentWorkout.exercises;
   const serverExercises = serverWorkout.exercises;
 
-  for (const localEx of localExercises) {
-    const serverEx = serverExercises.find(se => se.name === localEx.name);
-    if (!serverEx) continue;
+  // Build merged exercise list (server-biased)
+  const merged = [];
 
-    if (serverEx.notes && !localEx.notes) {
-      localEx.notes = serverEx.notes;
-    }
-  }
-
+  // Start with server exercises (preserves server ordering and data)
   for (const serverEx of serverExercises) {
     const localEx = localExercises.find(le => le.name === serverEx.name);
-    if (!localEx) {
-      localExercises.push(JSON.parse(JSON.stringify(serverEx)));
+    const mergedEx = JSON.parse(JSON.stringify(serverEx));
+    // Keep local notes if server has none
+    if (localEx?.notes && !serverEx.notes) {
+      mergedEx.notes = localEx.notes;
+    }
+    merged.push(mergedEx);
+  }
+
+  // Add any exercises that only exist locally (user added new ones)
+  for (const localEx of localExercises) {
+    const serverEx = serverExercises.find(se => se.name === localEx.name);
+    if (!serverEx) {
+      merged.push(JSON.parse(JSON.stringify(localEx)));
     }
   }
+
+  state.currentWorkout.exercises = merged;
+
+  // Always take server's target categories (including when cleared)
+  state.currentWorkout.targetCategories = serverWorkout.target_categories;
 
   renderWorkout();
 }
@@ -561,6 +572,43 @@ export function saveExerciseNotes(): void {
   hideExerciseNotes();
   renderWorkout();
   scheduleAutoSave();
+}
+
+// ==================== REFRESH CURRENT WORKOUT ====================
+export async function refreshCurrentWorkout(): Promise<boolean> {
+  if (!state.editingWorkoutId) return false;
+
+  // Cancel any pending auto-save so it doesn't overwrite the fresh server data
+  if (autoSaveTimeout) {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = null;
+  }
+
+  try {
+    const workout = await api.getWorkout(state.editingWorkoutId);
+    state.currentWorkout = {
+      startTime: workout.start_time,
+      targetCategories: workout.target_categories,
+      exercises: JSON.parse(JSON.stringify(workout.exercises)),
+    };
+    editingWorkoutUpdatedAt = workout.updated_at;
+    renderWorkout();
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      // Workout was deleted on the server — clean up local state
+      state.currentWorkout = null;
+      state.editingWorkoutId = null;
+      editingWorkoutUpdatedAt = null;
+      autoSaveConflictRetries = 0;
+      isEditingFromHistory = false;
+      expandedNotes.clear();
+      showWorkoutScreen('workout-empty');
+      return true;
+    } else {
+      throw error;
+    }
+  }
 }
 
 // ==================== EDIT FROM HISTORY ====================

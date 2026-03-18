@@ -79,6 +79,14 @@ async function handleRefresh(): Promise<void> {
   }
 }
 
+async function refresh(): Promise<void> {
+  const btn = document.getElementById('refresh-btn');
+  if (btn?.classList.contains('refreshing')) return;
+  btn?.classList.add('refreshing');
+  await handleRefresh();
+  btn?.classList.remove('refreshing');
+}
+
 // ==================== TAB SWITCH WIRING ====================
 onTabSwitch((tabName: string) => {
   if (tabName === 'history') renderHistory();
@@ -180,6 +188,8 @@ async function init(): Promise<void> {
   startRestTimer,
   pauseRestTimer,
   stopRestTimer,
+  // Refresh
+  refresh,
 };
 
 init();

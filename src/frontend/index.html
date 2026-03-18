@@ -73,6 +73,13 @@
     </div>
 
     <div id="main-app" class="hidden">
+    <!-- Refresh button -->
+    <button id="refresh-btn" onclick="app.refresh()" class="refresh-btn" title="Refresh">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.32-4.32M20 15a9 9 0 01-14.32 4.32"/>
+      </svg>
+    </button>
+
     <!-- Pull-to-refresh indicator -->
     <div id="pull-to-refresh" class="pull-to-refresh">
       <div class="pull-spinner"></div>

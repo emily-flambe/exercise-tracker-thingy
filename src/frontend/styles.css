@@ -38,6 +38,31 @@
   background: #888888;
 }
 
+/* Refresh button */
+.refresh-btn {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: 16px;
+  z-index: 45;
+  color: #888888;
+  padding: 8px;
+  transition: color 0.15s;
+}
+
+@media (min-width: 390px) {
+  .refresh-btn {
+    right: calc(50% - 195px + 16px);
+  }
+}
+
+.refresh-btn:hover {
+  color: #FFFFFF;
+}
+
+.refresh-btn.refreshing svg {
+  animation: spin 0.8s linear infinite;
+}
+
 /* Pull-to-refresh */
 .pull-to-refresh {
   position: fixed;

@@ -80,11 +80,11 @@ async function handleRefresh(): Promise<void> {
 }
 
 async function refresh(): Promise<void> {
-  const btn = document.getElementById('refresh-btn');
-  if (btn?.classList.contains('refreshing')) return;
-  btn?.classList.add('refreshing');
+  const btns = document.querySelectorAll('.refresh-icon');
+  if (btns[0]?.classList.contains('refreshing')) return;
+  btns.forEach(btn => btn.classList.add('refreshing'));
   await handleRefresh();
-  btn?.classList.remove('refreshing');
+  btns.forEach(btn => btn.classList.remove('refreshing'));
 }
 
 // ==================== TAB SWITCH WIRING ====================

@@ -15,6 +15,9 @@ let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let editingWorkoutUpdatedAt: number | null = null;
 let autoSaveConflictRetries = 0;
 const MAX_AUTO_SAVE_CONFLICT_RETRIES = 3;
+let pollIntervalId: ReturnType<typeof setInterval> | null = null;
+let isSyncPolling = false;
+let isAutoSaving = false;
 let expandedNotes = new Set<string>();
 let selectedTargetCategories = new Set<MuscleGroup>();
 let isEditingCategories = false;
@@ -190,6 +193,7 @@ export function scheduleAutoSave(): void {
   }
 
   autoSaveTimeout = setTimeout(() => {
+    autoSaveTimeout = null;
     autoSaveWorkout();
   }, 1500);
 }
@@ -199,6 +203,7 @@ async function autoSaveWorkout(): Promise<void> {
     return;
   }
 
+  isAutoSaving = true;
   try {
     const workoutData: CreateWorkoutRequest & { updated_at?: number } = {
       start_time: state.currentWorkout.startTime,
@@ -240,6 +245,8 @@ async function autoSaveWorkout(): Promise<void> {
     } else {
       console.error('Failed to auto-save workout:', error);
     }
+  } finally {
+    isAutoSaving = false;
   }
 }
 
@@ -642,6 +649,66 @@ function switchTabDirect(tabName: string): void {
   });
   $('nav-' + tabName).classList.remove('text-[#888888]');
   $('nav-' + tabName).classList.add('text-[#FF0000]');
+}
+
+// ==================== SYNC POLLING ====================
+export function startSyncPolling(): void {
+  stopSyncPolling();
+  pollIntervalId = setInterval(syncPoll, 5000);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+}
+
+export function stopSyncPolling(): void {
+  if (pollIntervalId !== null) {
+    clearInterval(pollIntervalId);
+    pollIntervalId = null;
+  }
+  isSyncPolling = false;
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+}
+
+function handleVisibilityChange(): void {
+  if (document.hidden) {
+    if (pollIntervalId !== null) {
+      clearInterval(pollIntervalId);
+      pollIntervalId = null;
+    }
+  } else {
+    if (pollIntervalId === null) {
+      pollIntervalId = setInterval(syncPoll, 5000);
+      syncPoll();
+    }
+  }
+}
+
+async function syncPoll(): Promise<void> {
+  if (!state.editingWorkoutId || autoSaveTimeout !== null || isAutoSaving || isSyncPolling) {
+    return;
+  }
+
+  isSyncPolling = true;
+  try {
+    const workout = await api.getWorkout(state.editingWorkoutId);
+
+    if (workout.updated_at === editingWorkoutUpdatedAt) {
+      return;
+    }
+
+    mergeServerWorkout(workout);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      state.currentWorkout = null;
+      state.editingWorkoutId = null;
+      editingWorkoutUpdatedAt = null;
+      autoSaveConflictRetries = 0;
+      isEditingFromHistory = false;
+      expandedNotes.clear();
+      showWorkoutScreen('workout-empty');
+    }
+    // Silently ignore network errors
+  } finally {
+    isSyncPolling = false;
+  }
 }
 
 // ==================== RESET HELPERS ====================

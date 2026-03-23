@@ -16,7 +16,7 @@ import {
   showAddSetForm, hideAddSetForm, saveSetInline, updateSet, deleteSet,
   showExerciseNotes, hideExerciseNotes, saveExerciseNotes,
   renderWorkout, scheduleAutoSave, editWorkout, resetWorkoutState,
-  refreshCurrentWorkout,
+  refreshCurrentWorkout, startSyncPolling, stopSyncPolling,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -55,6 +55,12 @@ async function clearAllData(): Promise<void> {
       alert('Failed to clear data');
     }
   }
+}
+
+// ==================== LOGOUT ====================
+function handleLogout(): void {
+  stopSyncPolling();
+  logout();
 }
 
 // ==================== REFRESH HANDLER ====================
@@ -100,6 +106,7 @@ async function init(): Promise<void> {
 
   $('auth-form').addEventListener('submit', createAuthSubmitHandler(() => {
     showMainApp(handleRefresh);
+    startSyncPolling();
   }));
 
   if (api.isAuthenticated()) {
@@ -108,6 +115,7 @@ async function init(): Promise<void> {
       setCurrentUser(user);
       await loadData();
       showMainApp(handleRefresh);
+      startSyncPolling();
     } catch {
       api.logout();
       showAuthScreen();
@@ -183,7 +191,7 @@ async function init(): Promise<void> {
   clearAllData,
   showLoginForm,
   showRegisterForm,
-  logout,
+  logout: handleLogout,
   // Rest Timer
   startRestTimer,
   pauseRestTimer,

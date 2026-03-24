@@ -80,6 +80,41 @@ app.put('/:id', async (c) => {
   return c.json(exercise);
 });
 
+// PATCH /api/exercises/:id/settings - Update exercise settings
+app.patch('/:id/settings', async (c) => {
+  const userId = c.get('userId');
+  const id = c.req.param('id');
+  const body = await c.req.json<{ settings: Record<string, string> | null }>();
+
+  // Validate settings: must be null or a plain object with string keys and string values
+  if (body.settings !== null && body.settings !== undefined) {
+    if (typeof body.settings !== 'object' || Array.isArray(body.settings)) {
+      return c.json({ error: 'Settings must be an object or null' }, 400);
+    }
+    const entries = Object.entries(body.settings);
+    if (entries.length > 20) {
+      return c.json({ error: 'Too many settings (max 20)' }, 400);
+    }
+    for (const [key, value] of entries) {
+      if (typeof key !== 'string' || typeof value !== 'string') {
+        return c.json({ error: 'Setting keys and values must be strings' }, 400);
+      }
+      if (key.length > 50) {
+        return c.json({ error: 'Setting key too long (max 50 chars)' }, 400);
+      }
+      if (value.length > 100) {
+        return c.json({ error: 'Setting value too long (max 100 chars)' }, 400);
+      }
+    }
+  }
+
+  const result = await queries.updateExerciseSettings(c.env.DB, id, userId, body.settings);
+  if (!result) {
+    return c.json({ error: 'Exercise not found' }, 404);
+  }
+  return c.json(result);
+});
+
 // DELETE /api/exercises/:id - Soft delete custom exercise
 app.delete('/:id', async (c) => {
   const userId = c.get('userId');

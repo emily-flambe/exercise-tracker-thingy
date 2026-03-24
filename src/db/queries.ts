@@ -20,6 +20,19 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+function parseSettings(raw: string | null | undefined): Record<string, string> | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Map old granular category values to coarse muscle groups for backward compatibility
 function mapToMuscleGroup(value: string): MuscleGroup {
   const mapping: Record<string, MuscleGroup> = {
@@ -311,6 +324,7 @@ export async function getAllCustomExercises(db: D1Database, userId: string): Pro
     muscle_group: (row.muscle_group || 'Other') as CustomExercise['muscle_group'],
     unit: row.unit as CustomExercise['unit'],
     created_at: row.created_at,
+    settings: parseSettings(row.settings),
   }));
 }
 
@@ -331,6 +345,7 @@ export async function getCustomExercise(db: D1Database, id: string, userId: stri
     muscle_group: (row.muscle_group || 'Other') as CustomExercise['muscle_group'],
     unit: row.unit as CustomExercise['unit'],
     created_at: row.created_at,
+    settings: parseSettings(row.settings),
   };
 }
 
@@ -426,7 +441,22 @@ export async function getDeletedCustomExercises(db: D1Database, userId: string):
     muscle_group: (row.muscle_group || 'Other') as CustomExercise['muscle_group'],
     unit: row.unit as CustomExercise['unit'],
     created_at: row.created_at,
+    settings: parseSettings(row.settings),
   }));
+}
+
+export async function updateExerciseSettings(db: D1Database, id: string, userId: string, settings: Record<string, string> | null): Promise<CustomExercise | null> {
+  const existing = await getCustomExercise(db, id, userId);
+  if (!existing) return null;
+
+  const settingsJson = settings && Object.keys(settings).length > 0 ? JSON.stringify(settings) : null;
+
+  await db
+    .prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+    .bind(settingsJson, id)
+    .run();
+
+  return getCustomExercise(db, id, userId);
 }
 
 // ==================== PERSONAL RECORDS ====================

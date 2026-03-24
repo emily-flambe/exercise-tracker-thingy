@@ -296,6 +296,7 @@ export function renderWorkout(): void {
     return;
   }
 
+  recalculateAllPRs();
   const exercises = state.currentWorkout.exercises;
   const exerciseCount = exercises.length;
 
@@ -464,7 +465,6 @@ export function toggleExerciseCompleted(index: number): void {
 export function toggleSetCompleted(exerciseIndex: number, setIndex: number): void {
   const set = state.currentWorkout!.exercises[exerciseIndex].sets[setIndex];
   set.completed = !set.completed;
-  recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
 }
@@ -472,7 +472,6 @@ export function toggleSetCompleted(exerciseIndex: number, setIndex: number): voi
 export function toggleSetMissed(exerciseIndex: number, setIndex: number): void {
   const set = state.currentWorkout!.exercises[exerciseIndex].sets[setIndex];
   set.missed = !set.missed;
-  recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
 }
@@ -513,7 +512,6 @@ export function saveSetInline(exerciseIndex: number): void {
   if (note) set.note = note;
 
   state.currentWorkout!.exercises[exerciseIndex].sets.push(set);
-  recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
 }
@@ -529,11 +527,9 @@ export function updateSet(exerciseIndex: number, setIndex: number, field: string
     renderWorkout();
   } else if (field === 'weight') {
     set.weight = parseFloat(value) || 0;
-    recalculateAllPRs();
     renderWorkout();
   } else if (field === 'reps') {
     set.reps = parseInt(value) || 0;
-    recalculateAllPRs();
     renderWorkout();
   }
   scheduleAutoSave();
@@ -541,7 +537,6 @@ export function updateSet(exerciseIndex: number, setIndex: number, field: string
 
 export function deleteSet(exerciseIndex: number, setIndex: number): void {
   state.currentWorkout!.exercises[exerciseIndex].sets.splice(setIndex, 1);
-  recalculateAllPRs();
   renderWorkout();
   scheduleAutoSave();
 }

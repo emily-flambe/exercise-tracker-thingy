@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS custom_exercises (
   created_at INTEGER NOT NULL,
   deleted INTEGER NOT NULL DEFAULT 0,
   deleted_at INTEGER,
+  settings TEXT,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

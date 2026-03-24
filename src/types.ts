@@ -25,6 +25,7 @@ export interface CustomExercise extends Exercise {
   id: string;
   user_id: string;
   created_at: number;
+  settings?: Record<string, string>;
 }
 
 // Set and Workout types
@@ -97,6 +98,7 @@ export interface CustomExerciseRow {
   created_at: number;
   deleted?: number;
   deleted_at?: number;
+  settings?: string | null;
 }
 
 export interface PersonalRecord {

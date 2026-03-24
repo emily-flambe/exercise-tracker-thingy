@@ -17,6 +17,7 @@ import {
   showExerciseNotes, hideExerciseNotes, saveExerciseNotes,
   renderWorkout, scheduleAutoSave, editWorkout, resetWorkoutState,
   refreshCurrentWorkout, startSyncPolling, stopSyncPolling,
+  editExerciseSetting, addExerciseSetting,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -34,6 +35,7 @@ import {
   renderExerciseCategories, toggleExerciseTabSort, toggleCategory, filterExercises,
   showCreateExercise, showEditExercise, hideEditExercise,
   saveExercise, deleteExercise, setExerciseUnit,
+  editExerciseSettingFromTab, addExerciseSettingFromTab, deleteExerciseSettingFromTab,
 } from './exercises-tab';
 import { renderPRsTab } from './prs-tab';
 
@@ -188,6 +190,11 @@ async function init(): Promise<void> {
   saveExercise,
   deleteExercise,
   setExerciseUnit,
+  editExerciseSetting,
+  addExerciseSetting,
+  editExerciseSettingFromTab,
+  addExerciseSettingFromTab,
+  deleteExerciseSettingFromTab,
   clearAllData,
   showLoginForm,
   showRegisterForm,

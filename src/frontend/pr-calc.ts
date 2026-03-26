@@ -1,5 +1,5 @@
 import { state } from './state';
-import { $, getExerciseUnit } from './helpers';
+import { $, getExerciseUnit, formatDate } from './helpers';
 
 export function calculateIsPR(exerciseName: string, weight: number, reps: number, exerciseIndex: number, setIndex: number): boolean {
   if (!state.currentWorkout) return false;
@@ -67,10 +67,71 @@ export function recalculateAllPRs(): void {
   }
 }
 
-export function showPRHistory(exerciseName: string): void {
-  const modal = $('pr-modal');
-  const title = $('pr-modal-title');
-  const content = $('pr-modal-content');
+// ==================== TAB STATE ====================
+let currentTab = 0;
+
+export function switchPRTab(index: number): void {
+  currentTab = index;
+  const slider = $('pr-modal-slider');
+  slider.style.transform = `translateX(-${index * 100}%)`;
+
+  // Update tab header styles
+  const tabPRs = $('pr-tab-prs');
+  const tabLast = $('pr-tab-last');
+
+  if (index === 0) {
+    tabPRs.className = 'flex-1 py-2 text-xs font-bold uppercase tracking-[0.15em] text-center border-b-2 border-swiss-red text-white';
+    tabLast.className = 'flex-1 py-2 text-xs font-bold uppercase tracking-[0.15em] text-center border-b-2 border-transparent text-swiss-text-secondary';
+  } else {
+    tabPRs.className = 'flex-1 py-2 text-xs font-bold uppercase tracking-[0.15em] text-center border-b-2 border-transparent text-swiss-text-secondary';
+    tabLast.className = 'flex-1 py-2 text-xs font-bold uppercase tracking-[0.15em] text-center border-b-2 border-swiss-red text-white';
+  }
+
+  // Update dot indicators
+  $('pr-dot-0').className = `w-2 h-2 rounded-full ${index === 0 ? 'bg-swiss-red' : 'bg-[#444]'}`;
+  $('pr-dot-1').className = `w-2 h-2 rounded-full ${index === 1 ? 'bg-swiss-red' : 'bg-[#444]'}`;
+}
+
+// ==================== SWIPE HANDLING ====================
+function initSwipe(): void {
+  const swipeContainer = $('pr-modal-swipe');
+  let startX = 0;
+  let startY = 0;
+  let isDragging = false;
+
+  swipeContainer.addEventListener('touchstart', (e: TouchEvent) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    isDragging = true;
+  }, { passive: true });
+
+  swipeContainer.addEventListener('touchmove', (_e: TouchEvent) => {
+    // We track but don't preventDefault to allow vertical scroll
+  }, { passive: true });
+
+  swipeContainer.addEventListener('touchend', (e: TouchEvent) => {
+    if (!isDragging) return;
+    isDragging = false;
+
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const diffX = endX - startX;
+    const diffY = endY - startY;
+
+    // Only trigger if horizontal movement exceeds vertical and threshold
+    if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+      if (diffX < 0 && currentTab === 0) {
+        switchPRTab(1);
+      } else if (diffX > 0 && currentTab === 1) {
+        switchPRTab(0);
+      }
+    }
+  }, { passive: true });
+}
+
+// ==================== PR TABLE RENDERING ====================
+function renderPRsPanel(exerciseName: string): void {
+  const panel = $('pr-panel-prs');
 
   const prs = state.allPRs
     .filter(pr => pr.exercise_name === exerciseName)
@@ -82,7 +143,6 @@ export function showPRHistory(exerciseName: string): void {
       if (exercise.name !== exerciseName) continue;
       for (const set of exercise.sets) {
         if (!set.isPR || set.missed === true || set.completed !== true) continue;
-        // Check if this PR already exists in server data (avoid duplicates)
         const alreadyRecorded = prs.some(pr =>
           pr.weight === set.weight && pr.reps === set.reps &&
           pr.workout_id === state.editingWorkoutId
@@ -103,10 +163,8 @@ export function showPRHistory(exerciseName: string): void {
     }
   }
 
-  title.textContent = `${exerciseName} PRs`;
-
   if (prs.length === 0) {
-    content.innerHTML = `
+    panel.innerHTML = `
       <div class="text-center text-[#888888] py-8">
         <p>No PRs recorded yet.</p>
         <p class="text-sm mt-2">PRs are tracked when you beat your best reps at a given weight.</p>
@@ -124,7 +182,7 @@ export function showPRHistory(exerciseName: string): void {
     const sortedWeights = [...prsByWeight.keys()].sort((a, b) => b - a);
     const unit = getExerciseUnit(exerciseName);
 
-    content.innerHTML = `
+    panel.innerHTML = `
       <table class="w-full text-sm font-mono">
         <thead>
           <tr class="text-[#888888] text-left text-xs uppercase tracking-wider">
@@ -152,6 +210,92 @@ export function showPRHistory(exerciseName: string): void {
         </tbody>
       </table>
     `;
+  }
+}
+
+// ==================== LAST WORKOUT RENDERING ====================
+function renderLastWorkoutPanel(exerciseName: string): void {
+  const panel = $('pr-panel-last');
+  const unit = getExerciseUnit(exerciseName);
+
+  // Find last workout containing this exercise, skipping the current one
+  let lastWorkout = null;
+  let lastExercise = null;
+
+  for (const workout of state.history) {
+    // Skip the workout currently being edited
+    if (state.editingWorkoutId && workout.id === state.editingWorkoutId) continue;
+    // Skip workouts at or after current workout start time
+    if (state.currentWorkout && workout.start_time >= state.currentWorkout.startTime) continue;
+
+    const ex = workout.exercises.find(e => e.name === exerciseName);
+    if (ex && ex.sets.length > 0) {
+      lastWorkout = workout;
+      lastExercise = ex;
+      break;
+    }
+  }
+
+  if (!lastWorkout || !lastExercise) {
+    panel.innerHTML = `
+      <div class="text-center text-[#888888] py-8">
+        <p>No previous workout found.</p>
+        <p class="text-sm mt-2">Complete a workout with this exercise to see history here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const dateStr = formatDate(lastWorkout.start_time);
+
+  panel.innerHTML = `
+    <div class="text-xs text-[#888888] uppercase tracking-wider mb-3">${dateStr}</div>
+    <table class="w-full text-sm font-mono">
+      <thead>
+        <tr class="text-[#888888] text-left text-xs uppercase tracking-wider">
+          <th class="pb-2">Set</th>
+          <th class="pb-2">Weight</th>
+          <th class="pb-2">Reps</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-[#2A2A2A]">
+        ${lastExercise.sets.map((set, i) => {
+          const missed = set.missed === true;
+          const rowClass = missed ? 'opacity-40 line-through' : '';
+          return `
+            <tr class="${rowClass}">
+              <td class="py-2">${i + 1}</td>
+              <td class="py-2 font-medium">${set.weight} ${unit}</td>
+              <td class="py-2">${set.reps}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ==================== MODAL SHOW/HIDE ====================
+let swipeInitialized = false;
+
+export function showPRHistory(exerciseName: string): void {
+  const modal = $('pr-modal');
+  const title = $('pr-modal-title');
+
+  title.textContent = exerciseName;
+
+  // Reset to first tab
+  currentTab = 0;
+  switchPRTab(0);
+
+  // Render both panels
+  renderPRsPanel(exerciseName);
+  renderLastWorkoutPanel(exerciseName);
+
+  // Initialize swipe once
+  if (!swipeInitialized) {
+    initSwipe();
+    swipeInitialized = true;
   }
 
   modal.classList.remove('hidden');

@@ -4,7 +4,7 @@ import { $, showToast } from './helpers';
 import { loadData } from './data';
 import { switchTab, onTabSwitch, showWorkoutScreen } from './nav';
 import { startRestTimer, pauseRestTimer, stopRestTimer } from './rest-timer';
-import { showPRHistory, hidePRHistory } from './pr-calc';
+import { showPRHistory, hidePRHistory, switchPRTab } from './pr-calc';
 import { showLoginForm, showRegisterForm, showAuthScreen, showMainApp, createAuthSubmitHandler, logout, getCurrentUser, setCurrentUser } from './auth';
 import {
   startWorkout,
@@ -161,6 +161,7 @@ async function init(): Promise<void> {
   toggleExerciseCompleted,
   showPRHistory,
   hidePRHistory,
+  switchPRTab,
   showExerciseNotes,
   hideExerciseNotes,
   saveExerciseNotes,

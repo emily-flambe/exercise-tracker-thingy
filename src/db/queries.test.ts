@@ -8,6 +8,10 @@ import {
   createCustomExercise,
   updateCustomExercise,
   getAllCustomExercises,
+  getCustomExercise,
+  getDeletedCustomExercises,
+  updateExerciseSettings,
+  deleteCustomExercise,
   getPRsForExercise,
   type UpdateWorkoutResult
 } from './queries';
@@ -1184,5 +1188,609 @@ describe('Optimistic Locking', () => {
     const result = await updateWorkout(env.DB, 'nonexistent-id', userId, updateData);
 
     expect(result.status).toBe('not_found');
+  });
+});
+
+describe('Exercise Settings', () => {
+  let userId: string;
+  const testUsername = 'testuser_settings';
+  const testPasswordHash = 'hash123';
+
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM users WHERE username = ?').bind(testUsername).run();
+    const user = await createUser(env.DB, testUsername, testPasswordHash);
+    userId = user.id;
+  });
+
+  // ==================== updateExerciseSettings basic ====================
+
+  it('should store and return valid settings', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, {
+      ankle: '3',
+      seat: '4',
+      back: '2',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.settings).toEqual({ ankle: '3', seat: '4', back: '2' });
+  });
+
+  it('should overwrite existing settings completely', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    await updateExerciseSettings(env.DB, exercise.id, userId, { ankle: '3', seat: '4' });
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, { pin: '7' });
+
+    expect(result).not.toBeNull();
+    expect(result!.settings).toEqual({ pin: '7' });
+    // Old keys should be gone
+    expect(result!.settings!['ankle']).toBeUndefined();
+    expect(result!.settings!['seat']).toBeUndefined();
+  });
+
+  it('should clear settings when passed null', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    await updateExerciseSettings(env.DB, exercise.id, userId, { ankle: '3' });
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, null);
+
+    expect(result).not.toBeNull();
+    expect(result!.settings).toBeUndefined();
+  });
+
+  it('should clear settings when passed an empty object', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    await updateExerciseSettings(env.DB, exercise.id, userId, { ankle: '3' });
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, {});
+
+    expect(result).not.toBeNull();
+    // Empty object should be stored as null (cleared)
+    expect(result!.settings).toBeUndefined();
+  });
+
+  it('should return null for non-existent exercise', async () => {
+    const result = await updateExerciseSettings(env.DB, 'nonexistent-id', userId, { ankle: '3' });
+    expect(result).toBeNull();
+  });
+
+  it('should return null for exercise belonging to different user', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const otherUser = await createUser(env.DB, 'testuser_settings_other', 'hash456');
+    const result = await updateExerciseSettings(env.DB, exercise.id, otherUser.id, { ankle: '3' });
+    expect(result).toBeNull();
+  });
+
+  // ==================== Settings in getAllCustomExercises ====================
+
+  it('should return settings in getAllCustomExercises', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    await updateExerciseSettings(env.DB, exercise.id, userId, { ankle: '3', seat: '4' });
+
+    const all = await getAllCustomExercises(env.DB, userId);
+    const found = all.find(e => e.id === exercise.id);
+
+    expect(found).toBeDefined();
+    expect(found!.settings).toEqual({ ankle: '3', seat: '4' });
+  });
+
+  it('should return undefined settings for exercises without settings in getAllCustomExercises', async () => {
+    await createCustomExercise(env.DB, userId, {
+      name: 'Bench Press',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    const all = await getAllCustomExercises(env.DB, userId);
+    expect(all.length).toBe(1);
+    expect(all[0].settings).toBeUndefined();
+  });
+
+  // ==================== Settings in getCustomExercise ====================
+
+  it('should return settings in getCustomExercise', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    await updateExerciseSettings(env.DB, exercise.id, userId, { pin: '5' });
+
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.settings).toEqual({ pin: '5' });
+  });
+
+  // ==================== Settings in getDeletedCustomExercises ====================
+
+  it('should preserve settings on soft-deleted exercises', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    await updateExerciseSettings(env.DB, exercise.id, userId, { ankle: '3' });
+    await deleteCustomExercise(env.DB, exercise.id, userId);
+
+    const deleted = await getDeletedCustomExercises(env.DB, userId);
+    const found = deleted.find(e => e.id === exercise.id);
+
+    expect(found).toBeDefined();
+    expect(found!.settings).toEqual({ ankle: '3' });
+  });
+
+  // ==================== Settings survive exercise rename ====================
+
+  it('should NOT wipe settings when exercise is renamed via updateCustomExercise', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Old Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    await updateExerciseSettings(env.DB, exercise.id, userId, { ankle: '3', seat: '4' });
+
+    // Rename via updateCustomExercise
+    const renamed = await updateCustomExercise(env.DB, exercise.id, userId, {
+      name: 'New Leg Press',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    expect(renamed).not.toBeNull();
+    expect(renamed!.name).toBe('New Leg Press');
+    // Settings should still be present
+    expect(renamed!.settings).toEqual({ ankle: '3', seat: '4' });
+  });
+
+  it('should NOT wipe settings when only type/category/unit changes', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Cable Row',
+      type: 'total',
+      category: 'Back',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    await updateExerciseSettings(env.DB, exercise.id, userId, { handle: 'V-bar', pin: '12' });
+
+    const updated = await updateCustomExercise(env.DB, exercise.id, userId, {
+      name: 'Cable Row',
+      type: '/side',
+      category: 'Back',
+      muscle_group: 'Upper',
+      unit: 'kg',
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated!.settings).toEqual({ handle: 'V-bar', pin: '12' });
+  });
+
+  // ==================== parseSettings edge cases (malformed JSON) ====================
+
+  it('should handle malformed JSON in settings column gracefully', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Test Exercise',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    // Directly inject malformed JSON into the database
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('NOT VALID JSON {{{', exercise.id)
+      .run();
+
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched).not.toBeNull();
+    // parseSettings should catch the JSON error and return undefined
+    expect(fetched!.settings).toBeUndefined();
+  });
+
+  it('should handle JSON array in settings column (not an object)', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Test Exercise Array',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    // Inject a valid JSON array (not an object)
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('["ankle", "seat"]', exercise.id)
+      .run();
+
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched).not.toBeNull();
+    // parseSettings rejects arrays, should return undefined
+    expect(fetched!.settings).toBeUndefined();
+  });
+
+  it('should handle JSON string primitive in settings column', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Test Exercise String',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    // Inject a JSON string primitive
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('"just a string"', exercise.id)
+      .run();
+
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched).not.toBeNull();
+    // parseSettings should reject non-object types
+    expect(fetched!.settings).toBeUndefined();
+  });
+
+  it('should handle JSON number in settings column', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Test Exercise Number',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('42', exercise.id)
+      .run();
+
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.settings).toBeUndefined();
+  });
+
+  it('should handle JSON null in settings column', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Test Exercise Null JSON',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('null', exercise.id)
+      .run();
+
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched).not.toBeNull();
+    // JSON.parse("null") returns null, which is falsy - parseSettings should return undefined
+    expect(fetched!.settings).toBeUndefined();
+  });
+
+  // ==================== Special characters in keys and values ====================
+
+  it('should handle special characters in setting keys and values', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Special Char Exercise',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const specialSettings = {
+      'key with spaces': 'value with spaces',
+      'key"with"quotes': 'value"with"quotes',
+      'key<with>angles': 'value<with>angles',
+      "key'apostrophe": "value'apostrophe",
+      'key/slash': 'value\\backslash',
+    };
+
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, specialSettings);
+    expect(result).not.toBeNull();
+    expect(result!.settings).toEqual(specialSettings);
+
+    // Verify roundtrip through getCustomExercise
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched!.settings).toEqual(specialSettings);
+  });
+
+  it('should handle unicode in setting keys and values', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Unicode Exercise',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const unicodeSettings = {
+      'position': 'hoch',
+      'einstellung': 'stufe 3',
+      'emoji_key': 'thumbs up',
+    };
+
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, unicodeSettings);
+    expect(result).not.toBeNull();
+    expect(result!.settings).toEqual(unicodeSettings);
+  });
+
+  it('should handle newlines and tabs in setting values', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Whitespace Exercise',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const settings = {
+      'notes': "line1\nline2\ttabbed",
+      'description': 'has\r\nwindows newlines',
+    };
+
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, settings);
+    expect(result).not.toBeNull();
+    expect(result!.settings).toEqual(settings);
+  });
+
+  // ==================== Very long keys/values ====================
+
+  it('should handle very long setting keys and values', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Long Settings Exercise',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const longKey = 'k'.repeat(1000);
+    const longValue = 'v'.repeat(10000);
+
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, {
+      [longKey]: longValue,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.settings![longKey]).toBe(longValue);
+  });
+
+  // ==================== Many settings (20+) ====================
+
+  it('should handle 20+ settings', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Many Settings Exercise',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const manySettings: Record<string, string> = {};
+    for (let i = 0; i < 30; i++) {
+      manySettings[`setting_${i}`] = `value_${i}`;
+    }
+
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, manySettings);
+
+    expect(result).not.toBeNull();
+    expect(Object.keys(result!.settings!).length).toBe(30);
+    expect(result!.settings).toEqual(manySettings);
+
+    // Verify roundtrip
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched!.settings).toEqual(manySettings);
+  });
+
+  // ==================== Empty string key/value ====================
+
+  it('should handle empty string as a setting value', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Empty Value Exercise',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, {
+      ankle: '',
+      seat: '4',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.settings).toEqual({ ankle: '', seat: '4' });
+  });
+
+  it('should handle empty string as a setting key', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Empty Key Exercise',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, {
+      '': 'some value',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.settings!['']).toBe('some value');
+  });
+
+  // ==================== createCustomExercise returns no settings ====================
+
+  it('should return undefined settings on freshly created exercise', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Fresh Exercise',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    // createCustomExercise doesn't set settings at all
+    expect(exercise.settings).toBeUndefined();
+
+    // Verify through getCustomExercise too
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched!.settings).toBeUndefined();
+  });
+
+  // ==================== Settings on deleted exercise cannot be updated ====================
+
+  it('should return null when updating settings on a soft-deleted exercise', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Deletable Exercise',
+      type: 'total',
+      category: 'Legs',
+      muscle_group: 'Lower',
+      unit: 'lbs',
+    });
+
+    await deleteCustomExercise(env.DB, exercise.id, userId);
+
+    // getCustomExercise filters out deleted exercises, so updateExerciseSettings should return null
+    const result = await updateExerciseSettings(env.DB, exercise.id, userId, { ankle: '3' });
+    expect(result).toBeNull();
+  });
+
+  // ==================== Settings with getAllCustomExercises malformed data ====================
+
+  it('should handle malformed JSON gracefully in getAllCustomExercises listing', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Malformed List Exercise',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    // Inject garbage JSON
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('{broken json', exercise.id)
+      .run();
+
+    // getAllCustomExercises should not crash, just return undefined for settings
+    const all = await getAllCustomExercises(env.DB, userId);
+    const found = all.find(e => e.id === exercise.id);
+    expect(found).toBeDefined();
+    expect(found!.settings).toBeUndefined();
+  });
+
+  it('should return empty object from parseSettings when DB contains "{}"', async () => {
+    // This tests a potential inconsistency: updateExerciseSettings stores {} as null,
+    // but if someone manually inserts '{}', parseSettings returns {} not undefined
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Empty Object Exercise',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('{}', exercise.id)
+      .run();
+
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched).not.toBeNull();
+    // parseSettings returns {} for '{}' -- this is a valid object, not undefined
+    // This means there's an asymmetry: updateExerciseSettings({}) -> null -> undefined
+    // but direct DB insert of '{}' -> {}
+    // This is arguably a bug or at least inconsistent behavior
+    expect(fetched!.settings).toEqual({});
+  });
+
+  it('should handle empty string in settings column', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Empty String Settings Exercise',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('', exercise.id)
+      .run();
+
+    const fetched = await getCustomExercise(env.DB, exercise.id, userId);
+    expect(fetched).not.toBeNull();
+    // Empty string is falsy, parseSettings returns undefined
+    expect(fetched!.settings).toBeUndefined();
+  });
+
+  it('should handle malformed JSON gracefully in getDeletedCustomExercises listing', async () => {
+    const exercise = await createCustomExercise(env.DB, userId, {
+      name: 'Malformed Deleted Exercise',
+      type: 'total',
+      category: 'Chest',
+      muscle_group: 'Upper',
+      unit: 'lbs',
+    });
+
+    // Inject garbage JSON then soft-delete
+    await env.DB.prepare('UPDATE custom_exercises SET settings = ? WHERE id = ?')
+      .bind('{nope}}}', exercise.id)
+      .run();
+    await deleteCustomExercise(env.DB, exercise.id, userId);
+
+    const deleted = await getDeletedCustomExercises(env.DB, userId);
+    const found = deleted.find(e => e.id === exercise.id);
+    expect(found).toBeDefined();
+    expect(found!.settings).toBeUndefined();
   });
 });

@@ -4,7 +4,7 @@ import { $, showToast } from './helpers';
 import { loadData } from './data';
 import { switchTab, onTabSwitch, showWorkoutScreen } from './nav';
 import { startRestTimer, pauseRestTimer, stopRestTimer } from './rest-timer';
-import { showPRHistory, hidePRHistory } from './pr-calc';
+import { showPRHistory, hidePRHistory, switchPRTab } from './pr-calc';
 import { showLoginForm, showRegisterForm, showAuthScreen, showMainApp, createAuthSubmitHandler, logout, getCurrentUser, setCurrentUser } from './auth';
 import {
   startWorkout,
@@ -17,6 +17,7 @@ import {
   showExerciseNotes, hideExerciseNotes, saveExerciseNotes,
   renderWorkout, scheduleAutoSave, editWorkout, resetWorkoutState,
   refreshCurrentWorkout, startSyncPolling, stopSyncPolling,
+  editExerciseSetting, addExerciseSetting,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -34,6 +35,7 @@ import {
   renderExerciseCategories, toggleExerciseTabSort, toggleCategory, filterExercises,
   showCreateExercise, showEditExercise, hideEditExercise,
   saveExercise, deleteExercise, setExerciseUnit,
+  editExerciseSettingFromTab, addExerciseSettingFromTab, deleteExerciseSettingFromTab,
 } from './exercises-tab';
 import { renderPRsTab } from './prs-tab';
 
@@ -159,6 +161,7 @@ async function init(): Promise<void> {
   toggleExerciseCompleted,
   showPRHistory,
   hidePRHistory,
+  switchPRTab,
   showExerciseNotes,
   hideExerciseNotes,
   saveExerciseNotes,
@@ -188,6 +191,11 @@ async function init(): Promise<void> {
   saveExercise,
   deleteExercise,
   setExerciseUnit,
+  editExerciseSetting,
+  addExerciseSetting,
+  editExerciseSettingFromTab,
+  addExerciseSettingFromTab,
+  deleteExerciseSettingFromTab,
   clearAllData,
   showLoginForm,
   showRegisterForm,

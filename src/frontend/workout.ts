@@ -4,7 +4,7 @@ import type { Workout, Set as WorkoutSet } from './api';
 import type { MuscleGroup } from './api';
 import type { CreateWorkoutRequest } from '../types';
 import { state, ALL_MUSCLE_GROUPS } from './state';
-import { $, formatDate, getAllExercises, getTypeColor, getTypeLabel } from './helpers';
+import { $, escapeHtml, formatDate, getAllExercises, getTypeColor, getTypeLabel, showToast } from './helpers';
 import { loadData } from './data';
 import { showWorkoutScreen } from './nav';
 import { recalculateAllPRs } from './pr-calc';
@@ -385,8 +385,9 @@ export function renderWorkout(): void {
               ${checkmarkIcon}
             </button>
             <div>
-              <span class="font-bold ${isCompleted ? 'text-[#888888] line-through' : ''}">${ex.name}</span>
+              <span class="font-bold ${isCompleted ? 'text-[#888888] line-through' : ''}">${escapeHtml(ex.name)}</span>
               <div class="text-xs ${getTypeColor(exercise.type)}">${getTypeLabel(exercise.type)}</div>
+              ${renderExerciseSettings(ex.name)}
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -704,6 +705,77 @@ async function syncPoll(): Promise<void> {
   } finally {
     isSyncPolling = false;
   }
+}
+
+// ==================== EXERCISE SETTINGS ====================
+function renderExerciseSettings(exerciseName: string): string {
+  const customEx = state.customExercises.find(ce => ce.name === exerciseName);
+  if (!customEx) return '';
+
+  const settings = customEx.settings || {};
+  const entries = Object.entries(settings);
+
+  return `
+    <div class="flex flex-wrap gap-1 mt-1 items-center">
+      ${entries.map(([key, value]) => `
+        <span class="inline-flex items-center gap-1 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-0.5 text-xs text-[#888888] cursor-pointer" data-exercise-id="${escapeHtml(customEx.id)}" data-setting-key="${escapeHtml(key)}" data-setting-value="${escapeHtml(value)}" onclick="app.editExerciseSetting(this.dataset.exerciseId, this.dataset.settingKey, this.dataset.settingValue)">
+          <span>${escapeHtml(key)}:</span>
+          <span class="text-white">${escapeHtml(value)}</span>
+        </span>
+      `).join('')}
+      <button data-exercise-id="${escapeHtml(customEx.id)}" onclick="app.addExerciseSetting(this.dataset.exerciseId)" class="text-[#888888] hover:text-[#FF0000] text-xs px-1 transition-colors">+ setting</button>
+    </div>
+  `;
+}
+
+export function editExerciseSetting(exerciseId: string, key: string, currentValue: string): void {
+  const newValue = prompt(`${key}:`, currentValue);
+  if (newValue === null) return; // cancelled
+
+  const customEx = state.customExercises.find(ce => ce.id === exerciseId);
+  if (!customEx) return;
+
+  const settings = { ...(customEx.settings || {}) };
+
+  if (newValue === '') {
+    // Empty value = delete this setting
+    delete settings[key];
+  } else {
+    settings[key] = newValue;
+  }
+
+  // Update local state immediately for responsiveness
+  customEx.settings = Object.keys(settings).length > 0 ? settings : undefined;
+  renderWorkout();
+
+  // Persist to server
+  const settingsToSend = Object.keys(settings).length > 0 ? settings : null;
+  api.updateExerciseSettings(exerciseId, settingsToSend).catch(err => {
+    console.error('Failed to save exercise settings:', err);
+    showToast('Failed to save setting');
+  });
+}
+
+export function addExerciseSetting(exerciseId: string): void {
+  const key = prompt('Setting name (e.g., seat, ankle, lever):');
+  if (!key || !key.trim()) return;
+
+  const value = prompt(`${key.trim()}:`);
+  if (value === null || !value.trim()) return;
+
+  const customEx = state.customExercises.find(ce => ce.id === exerciseId);
+  if (!customEx) return;
+
+  const settings = { ...(customEx.settings || {}) };
+  settings[key.trim()] = value.trim();
+
+  customEx.settings = settings;
+  renderWorkout();
+
+  api.updateExerciseSettings(exerciseId, settings).catch(err => {
+    console.error('Failed to save exercise settings:', err);
+    showToast('Failed to save setting');
+  });
 }
 
 // ==================== RESET HELPERS ====================

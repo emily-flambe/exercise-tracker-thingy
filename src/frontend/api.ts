@@ -161,6 +161,7 @@ export interface CustomExercise {
   muscle_group: MuscleGroup;
   unit: 'lbs' | 'kg';
   created_at: number;
+  settings?: Record<string, string>;
 }
 
 // Workout API
@@ -256,6 +257,14 @@ export async function updateCustomExercise(id: string, data: {
 export async function deleteCustomExercise(id: string): Promise<void> {
   await apiFetch(`/exercises/${id}`, { method: 'DELETE' });
 }
+
+export async function updateExerciseSettings(id: string, settings: Record<string, string> | null): Promise<CustomExercise> {
+  return apiFetch<CustomExercise>(`/exercises/${id}/settings`, {
+    method: 'PATCH',
+    body: JSON.stringify({ settings }),
+  });
+}
+
 
 // PR API
 export async function getAllPRs(): Promise<PersonalRecord[]> {

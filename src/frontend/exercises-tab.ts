@@ -1,7 +1,7 @@
 import * as api from './api';
 import { state, mainCategories } from './state';
 import type { Exercise } from './state';
-import { $, $input, $select, formatDate, getAllExercises, getTypeColor, getTypeLabel, getLastLoggedDate } from './helpers';
+import { $, $input, $select, escapeHtml, formatDate, getAllExercises, getTypeColor, getTypeLabel, getLastLoggedDate, showToast } from './helpers';
 import { loadData } from './data';
 import { renderWorkout } from './workout';
 
@@ -197,6 +197,9 @@ export function showEditExercise(exerciseName: string): void {
 
   setExerciseUnit(exercise.unit);
 
+  // Render settings section
+  renderExerciseSettingsInEditView(customExercise || null);
+
   const recentSets = getRecentSetsForExercise(exerciseName, 10);
   const exercisePRs = state.allPRs.filter(pr => pr.exercise_name === exerciseName);
   const historyList = $('exercise-history-list');
@@ -356,6 +359,115 @@ function renderWeightChart(data: Array<{ date: number; maxWeight: number }>, uni
   `;
 
   container.innerHTML = svg;
+}
+
+// ==================== EXERCISE SETTINGS (EDIT VIEW) ====================
+function renderExerciseSettingsInEditView(customExercise: api.CustomExercise | null): void {
+  let container = document.getElementById('exercise-settings-section');
+  if (!container) {
+    // Create the container if it doesn't exist yet - insert before history section
+    const historySection = document.getElementById('exercise-history-section');
+    if (!historySection) return;
+    container = document.createElement('div');
+    container.id = 'exercise-settings-section';
+    historySection.parentNode!.insertBefore(container, historySection);
+  }
+
+  if (!customExercise) {
+    container.innerHTML = '';
+    container.classList.add('hidden');
+    return;
+  }
+
+  const settings = customExercise.settings || {};
+  const entries = Object.entries(settings);
+
+  container.classList.remove('hidden');
+  container.className = 'mt-6 pt-6 border-t border-[#2A2A2A]';
+  container.id = 'exercise-settings-section';
+
+  container.innerHTML = `
+    <div class="text-xs text-[#888888] mb-3 uppercase tracking-wider font-bold">Machine Settings</div>
+    <div class="space-y-2">
+      ${entries.map(([key, value]) => `
+        <div class="flex items-center justify-between bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-3 py-2">
+          <div class="flex items-center gap-2">
+            <span class="text-[#888888] text-sm">${escapeHtml(key)}:</span>
+            <span class="text-white text-sm">${escapeHtml(value)}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button data-exercise-id="${escapeHtml(customExercise.id)}" data-setting-key="${escapeHtml(key)}" data-setting-value="${escapeHtml(value)}" onclick="app.editExerciseSettingFromTab(this.dataset.exerciseId, this.dataset.settingKey, this.dataset.settingValue)" class="text-[#888888] hover:text-white text-xs transition-colors">edit</button>
+            <button data-exercise-id="${escapeHtml(customExercise.id)}" data-setting-key="${escapeHtml(key)}" onclick="app.deleteExerciseSettingFromTab(this.dataset.exerciseId, this.dataset.settingKey)" class="text-[#FF0000] hover:opacity-80 text-xs transition-colors">x</button>
+          </div>
+        </div>
+      `).join('')}
+      <button data-exercise-id="${escapeHtml(customExercise.id)}" onclick="app.addExerciseSettingFromTab(this.dataset.exerciseId)" class="text-[#FF0000] text-sm uppercase tracking-wider font-bold mt-2">+ Add Setting</button>
+    </div>
+  `;
+}
+
+export function editExerciseSettingFromTab(exerciseId: string, key: string, currentValue: string): void {
+  const newValue = prompt(`${key}:`, currentValue);
+  if (newValue === null) return;
+
+  const customEx = state.customExercises.find(ce => ce.id === exerciseId);
+  if (!customEx) return;
+
+  const settings = { ...(customEx.settings || {}) };
+
+  if (newValue === '') {
+    delete settings[key];
+  } else {
+    settings[key] = newValue;
+  }
+
+  customEx.settings = Object.keys(settings).length > 0 ? settings : undefined;
+  renderExerciseSettingsInEditView(customEx);
+
+  const settingsToSend = Object.keys(settings).length > 0 ? settings : null;
+  api.updateExerciseSettings(exerciseId, settingsToSend).catch(err => {
+    console.error('Failed to save exercise settings:', err);
+    showToast('Failed to save setting');
+  });
+}
+
+export function addExerciseSettingFromTab(exerciseId: string): void {
+  const key = prompt('Setting name (e.g., seat, ankle, lever):');
+  if (!key || !key.trim()) return;
+
+  const value = prompt(`${key.trim()}:`);
+  if (value === null || !value.trim()) return;
+
+  const customEx = state.customExercises.find(ce => ce.id === exerciseId);
+  if (!customEx) return;
+
+  const settings = { ...(customEx.settings || {}) };
+  settings[key.trim()] = value.trim();
+
+  customEx.settings = settings;
+  renderExerciseSettingsInEditView(customEx);
+
+  api.updateExerciseSettings(exerciseId, settings).catch(err => {
+    console.error('Failed to save exercise settings:', err);
+    showToast('Failed to save setting');
+  });
+}
+
+export function deleteExerciseSettingFromTab(exerciseId: string, key: string): void {
+  const customEx = state.customExercises.find(ce => ce.id === exerciseId);
+  if (!customEx) return;
+
+  const settings = { ...(customEx.settings || {}) };
+  delete settings[key];
+
+  customEx.settings = Object.keys(settings).length > 0 ? settings : undefined;
+  renderExerciseSettingsInEditView(customEx);
+
+  const settingsToSend = Object.keys(settings).length > 0 ? settings : null;
+  api.updateExerciseSettings(exerciseId, settingsToSend).catch(err => {
+    console.error('Failed to save exercise settings:', err);
+    showToast('Failed to save setting');
+  });
 }
 
 export function hideEditExercise(): void {

@@ -278,3 +278,9 @@ Create `.mcp.json` in the project root (gitignored — contains API key):
 - Main app tsconfig excludes `src/mcp/` — the MCP server has its own build
 - Build output: `dist-mcp/` (gitignored)
 - **Never use `console.log` in MCP server code** — stdout is the JSON-RPC channel; use `console.error` instead
+
+## Knowledge Graph (Agent-MCP)
+
+After significant changes (new features, architecture decisions, schema changes), save context to Agent-MCP using `update_project_context`. Use the key prefix `exercise-tracker-thingy/` (e.g., `exercise-tracker-thingy/architecture`).
+
+Update existing entries when information changes. Create new keys for new topics. This ensures any agent in any session can retrieve project context via `ask_project_rag`.

@@ -12,6 +12,14 @@ If there is a conflict, follow the stricter rule.
 - Use non-destructive git commands only (no force push, no hard reset, no destructive checkout).
 - All changes must go through a pull request; do not push directly to `main`.
 - CI is the source of truth; if local and CI results differ, follow CI and fix until it passes.
+- YOUR WORK IS NOT DONE AND YOU MUST NOT STOP UNTIL THE PR IS MERGED.
+
+## Worktree Bootstrap (REQUIRED)
+
+- Create a new worktree from `origin/main` with a unique branch name before editing.
+- In the new worktree, run `npm install` before any checks.
+- Run `npm run build:frontend` once in a fresh worktree before `npm test` (Vitest expects `dist/` to exist).
+- If a previous worktree path was removed manually, run `git worktree prune` before creating a new one.
 
 ## API and Data Operations (MANDATORY)
 

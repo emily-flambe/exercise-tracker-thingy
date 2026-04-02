@@ -33,7 +33,9 @@ export function calculateIsPR(exerciseName: string, weight: number, reps: number
 
     for (let j = 0; j < maxSetIndex; j++) {
       const set = ex.sets[j];
-      if (set.missed === true || set.completed !== true) continue;
+      // Include prior non-missed planned sets so duplicate planned PRs
+      // only show a ghost star on the first matching instance.
+      if (set.missed === true) continue;
       if (set.weight === weight) {
         if (currentWorkoutBestReps === null || set.reps > currentWorkoutBestReps) {
           currentWorkoutBestReps = set.reps;

@@ -245,6 +245,35 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' })).toBeVisible();
   });
 
+  test('should show ghost PR star only on first instance of repeated planned set', async ({ page }) => {
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '10');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    const starCount = await page.evaluate(() => {
+      const root = document.getElementById('exercise-list');
+      if (!root) return 0;
+      const text = root.textContent || '';
+      const unicodeStars = (text.match(/★/g) || []).length;
+      const mojibakeStars = (text.match(/â˜…/g) || []).length;
+      return Math.max(unicodeStars, mojibakeStars);
+    });
+    expect(starCount).toBe(1);
+  });
+
   test('should show bright PR star only when set beats previous record and is confirmed', async ({ page, request }) => {
     // Create first workout via API with confirmed set
     await createWorkoutViaApi(request, setup.token, {

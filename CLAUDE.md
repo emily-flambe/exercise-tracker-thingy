@@ -12,12 +12,30 @@ git worktree add ../exercise-tracker-<feature-name> -b claude/<feature-name> ori
 # Work in the worktree
 cd ../exercise-tracker-<feature-name>
 npm install
+npm run build:frontend
 
 # When done, clean up
 git worktree remove ../exercise-tracker-<feature-name>
 ```
 
 Worktree naming: `../exercise-tracker-<descriptive-name>` (e.g., `../exercise-tracker-add-rest-timer`)
+
+If setup fails due to stale metadata or existing branch/path:
+
+```bash
+# Clean stale worktree metadata (safe, non-destructive)
+git worktree prune
+
+# If branch already exists, reuse it without -b
+git worktree add ../exercise-tracker-<feature-name> claude/<feature-name>
+```
+
+Fresh worktree bootstrap checklist:
+1. `git fetch origin`
+2. `git worktree add ../exercise-tracker-<feature-name> -b claude/<feature-name> origin/main`
+3. `cd ../exercise-tracker-<feature-name>`
+4. `npm install`
+5. `npm run build:frontend` (required before `npm test` in a fresh worktree)
 
 ## Project Overview
 

@@ -332,9 +332,9 @@ export function renderWorkout(): void {
                   ${setCheckmarkIcon}
                 </button>
                 <span class="w-6 text-[#888888] text-xs font-mono ${isSetCompleted ? 'line-through' : ''}">${si + 1}</span>
-                <input type="number" value="${set.weight}" onchange="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-1 text-center text-sm font-mono focus:outline-none focus:border-[#FF0000] text-white ${isSetCompleted ? 'opacity-50' : ''}">
+                <input type="number" value="${set.weight}" oninput="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-1 text-center text-sm font-mono focus:outline-none focus:border-[#FF0000] text-white ${isSetCompleted ? 'opacity-50' : ''}">
                 <span class="text-[#888888] ${isSetCompleted ? 'line-through' : ''}">x</span>
-                <input type="number" value="${set.reps}" onchange="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-1 text-center text-sm font-mono focus:outline-none focus:border-[#FF0000] text-white ${isSetCompleted ? 'opacity-50' : ''}">
+                <input type="number" value="${set.reps}" oninput="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-1 text-center text-sm font-mono focus:outline-none focus:border-[#FF0000] text-white ${isSetCompleted ? 'opacity-50' : ''}">
                 ${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-[#FFD700] text-lg">★</span>' : '<span class="text-[#FFD700] text-lg opacity-40">★</span>') : ''}
                 <button onclick="app.toggleSetMissed(${i}, ${si})" class="flex-shrink-0 hover:opacity-80 transition-opacity" title="${isSetMissed ? 'Mark as not missed' : 'Mark as missed'}">
                   ${missIcon}
@@ -528,10 +528,8 @@ export function updateSet(exerciseIndex: number, setIndex: number, field: string
     renderWorkout();
   } else if (field === 'weight') {
     set.weight = parseFloat(value) || 0;
-    renderWorkout();
   } else if (field === 'reps') {
     set.reps = parseInt(value) || 0;
-    renderWorkout();
   }
   scheduleAutoSave();
 }
@@ -678,7 +676,9 @@ function handleVisibilityChange(): void {
 }
 
 async function syncPoll(): Promise<void> {
-  if (!state.editingWorkoutId || autoSaveTimeout !== null || isAutoSaving || isSyncPolling) {
+  const activeEl = document.activeElement;
+  const isUserEditing = activeEl instanceof HTMLInputElement && activeEl.closest('#current-workout');
+  if (!state.editingWorkoutId || autoSaveTimeout !== null || isAutoSaving || isSyncPolling || isUserEditing) {
     return;
   }
 

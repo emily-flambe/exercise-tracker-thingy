@@ -1,25 +1,15 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import {
   setupTestUserWithExercises,
   registerUserViaApi,
   createExerciseViaApi,
   createWorkoutViaApi,
   authenticatePage,
+  startWorkoutWithExercise,
+  addSet,
+  addExerciseToWorkout,
   TestSetup,
 } from './helpers';
-
-// Helper function to create a custom exercise via the UI (only needed for tests that test this flow)
-async function createExerciseViaUI(page: Page, name: string, type: string, category: string, muscleGroup: string) {
-  await page.getByRole('button', { name: 'Exercises' }).click();
-  await page.getByRole('button', { name: '+ New' }).click();
-  await page.fill('#exercise-name-input', name);
-  await page.selectOption('#exercise-category-input', category);
-  await page.selectOption('#exercise-muscle-group-input', muscleGroup);
-  await page.locator(`input[name="weight-type"][value="${type}"]`).click();
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.locator('#exercises-list-view')).toBeVisible({ timeout: 10000 });
-  await page.getByRole('button', { name: 'Workout' }).click();
-}
 
 test.describe('Workout Tracker', () => {
   let setup: TestSetup;
@@ -51,12 +41,7 @@ test.describe('Workout Tracker', () => {
   });
 
   test('should add an exercise to workout', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
     await expect(page.locator('#exercise-list').getByText('+bar weight')).toBeVisible();
   });
@@ -87,13 +72,7 @@ test.describe('Workout Tracker', () => {
   });
 
   test('should gray out exercises already in workout in category view', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
 
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
 
@@ -117,13 +96,7 @@ test.describe('Workout Tracker', () => {
     await page.reload();
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
 
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
 
@@ -144,50 +117,23 @@ test.describe('Workout Tracker', () => {
   });
 
   test('should add a set to an exercise', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '10');
 
     await expect(page.locator('input[type="number"]').first()).toHaveValue('135');
   });
 
   test('should show pencil icon for notes', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '10');
 
     await expect(page.locator('button[title="Add note"]').first()).toBeVisible();
     await expect(page.locator('input[placeholder="note"]').first()).not.toBeVisible();
   });
 
   test('should expand notes field when pencil icon is clicked', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '10');
 
     await page.locator('button[title="Add note"]').first().click();
 
@@ -195,17 +141,8 @@ test.describe('Workout Tracker', () => {
   });
 
   test('should save note and show edit button', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '10');
 
     await page.locator('button[title="Add note"]').first().click();
     const noteField = page.locator('input[placeholder="note"]').first();
@@ -216,17 +153,8 @@ test.describe('Workout Tracker', () => {
   });
 
   test('should show faded PR star when unconfirmed and bright when confirmed', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '10');
 
     // Unconfirmed set should show faded PR star (opacity-40)
     const fadedStar = page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' });
@@ -246,22 +174,9 @@ test.describe('Workout Tracker', () => {
   });
 
   test('should show ghost PR star only on first instance of repeated planned set', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '10');
+    await addSet(page, '135', '10');
 
     const starCount = await page.evaluate(() => {
       const root = document.getElementById('exercise-list');
@@ -289,17 +204,8 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     // Start second workout
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '10');
 
     // Unconfirmed set that beats previous record should show faded PR star (opacity-40)
     const fadedStar = page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' });
@@ -327,18 +233,10 @@ test.describe('Workout Tracker', () => {
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     // Start a new workout and add Bench Press
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
 
     // Add a set with NON-PR values (135x5 — same weight but fewer reps than the 135x8 baseline)
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '5');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await addSet(page, '135', '5');
 
     // Verify no PR star appears for the non-PR set (5 reps does not beat 8 reps at 135)
     const stars = page.locator('#exercise-list span.text-\\[\\#FFD700\\]').filter({ hasText: '★' });
@@ -593,17 +491,8 @@ test.describe('Exercise Rename During Active Workout', () => {
   });
 
   test('should update current workout when exercise is renamed', async ({ page }) => {
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '10');
 
     await expect(page.locator('#exercise-list').getByText('Bench Press')).toBeVisible();
 
@@ -637,17 +526,8 @@ test.describe('Exercise Rename During Active Workout', () => {
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
 
     // Start second workout
-    await page.getByRole('button', { name: 'Start Workout' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
-    await page.getByRole('button', { name: '+ Add Exercise' }).click();
-    await page.fill('#add-exercise-search', 'Bench Press');
-    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
-    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
-
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '8');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await startWorkoutWithExercise(page, 'Bench Press');
+    await addSet(page, '135', '8');
 
     const prStars = page.locator('#exercise-list span').filter({ hasText: '★' });
     await expect(prStars).toHaveCount(0);
@@ -670,10 +550,7 @@ test.describe('Exercise Rename During Active Workout', () => {
     // Now add a set that DOES beat the record (10 reps vs previous 8)
     // Server-side rename propagated to historical workouts, so "Barbell Bench Press"
     // now has history of 135x8. Only the new set (10 reps) beats it.
-    await page.getByRole('button', { name: '+ Add set' }).click();
-    await page.fill('input[placeholder="wt"]', '135');
-    await page.fill('input[placeholder="reps"]', '10');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await addSet(page, '135', '10');
 
     // Only the second set (10 reps) should show a faded PR star — the first set
     // (8 reps) ties the renamed history record and is NOT a PR (8 > 8 is false)

@@ -335,7 +335,7 @@ export function renderWorkout(): void {
                 <input type="number" value="${set.weight}" oninput="app.updateSet(${i}, ${si}, 'weight', this.value)" class="w-16 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-1 text-center text-sm font-mono focus:outline-none focus:border-[#FF0000] text-white ${isSetCompleted ? 'opacity-50' : ''}">
                 <span class="text-[#888888] ${isSetCompleted ? 'line-through' : ''}">x</span>
                 <input type="number" value="${set.reps}" oninput="app.updateSet(${i}, ${si}, 'reps', this.value)" class="w-14 bg-[#1A1A1A] border border-[#2A2A2A] rounded-sm px-2 py-1 text-center text-sm font-mono focus:outline-none focus:border-[#FF0000] text-white ${isSetCompleted ? 'opacity-50' : ''}">
-                ${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-[#FFD700] text-lg">★</span>' : '<span class="text-[#FFD700] text-lg opacity-40">★</span>') : ''}
+                <span id="star-${i}-${si}">${set.isPR ? (set.completed && !isSetMissed ? '<span class="text-[#FFD700] text-lg">★</span>' : '<span class="text-[#FFD700] text-lg opacity-40">★</span>') : ''}</span>
                 <button onclick="app.toggleSetMissed(${i}, ${si})" class="flex-shrink-0 hover:opacity-80 transition-opacity" title="${isSetMissed ? 'Mark as not missed' : 'Mark as missed'}">
                   ${missIcon}
                 </button>
@@ -531,7 +531,34 @@ export function updateSet(exerciseIndex: number, setIndex: number, field: string
   } else if (field === 'reps') {
     set.reps = parseInt(value) || 0;
   }
+  if (field === 'weight' || field === 'reps') {
+    recalculateAllPRs();
+    updateStarIndicators();
+  }
   scheduleAutoSave();
+}
+
+// star-{i}-{si} IDs use array indices, which is safe because any set
+// reordering (add/remove/splice) triggers a full renderWorkout() re-render.
+function updateStarIndicators(): void {
+  if (!state.currentWorkout) return;
+  const exercises = state.currentWorkout.exercises;
+  for (let i = 0; i < exercises.length; i++) {
+    const ex = exercises[i];
+    for (let si = 0; si < ex.sets.length; si++) {
+      const set = ex.sets[si];
+      const starEl = document.getElementById('star-' + i + '-' + si);
+      if (!starEl) continue;
+      const isSetMissed = set.missed || false;
+      if (set.isPR) {
+        starEl.innerHTML = set.completed && !isSetMissed
+          ? '<span class="text-[#FFD700] text-lg">★</span>'
+          : '<span class="text-[#FFD700] text-lg opacity-40">★</span>';
+      } else {
+        starEl.innerHTML = '';
+      }
+    }
+  }
 }
 
 export function deleteSet(exerciseIndex: number, setIndex: number): void {

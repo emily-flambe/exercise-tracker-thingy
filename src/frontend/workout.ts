@@ -538,6 +538,8 @@ export function updateSet(exerciseIndex: number, setIndex: number, field: string
   scheduleAutoSave();
 }
 
+// star-{i}-{si} IDs use array indices, which is safe because any set
+// reordering (add/remove/splice) triggers a full renderWorkout() re-render.
 function updateStarIndicators(): void {
   if (!state.currentWorkout) return;
   const exercises = state.currentWorkout.exercises;
@@ -550,8 +552,8 @@ function updateStarIndicators(): void {
       const isSetMissed = set.missed || false;
       if (set.isPR) {
         starEl.innerHTML = set.completed && !isSetMissed
-          ? '<span class="text-[#FFD700] text-lg">\u2605</span>'
-          : '<span class="text-[#FFD700] text-lg opacity-40">\u2605</span>';
+          ? '<span class="text-[#FFD700] text-lg">★</span>'
+          : '<span class="text-[#FFD700] text-lg opacity-40">★</span>';
       } else {
         starEl.innerHTML = '';
       }

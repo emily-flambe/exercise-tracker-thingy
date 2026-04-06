@@ -312,6 +312,47 @@ test.describe('Workout Tracker', () => {
     await expect(brightStar).toBeVisible();
     await expect(page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' })).toHaveCount(0);
   });
+
+  test('should show PR star immediately when editing weight/reps on a planned set', async ({ page, request }) => {
+    // Create prior workout history with a known benchmark (Bench Press 135x8)
+    await createWorkoutViaApi(request, setup.token, {
+      start_time: Date.now() - 86400000,
+      end_time: Date.now() - 86400000 + 3600000,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ weight: 135, reps: 8, completed: true }],
+      }],
+    });
+    await page.reload();
+    await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
+
+    // Start a new workout and add Bench Press
+    await page.getByRole('button', { name: 'Start Workout' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
+    await page.getByRole('button', { name: '+ Add Exercise' }).click();
+    await page.fill('#add-exercise-search', 'Bench Press');
+    await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+    await page.locator('#add-exercise-search-results').getByText('Bench Press', { exact: true }).click();
+
+    // Add a set with NON-PR values (135x5 — same weight but fewer reps than the 135x8 baseline)
+    await page.getByRole('button', { name: '+ Add set' }).click();
+    await page.fill('input[placeholder="wt"]', '135');
+    await page.fill('input[placeholder="reps"]', '5');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Verify no PR star appears for the non-PR set (5 reps does not beat 8 reps at 135)
+    const stars = page.locator('#exercise-list span.text-\\[\\#FFD700\\]').filter({ hasText: '★' });
+    await expect(stars).toHaveCount(0);
+
+    // Edit the reps inline to beat the baseline (10 > 8 at the same weight 135)
+    const repsInput = page.locator('#exercise-list input[type="number"].w-14').first();
+    await repsInput.fill('10');
+
+    // Key assertion: a faded PR star should appear immediately after editing,
+    // without toggling failed/completed. This is the regression test for PR #96.
+    const fadedStar = page.locator('span.text-\\[\\#FFD700\\].opacity-40').filter({ hasText: '★' });
+    await expect(fadedStar).toBeVisible({ timeout: 5000 });
+  });
 });
 
 test.describe('Calendar View', () => {

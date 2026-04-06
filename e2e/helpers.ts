@@ -1,4 +1,4 @@
-import { APIRequestContext, Page } from '@playwright/test';
+import { APIRequestContext, Page, expect } from '@playwright/test';
 
 const TEST_PASSWORD = 'testpass123';
 
@@ -81,4 +81,36 @@ export async function authenticatePage(page: Page, token: string) {
   await page.goto('/');
   await page.evaluate((t) => localStorage.setItem('workout_auth_token', t), token);
   await page.reload();
+}
+
+/**
+ * Start a workout and add one exercise by name (searches and selects it).
+ */
+export async function startWorkoutWithExercise(page: Page, exerciseName: string) {
+  await page.getByRole('button', { name: 'Start Workout' }).click();
+  await page.getByRole('button', { name: 'Skip' }).click();
+  await page.getByRole('button', { name: '+ Add Exercise' }).click();
+  await page.fill('#add-exercise-search', exerciseName);
+  await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+  await page.locator('#add-exercise-search-results').getByText(exerciseName, { exact: true }).click();
+}
+
+/**
+ * Add a set with the given weight and reps (clicks "+ Add set", fills, saves).
+ */
+export async function addSet(page: Page, weight: string, reps: string) {
+  await page.getByRole('button', { name: '+ Add set' }).click();
+  await page.fill('input[placeholder="wt"]', weight);
+  await page.fill('input[placeholder="reps"]', reps);
+  await page.getByRole('button', { name: 'Save' }).click();
+}
+
+/**
+ * Add another exercise to an already-started workout (searches and selects it).
+ */
+export async function addExerciseToWorkout(page: Page, exerciseName: string) {
+  await page.getByRole('button', { name: '+ Add Exercise' }).click();
+  await page.fill('#add-exercise-search', exerciseName);
+  await expect(page.locator('#add-exercise-search-results')).toBeVisible();
+  await page.locator('#add-exercise-search-results').getByText(exerciseName, { exact: true }).click();
 }

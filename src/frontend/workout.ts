@@ -258,24 +258,22 @@ function mergeServerWorkout(serverWorkout: Workout): void {
   const localExercises = state.currentWorkout.exercises;
   const serverExercises = serverWorkout.exercises;
 
-  // Build merged exercise list (server-biased)
+  // Build merged exercise list (local-biased: local list is authoritative
+  // for which exercises exist, so user deletions are preserved)
   const merged = [];
 
-  // Start with server exercises (preserves server ordering and data)
-  for (const serverEx of serverExercises) {
-    const localEx = localExercises.find(le => le.name === serverEx.name);
-    const mergedEx = JSON.parse(JSON.stringify(serverEx));
-    // Keep local notes if server has none
-    if (localEx?.notes && !serverEx.notes) {
-      mergedEx.notes = localEx.notes;
-    }
-    merged.push(mergedEx);
-  }
-
-  // Add any exercises that only exist locally (user added new ones)
   for (const localEx of localExercises) {
     const serverEx = serverExercises.find(se => se.name === localEx.name);
-    if (!serverEx) {
+    if (serverEx) {
+      // Exercise exists in both: start with server data, overlay local edits
+      const mergedEx = JSON.parse(JSON.stringify(serverEx));
+      // Keep local notes if server has none
+      if (localEx.notes && !serverEx.notes) {
+        mergedEx.notes = localEx.notes;
+      }
+      merged.push(mergedEx);
+    } else {
+      // Exercise only exists locally (user added it) — keep as-is
       merged.push(JSON.parse(JSON.stringify(localEx)));
     }
   }

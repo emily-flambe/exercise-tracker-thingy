@@ -19,7 +19,11 @@ function base64UrlDecode(input: string): string {
     return atob(s);
   }
   // Fallback for Node/test environments.
-  return Buffer.from(s, 'base64').toString('binary');
+  const g = globalThis as { Buffer?: { from(s: string, enc: string): { toString(enc: string): string } } };
+  if (g.Buffer) {
+    return g.Buffer.from(s, 'base64').toString('binary');
+  }
+  throw new Error('No base64 decoder available');
 }
 
 export function decodeJwtUnverified(token: string): JwtPayload | null {

@@ -28,13 +28,20 @@ app.get('/:id', async (c) => {
   return c.json(workout);
 });
 
-// POST /api/workouts - Create workout
+// POST /api/workouts - Create workout (supports client-supplied id for idempotent retries)
 app.post('/', async (c) => {
   const userId = c.get('userId');
-  const body = await c.req.json<CreateWorkoutRequest>();
+  const body = await c.req.json<CreateWorkoutRequest & { id?: string }>();
 
   if (!body.start_time || !Array.isArray(body.exercises)) {
     return c.json({ error: 'Missing required fields' }, 400);
+  }
+
+  // Validate optional client-supplied id: must be a plausible UUID-ish string
+  if (body.id !== undefined) {
+    if (typeof body.id !== 'string' || body.id.length < 8 || body.id.length > 64) {
+      return c.json({ error: 'Invalid id' }, 400);
+    }
   }
 
   const workout = await queries.createWorkout(c.env.DB, userId, body);

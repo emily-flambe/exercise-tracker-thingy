@@ -240,7 +240,7 @@ async function autoSaveWorkout(): Promise<void> {
         return;
       }
       console.log(`Auto-save conflict detected (attempt ${autoSaveConflictRetries}/${MAX_AUTO_SAVE_CONFLICT_RETRIES}), merging server changes`);
-      mergeServerWorkout(error.currentWorkout);
+      mergeServerWorkout(error.currentWorkout, { localAuthoritative: true });
       scheduleAutoSave();
     } else {
       console.error('Failed to auto-save workout:', error);
@@ -250,7 +250,10 @@ async function autoSaveWorkout(): Promise<void> {
   }
 }
 
-function mergeServerWorkout(serverWorkout: Workout): void {
+function mergeServerWorkout(
+  serverWorkout: Workout,
+  opts: { localAuthoritative: boolean }
+): void {
   if (!state.currentWorkout) return;
 
   editingWorkoutUpdatedAt = serverWorkout.updated_at;
@@ -258,25 +261,57 @@ function mergeServerWorkout(serverWorkout: Workout): void {
   const localExercises = state.currentWorkout.exercises;
   const serverExercises = serverWorkout.exercises;
 
-  // Build merged exercise list (server-biased)
+  // The two callers have different semantic needs:
+  //
+  // - autoSaveWorkout (409 conflict path): localAuthoritative=true.
+  //   The local exercise list reflects the user's in-progress edits,
+  //   including pending DELETIONS that haven't been flushed yet.
+  //   If we re-introduced server-only exercises here, the next
+  //   auto-save would resurrect the exercise the user just deleted.
+  //
+  // - syncPoll (background poll path): localAuthoritative=false.
+  //   Another device/session may have ADDED exercises to this workout.
+  //   We must surface those additions; dropping server-only exercises
+  //   would hide remote work and the next auto-save would erase it
+  //   from the server too.
   const merged = [];
 
-  // Start with server exercises (preserves server ordering and data)
-  for (const serverEx of serverExercises) {
-    const localEx = localExercises.find(le => le.name === serverEx.name);
-    const mergedEx = JSON.parse(JSON.stringify(serverEx));
-    // Keep local notes if server has none
-    if (localEx?.notes && !serverEx.notes) {
-      mergedEx.notes = localEx.notes;
+  if (opts.localAuthoritative) {
+    // Local-biased: iterate local exercises, enrich from server matches,
+    // drop server-only exercises (they were deleted locally).
+    for (const localEx of localExercises) {
+      const serverEx = serverExercises.find(se => se.name === localEx.name);
+      if (serverEx) {
+        // Exercise exists in both: start with server data, overlay local edits
+        const mergedEx = JSON.parse(JSON.stringify(serverEx));
+        // Keep local notes if server has none
+        if (localEx.notes && !serverEx.notes) {
+          mergedEx.notes = localEx.notes;
+        }
+        merged.push(mergedEx);
+      } else {
+        // Exercise only exists locally (user added it) — keep as-is
+        merged.push(JSON.parse(JSON.stringify(localEx)));
+      }
     }
-    merged.push(mergedEx);
-  }
-
-  // Add any exercises that only exist locally (user added new ones)
-  for (const localEx of localExercises) {
-    const serverEx = serverExercises.find(se => se.name === localEx.name);
-    if (!serverEx) {
-      merged.push(JSON.parse(JSON.stringify(localEx)));
+  } else {
+    // Server-biased: start with server exercises (preserves server ordering
+    // and any remote additions), then append local-only exercises the user
+    // has added but not yet synced.
+    for (const serverEx of serverExercises) {
+      const localEx = localExercises.find(le => le.name === serverEx.name);
+      const mergedEx = JSON.parse(JSON.stringify(serverEx));
+      // Keep local notes if server has none
+      if (localEx?.notes && !serverEx.notes) {
+        mergedEx.notes = localEx.notes;
+      }
+      merged.push(mergedEx);
+    }
+    for (const localEx of localExercises) {
+      const serverEx = serverExercises.find(se => se.name === localEx.name);
+      if (!serverEx) {
+        merged.push(JSON.parse(JSON.stringify(localEx)));
+      }
     }
   }
 
@@ -717,7 +752,7 @@ async function syncPoll(): Promise<void> {
       return;
     }
 
-    mergeServerWorkout(workout);
+    mergeServerWorkout(workout, { localAuthoritative: false });
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       state.currentWorkout = null;

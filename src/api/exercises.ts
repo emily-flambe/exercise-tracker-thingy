@@ -35,13 +35,20 @@ app.get('/:id', async (c) => {
   return c.json(exercise);
 });
 
-// POST /api/exercises - Create custom exercise
+// POST /api/exercises - Create custom exercise (supports client-supplied id for idempotent retries)
 app.post('/', async (c) => {
   const userId = c.get('userId');
-  const body = await c.req.json<CreateExerciseRequest>();
+  const body = await c.req.json<CreateExerciseRequest & { id?: string }>();
 
   if (!body.name || !body.type || !body.category || !body.muscle_group || !body.unit) {
     return c.json({ error: 'Missing required fields' }, 400);
+  }
+
+  // Validate optional client-supplied id: must be a plausible UUID-ish string
+  if (body.id !== undefined) {
+    if (typeof body.id !== 'string' || body.id.length < 8 || body.id.length > 64) {
+      return c.json({ error: 'Invalid id' }, 400);
+    }
   }
 
   const exercise = await queries.createCustomExercise(c.env.DB, userId, body);

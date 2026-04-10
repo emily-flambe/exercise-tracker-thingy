@@ -190,8 +190,15 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
   return exercises;
 }
 
-export async function createWorkout(db: D1Database, userId: string, data: CreateWorkoutRequest): Promise<Workout> {
-  const id = generateId();
+export async function createWorkout(db: D1Database, userId: string, data: CreateWorkoutRequest & { id?: string }): Promise<Workout> {
+  // Idempotency: if a client-supplied id already exists for this user,
+  // treat the POST as a no-op and return the existing workout. This lets
+  // the offline outbox retry mutations safely.
+  if (data.id) {
+    const existing = await getWorkout(db, data.id, userId);
+    if (existing) return existing;
+  }
+  const id = data.id ?? generateId();
   const now = Date.now();
   const targetCategoriesJson = data.target_categories
     ? JSON.stringify(data.target_categories)
@@ -349,8 +356,13 @@ export async function getCustomExercise(db: D1Database, id: string, userId: stri
   };
 }
 
-export async function createCustomExercise(db: D1Database, userId: string, data: CreateExerciseRequest): Promise<CustomExercise> {
-  const id = generateId();
+export async function createCustomExercise(db: D1Database, userId: string, data: CreateExerciseRequest & { id?: string }): Promise<CustomExercise> {
+  // Idempotency: if a client-supplied id already exists for this user, return it.
+  if (data.id) {
+    const existing = await getCustomExercise(db, data.id, userId);
+    if (existing) return existing;
+  }
+  const id = data.id ?? generateId();
   const now = Date.now();
 
   await db

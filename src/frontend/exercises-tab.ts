@@ -526,7 +526,11 @@ export async function saveExercise(): Promise<void> {
         };
       }
       await enqueue(buildExerciseUpsert(existingId, false, { name, type, category: category as any, muscle_group: muscle_group as MuscleGroup, unit }));
-      void flushNow();
+      // Await the flush when online so server-side side effects (rename
+      // propagation to historical workouts, PR recomputation) complete
+      // before we refresh local data. When offline, flushNow() returns
+      // early and we keep only the optimistic local update.
+      await flushNow();
     } else {
       const id = newClientId();
       const optimistic: CustomExercise = {
@@ -541,7 +545,7 @@ export async function saveExercise(): Promise<void> {
       };
       state.customExercises.push(optimistic);
       await enqueue(buildExerciseUpsert(id, true, { name, type, category: category as any, muscle_group: muscle_group as MuscleGroup, unit }));
-      void flushNow();
+      await flushNow();
     }
 
     if (oldName && oldName !== name && state.currentWorkout) {
@@ -551,6 +555,13 @@ export async function saveExercise(): Promise<void> {
         }
       }
       renderWorkout();
+    }
+
+    // Refresh history + PRs from the server so that renames that propagated
+    // to historical workouts are reflected in PR calculations. If offline,
+    // loadData will fail silently and we keep the optimistic local state.
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+      await loadData();
     }
 
     hideEditExercise();
@@ -568,7 +579,7 @@ export async function deleteExercise(): Promise<void> {
       const deletedId = state.editingExercise.id;
       state.customExercises = state.customExercises.filter(e => e.id !== deletedId);
       await enqueue(buildExerciseDelete(deletedId));
-      void flushNow();
+      await flushNow();
       hideEditExercise();
     } catch (error) {
       console.error('Failed to delete exercise:', error);

@@ -104,10 +104,37 @@ async function doFlush(): Promise<void> {
           emitStatus({ pending: await queueLength(), lastError: null });
         } catch (err) {
           if (err instanceof SyncHttpError) {
+            if (err.status === 401 || err.status === 403) {
+              // Auth transient (token rotation, brief denial). Keep the mutation,
+              // pause flush, retry on the next online/interval trigger.
+              emitStatus({
+                pending: await queueLength(),
+                lastError: `HTTP ${err.status}`,
+              });
+              return;
+            }
             if (err.status === 409) {
-              // Last-write-wins: our mutation superseded by a concurrent change.
-              // Drop this mutation, surface a one-time toast.
-              deps.toast?.('Sync conflict resolved (your latest change kept).');
+              // Last-write-wins with one replay: inject the server's current
+              // updated_at into our payload and retry once. A second conflict
+              // is terminal — drop and tell the user the truth.
+              const current = (err.body as { current?: { updated_at?: number } } | undefined)?.current;
+              if (current?.updated_at !== undefined && !m.replayedOnce) {
+                const bodyObj = (m.body && typeof m.body === 'object')
+                  ? (m.body as Record<string, unknown>)
+                  : null;
+                if (bodyObj) {
+                  bodyObj.updated_at = current.updated_at;
+                }
+                const replayed: Mutation = {
+                  ...m,
+                  body: bodyObj ?? m.body,
+                  replayedOnce: true,
+                };
+                await updateQueueEntry(replayed);
+                // Retry this mutation immediately in the next pass.
+                break;
+              }
+              deps.toast?.('A newer version from another device replaced your offline edit.');
               await removeFromQueue(m.id);
               emitStatus({ pending: await queueLength() });
               continue;

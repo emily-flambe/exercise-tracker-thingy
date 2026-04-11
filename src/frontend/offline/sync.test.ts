@@ -86,8 +86,7 @@ describe('sync engine', () => {
   // transient auth hiccup (server blip, token rotation, reverse-proxy 401 during
   // maintenance) causes the offline queue to permanently discard user mutations
   // with no retry. The user loses data they thought was safely queued.
-  // TODO: update for queue-based flow
-  it.skip('401 auth error must not silently discard the mutation', async () => {
+  it('401 auth error must not silently discard the mutation', async () => {
     state.queue = [makeMutation('a', 1)];
     const send = vi.fn(async () => {
       throw new SyncHttpError(401, { error: 'unauthorized' });
@@ -101,8 +100,7 @@ describe('sync engine', () => {
 
   // BUG-HUNT: 403 is the same class of problem — if the server briefly denies
   // (e.g. subscription lapse, read-only mode) the queue nukes all pending work.
-  // TODO: update for queue-based flow
-  it.skip('403 forbidden must not silently discard the mutation', async () => {
+  it('403 forbidden must not silently discard the mutation', async () => {
     state.queue = [makeMutation('a', 1)];
     const send = vi.fn(async () => {
       throw new SyncHttpError(403, { error: 'forbidden' });

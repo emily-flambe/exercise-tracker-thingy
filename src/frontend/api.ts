@@ -7,7 +7,7 @@ const API_BASE = isCapacitor ? 'https://workout.emilycogsdill.com/api' : '/api';
 const TOKEN_KEY = 'workout_auth_token';
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public body?: unknown) {
     super(message);
     this.name = 'ApiError';
   }
@@ -55,7 +55,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Request failed' })) as { error?: string };
-    throw new ApiError(response.status, errorData.error || 'Request failed');
+    throw new ApiError(response.status, errorData.error || 'Request failed', errorData);
   }
 
   return response.json();
@@ -174,6 +174,7 @@ export async function getWorkout(id: string): Promise<Workout> {
 }
 
 export async function createWorkout(data: {
+  id?: string;
   start_time: number;
   end_time?: number;
   target_categories?: MuscleGroup[];
@@ -213,7 +214,7 @@ export async function updateWorkout(id: string, data: {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Request failed' })) as { error?: string };
-    throw new ApiError(response.status, errorData.error || 'Request failed');
+    throw new ApiError(response.status, errorData.error || 'Request failed', errorData);
   }
 
   return response.json();
@@ -229,6 +230,7 @@ export async function getCustomExercises(): Promise<CustomExercise[]> {
 }
 
 export async function createCustomExercise(data: {
+  id?: string;
   name: string;
   type: string;
   category: string;

@@ -1,11 +1,14 @@
 import * as api from './api';
-import type { MuscleGroup } from './api';
+import type { MuscleGroup, CustomExercise } from './api';
 import { state, mainCategories } from './state';
 import type { Exercise } from './state';
 import { $, $input, $select, formatDate, getAllExercises, isExerciseInWorkout, getLastLoggedDate, getLatestPRForExercise } from './helpers';
 import { loadData } from './data';
 import { showWorkoutScreen } from './nav';
 import { renderWorkout, scheduleAutoSave } from './workout';
+import { enqueue } from './offline/db';
+import { flushNow } from './offline/sync';
+import { buildExerciseUpsert, newClientId } from './offline/mutations';
 
 // ==================== ADD EXERCISE STATE ====================
 let addExerciseSort = { field: 'recent', asc: true };
@@ -246,8 +249,21 @@ export async function saveExerciseFromWorkout(): Promise<void> {
   const type = typeInput.value as 'total' | '/side' | '+bar' | 'bodyweight';
 
   try {
-    await api.createCustomExercise({ name, type, category, muscle_group, unit });
-    await loadData();
+    // Optimistic: assign client id, push into state, enqueue upsert.
+    const id = newClientId();
+    const optimistic: CustomExercise = {
+      id,
+      user_id: '',
+      name,
+      type,
+      category: category as CustomExercise['category'],
+      muscle_group: muscle_group as MuscleGroup,
+      unit,
+      created_at: Date.now(),
+    };
+    state.customExercises.push(optimistic);
+    await enqueue(buildExerciseUpsert(id, true, { name, type, category: category as any, muscle_group: muscle_group as MuscleGroup, unit }));
+    void flushNow();
 
     state.currentWorkout!.exercises.push({ name, sets: [], completed: false });
     renderWorkout();

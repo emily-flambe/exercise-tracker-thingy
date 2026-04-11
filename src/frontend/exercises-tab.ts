@@ -1,9 +1,13 @@
 import * as api from './api';
+import type { CustomExercise, MuscleGroup } from './api';
 import { state, mainCategories } from './state';
 import type { Exercise } from './state';
 import { $, $input, $select, escapeHtml, formatDate, getAllExercises, getTypeColor, getTypeLabel, getLastLoggedDate, showToast } from './helpers';
 import { loadData } from './data';
 import { renderWorkout } from './workout';
+import { enqueue } from './offline/db';
+import { flushNow } from './offline/sync';
+import { buildExerciseUpsert, buildExerciseDelete, newClientId } from './offline/mutations';
 
 // ==================== EXERCISES TAB STATE ====================
 let exerciseTabSort = { field: 'recent', asc: true };
@@ -508,11 +512,41 @@ export async function saveExercise(): Promise<void> {
   try {
     const oldName = state.editingExercise?.name;
     if (state.editingExercise?.id) {
-      await api.updateCustomExercise(state.editingExercise.id, { name, type, category, muscle_group, unit });
+      const existingId = state.editingExercise.id;
+      // Optimistic: update in-memory entry so UI reflects change immediately.
+      const idx = state.customExercises.findIndex(e => e.id === existingId);
+      if (idx >= 0) {
+        state.customExercises[idx] = {
+          ...state.customExercises[idx],
+          name,
+          type,
+          category: category as CustomExercise['category'],
+          muscle_group: muscle_group as MuscleGroup,
+          unit,
+        };
+      }
+      await enqueue(buildExerciseUpsert(existingId, false, { name, type, category: category as any, muscle_group: muscle_group as MuscleGroup, unit }));
+      // Await the flush when online so server-side side effects (rename
+      // propagation to historical workouts, PR recomputation) complete
+      // before we refresh local data. When offline, flushNow() returns
+      // early and we keep only the optimistic local update.
+      await flushNow();
     } else {
-      await api.createCustomExercise({ name, type, category, muscle_group, unit });
+      const id = newClientId();
+      const optimistic: CustomExercise = {
+        id,
+        user_id: '',
+        name,
+        type,
+        category: category as CustomExercise['category'],
+        muscle_group: muscle_group as MuscleGroup,
+        unit,
+        created_at: Date.now(),
+      };
+      state.customExercises.push(optimistic);
+      await enqueue(buildExerciseUpsert(id, true, { name, type, category: category as any, muscle_group: muscle_group as MuscleGroup, unit }));
+      await flushNow();
     }
-    await loadData();
 
     if (oldName && oldName !== name && state.currentWorkout) {
       for (const exercise of state.currentWorkout.exercises) {
@@ -521,6 +555,13 @@ export async function saveExercise(): Promise<void> {
         }
       }
       renderWorkout();
+    }
+
+    // Refresh history + PRs from the server so that renames that propagated
+    // to historical workouts are reflected in PR calculations. If offline,
+    // loadData will fail silently and we keep the optimistic local state.
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+      await loadData();
     }
 
     hideEditExercise();
@@ -535,8 +576,10 @@ export async function deleteExercise(): Promise<void> {
 
   if (confirm(`Delete "${state.editingExercise.name}"? This cannot be undone.`)) {
     try {
-      await api.deleteCustomExercise(state.editingExercise.id);
-      await loadData();
+      const deletedId = state.editingExercise.id;
+      state.customExercises = state.customExercises.filter(e => e.id !== deletedId);
+      await enqueue(buildExerciseDelete(deletedId));
+      await flushNow();
       hideEditExercise();
     } catch (error) {
       console.error('Failed to delete exercise:', error);

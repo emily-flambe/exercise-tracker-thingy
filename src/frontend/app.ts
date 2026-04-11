@@ -1,7 +1,10 @@
 import * as api from './api';
 import { state } from './state';
 import { $, showToast } from './helpers';
-import { loadData } from './data';
+import { loadData, hydrateFromCache } from './data';
+import { startSync, stopSync, type SyncStatus } from './offline/sync';
+import { sendMutation } from './offline/client';
+import { decodeJwtUnverified, isJwtExpired } from './offline/jwt';
 import { switchTab, onTabSwitch, showWorkoutScreen } from './nav';
 import { startRestTimer, pauseRestTimer, stopRestTimer } from './rest-timer';
 import { showPRHistory, hidePRHistory, switchPRTab } from './pr-calc';
@@ -59,9 +62,47 @@ async function clearAllData(): Promise<void> {
   }
 }
 
+// ==================== SYNC INDICATOR ====================
+function updateSyncIndicator(status: SyncStatus): void {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+  el.classList.remove('hidden', 'sync-pending', 'sync-syncing', 'sync-error', 'sync-offline');
+  if (!online) {
+    el.classList.add('sync-offline');
+    el.setAttribute('title', `Offline${status.pending ? ` (${status.pending} pending)` : ''}`);
+    return;
+  }
+  if (status.syncing) {
+    el.classList.add('sync-syncing');
+    el.setAttribute('title', 'Syncing...');
+    return;
+  }
+  if (status.lastError) {
+    el.classList.add('sync-error');
+    el.setAttribute('title', `Sync error: ${status.lastError}`);
+    return;
+  }
+  if (status.pending > 0) {
+    el.classList.add('sync-pending');
+    el.setAttribute('title', `${status.pending} pending`);
+    return;
+  }
+  el.classList.add('hidden');
+}
+
+function startSyncEngine(): void {
+  startSync({
+    send: sendMutation,
+    toast: showToast,
+    onStatusChange: updateSyncIndicator,
+  });
+}
+
 // ==================== LOGOUT ====================
 function handleLogout(): void {
   stopSyncPolling();
+  stopSync();
   logout();
 }
 
@@ -109,15 +150,64 @@ async function init(): Promise<void> {
   $('auth-form').addEventListener('submit', createAuthSubmitHandler(() => {
     showMainApp(handleRefresh);
     startSyncPolling();
+    startSyncEngine();
   }));
 
   if (api.isAuthenticated()) {
+    // Cache-first startup: hydrate from IndexedDB before any network call so the
+    // UI is usable offline or on slow connections.
+    const hydrated = await hydrateFromCache();
+    const token = api.getToken();
+    const payload = token ? decodeJwtUnverified(token) : null;
+    const expired = isJwtExpired(payload);
+    const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+
+    if (expired) {
+      api.logout();
+      showAuthScreen();
+      return;
+    }
+
+    if (hydrated && payload) {
+      // Optimistically show the app from cache; validate with /me in the background.
+      setCurrentUser({
+        id: (payload.sub || payload.userId || '') as string,
+        username: (payload.username || '') as string,
+        created_at: 0,
+      });
+      showMainApp(handleRefresh);
+      startSyncPolling();
+      startSyncEngine();
+      if (online) {
+        // Background refresh + auth validation. Failure kicks user back to auth.
+        void (async () => {
+          try {
+            const user = await api.getCurrentUser();
+            setCurrentUser(user);
+            await loadData();
+          } catch {
+            api.logout();
+            stopSync();
+            showAuthScreen();
+          }
+        })();
+      }
+      return;
+    }
+
+    // No cache — must contact the server.
+    if (!online) {
+      // Offline with no cache: can't validate. Show auth screen.
+      showAuthScreen();
+      return;
+    }
     try {
       const user = await api.getCurrentUser();
       setCurrentUser(user);
       await loadData();
       showMainApp(handleRefresh);
       startSyncPolling();
+      startSyncEngine();
     } catch {
       api.logout();
       showAuthScreen();

@@ -20,6 +20,16 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+// Thrown when a client-supplied id already exists but belongs to a DIFFERENT
+// user (or a different resource table). The caller (API handler) translates
+// this to a 409 so the client can pick a new id.
+export class IdConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'IdConflictError';
+  }
+}
+
 function parseSettings(raw: string | null | undefined): Record<string, string> | undefined {
   if (!raw) return undefined;
   try {
@@ -197,6 +207,14 @@ export async function createWorkout(db: D1Database, userId: string, data: Create
   if (data.id) {
     const existing = await getWorkout(db, data.id, userId);
     if (existing) return existing;
+    // Not owned by this user — check whether it exists under another user.
+    // A cross-user collision would otherwise explode the INSERT with a
+    // confusing unique-constraint error; return a clean 409 instead.
+    const existsElsewhere = await db
+      .prepare('SELECT 1 FROM workouts WHERE id = ?')
+      .bind(data.id)
+      .first();
+    if (existsElsewhere) throw new IdConflictError('workout id collision');
   }
   const id = data.id ?? generateId();
   const now = Date.now();
@@ -361,6 +379,13 @@ export async function createCustomExercise(db: D1Database, userId: string, data:
   if (data.id) {
     const existing = await getCustomExercise(db, data.id, userId);
     if (existing) return existing;
+    // Cross-user collision check (see createWorkout).
+    // Include soft-deleted rows so we don't silently collide with a tombstone.
+    const existsElsewhere = await db
+      .prepare('SELECT 1 FROM custom_exercises WHERE id = ?')
+      .bind(data.id)
+      .first();
+    if (existsElsewhere) throw new IdConflictError('exercise id collision');
   }
   const id = data.id ?? generateId();
   const now = Date.now();

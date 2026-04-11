@@ -4,6 +4,7 @@ import { state } from './state';
 import { $, showToast } from './helpers';
 import { loadData } from './data';
 import { setupPullToRefresh } from './pull-to-refresh';
+import { cacheClear, clearQueue } from './offline/db';
 
 let currentUser: User | null = null;
 let isRegisterMode = false;
@@ -117,13 +118,17 @@ export function createAuthSubmitHandler(onLoginSuccess: () => void): (e: Event) 
   };
 }
 
-export function logout(): void {
+export async function logout(): Promise<void> {
   api.logout();
   currentUser = null;
   state.history = [];
   state.customExercises = [];
   state.currentWorkout = null;
   state.editingWorkoutId = null;
+  // Clear offline cache + pending mutation queue so the next user doesn't
+  // see or accidentally replay the previous user's data.
+  try { await cacheClear(); } catch {}
+  try { await clearQueue(); } catch {}
   ($('auth-username') as HTMLInputElement).value = '';
   ($('auth-password') as HTMLInputElement).value = '';
   showLoginForm();

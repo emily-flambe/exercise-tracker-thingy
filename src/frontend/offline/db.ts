@@ -24,6 +24,9 @@ export interface Mutation {
   createdAt: number;
   attempts: number;
   lastError?: string;
+  // Set once if a 409 conflict has already been replayed with a fresh updated_at.
+  // A second conflict on the same mutation is terminal (drop + tell the truth).
+  replayedOnce?: boolean;
 }
 
 export type CacheKey = 'user' | 'workouts' | 'exercises' | 'prs';

@@ -29,8 +29,11 @@ function base64UrlDecode(input: string): string {
 export function decodeJwtUnverified(token: string): JwtPayload | null {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const json = base64UrlDecode(parts[1]);
+    if (parts.length < 2 || parts.length > 3) return null;
+    // 2-part: payload.signature (this app's format)
+    // 3-part: header.payload.signature (standard JWT)
+    const payloadPart = parts.length === 3 ? parts[1] : parts[0];
+    const json = base64UrlDecode(payloadPart);
     // atob returns a binary string; decodeURIComponent escape handles UTF-8.
     let decoded: string;
     try {

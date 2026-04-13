@@ -15,7 +15,7 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
-async function request(method: string, path: string, body: unknown): Promise<void> {
+async function request(method: string, path: string, body: unknown): Promise<unknown> {
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: authHeaders(),
@@ -25,34 +25,31 @@ async function request(method: string, path: string, body: unknown): Promise<voi
     const parsed = await res.json().catch(() => ({}));
     throw new SyncHttpError(res.status, parsed);
   }
+  return res.json().catch(() => ({}));
 }
 
-export async function sendMutation(m: Mutation): Promise<void> {
+export async function sendMutation(m: Mutation): Promise<unknown> {
   switch (m.kind) {
     case 'workout.upsert': {
       if (m.isNew) {
         // POST with client-supplied id — idempotent per backend.
-        await request('POST', '/workouts', m.body);
+        return request('POST', '/workouts', m.body);
       } else {
-        await request('PUT', `/workouts/${m.resourceId}`, m.body);
+        return request('PUT', `/workouts/${m.resourceId}`, m.body);
       }
-      return;
     }
     case 'workout.delete': {
-      await request('DELETE', `/workouts/${m.resourceId}`, null);
-      return;
+      return request('DELETE', `/workouts/${m.resourceId}`, null);
     }
     case 'exercise.upsert': {
       if (m.isNew) {
-        await request('POST', '/exercises', m.body);
+        return request('POST', '/exercises', m.body);
       } else {
-        await request('PUT', `/exercises/${m.resourceId}`, m.body);
+        return request('PUT', `/exercises/${m.resourceId}`, m.body);
       }
-      return;
     }
     case 'exercise.delete': {
-      await request('DELETE', `/exercises/${m.resourceId}`, null);
-      return;
+      return request('DELETE', `/exercises/${m.resourceId}`, null);
     }
   }
 }

@@ -10,10 +10,14 @@ export function newClientId(): string {
   if (g.crypto && typeof g.crypto.randomUUID === 'function') {
     return g.crypto.randomUUID();
   }
-  // Fallback: 16-char hex.
+  // Fallback: proper UUID v4 with dashes and version/variant bits.
   const buf = new Uint8Array(16);
   (globalThis.crypto as Crypto).getRandomValues(buf);
-  return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+  // Set version (byte 6, high nibble = 4) and variant (byte 8, high bits = 10)
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+  const hex = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
 export function buildWorkoutUpsert(

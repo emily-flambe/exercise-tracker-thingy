@@ -49,6 +49,6 @@ export function decodeJwtUnverified(token: string): JwtPayload | null {
 }
 
 export function isJwtExpired(payload: JwtPayload | null, nowMs = Date.now()): boolean {
-  if (!payload || typeof payload.exp !== 'number') return false;
+  if (!payload || typeof payload.exp !== 'number') return true;
   return payload.exp * 1000 <= nowMs;
 }

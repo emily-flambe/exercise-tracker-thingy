@@ -20,13 +20,21 @@ import {
 export interface SyncDeps {
   // Perform the actual HTTP request for a single mutation.
   // Should throw on non-2xx with { status, body }.
-  send: (m: Mutation) => Promise<void>;
+  // Returns the parsed response body on success.
+  send: (m: Mutation) => Promise<unknown>;
   // User-visible notification (optional — used on 409 LWW replay).
   toast?: (message: string) => void;
   // Callback invoked whenever queue length or status changes (for UI indicator).
   onStatusChange?: (status: SyncStatus) => void;
   // Whether the browser thinks we are online. Defaults to navigator.onLine.
   isOnline?: () => boolean;
+  // Callback after a successful workout upsert sync. Receives the mutation and
+  // the parsed server response so the caller can update local state (e.g.
+  // editingWorkoutUpdatedAt).
+  onWorkoutSynced?: (mutation: Mutation, response: unknown) => void;
+  // Callback when a 409 conflict on a workout update returns current server state.
+  // The caller should merge the server state and re-enqueue.
+  onWorkoutConflict?: (mutation: Mutation, current: unknown) => void;
 }
 
 export interface SyncStatus {
@@ -99,9 +107,14 @@ async function doFlush(): Promise<void> {
 
       for (const m of queue) {
         try {
-          await deps.send(m);
+          const response = await deps.send(m);
           await removeFromQueue(m.id);
           emitStatus({ pending: await queueLength(), lastError: null });
+          // Notify workout module of successful sync so it can update local state
+          // (e.g. editingWorkoutUpdatedAt to prevent stale 409 loops).
+          if (m.kind === 'workout.upsert' && deps.onWorkoutSynced) {
+            try { deps.onWorkoutSynced(m, response); } catch { /* non-fatal */ }
+          }
         } catch (err) {
           if (err instanceof SyncHttpError) {
             if (err.status === 401 || err.status === 403) {
@@ -116,9 +129,13 @@ async function doFlush(): Promise<void> {
             if (err.status === 409) {
               // Last-write-wins with one replay: inject the server's current
               // updated_at into our payload and retry once. A second conflict
-              // is terminal — drop and tell the user the truth.
-              const current = (err.body as { current?: { updated_at?: number } } | undefined)?.current;
+              // is terminal — drop and tell the truth, but merge server state.
+              const current = (err.body as { current?: Record<string, unknown> } | undefined)?.current;
               if (current?.updated_at !== undefined && !m.replayedOnce) {
+                // Notify workout module to merge server state before retrying
+                if (m.kind === 'workout.upsert' && deps.onWorkoutConflict) {
+                  try { deps.onWorkoutConflict(m, current); } catch { /* non-fatal */ }
+                }
                 const bodyObj = (m.body && typeof m.body === 'object')
                   ? (m.body as Record<string, unknown>)
                   : null;
@@ -133,6 +150,10 @@ async function doFlush(): Promise<void> {
                 await updateQueueEntry(replayed);
                 // Retry this mutation immediately in the next pass.
                 break;
+              }
+              // Terminal conflict: merge server state if available, then drop
+              if (current && m.kind === 'workout.upsert' && deps.onWorkoutConflict) {
+                try { deps.onWorkoutConflict(m, current); } catch { /* non-fatal */ }
               }
               deps.toast?.('A newer version from another device replaced your offline edit.');
               await removeFromQueue(m.id);

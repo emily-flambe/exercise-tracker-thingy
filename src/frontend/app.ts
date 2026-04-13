@@ -21,6 +21,7 @@ import {
   renderWorkout, scheduleAutoSave, editWorkout, resetWorkoutState,
   refreshCurrentWorkout, startSyncPolling, stopSyncPolling,
   editExerciseSetting, addExerciseSetting,
+  handleWorkoutSynced, handleWorkoutConflict,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -96,14 +97,16 @@ function startSyncEngine(): void {
     send: sendMutation,
     toast: showToast,
     onStatusChange: updateSyncIndicator,
+    onWorkoutSynced: handleWorkoutSynced,
+    onWorkoutConflict: handleWorkoutConflict,
   });
 }
 
 // ==================== LOGOUT ====================
-function handleLogout(): void {
+async function handleLogout(): Promise<void> {
   stopSyncPolling();
   stopSync();
-  logout();
+  await logout();
 }
 
 // ==================== REFRESH HANDLER ====================

@@ -8,7 +8,7 @@ import { $, escapeHtml, formatDate, getAllExercises, getTypeColor, getTypeLabel,
 import { loadData } from './data';
 import { showWorkoutScreen } from './nav';
 import { recalculateAllPRs } from './pr-calc';
-import { enqueue } from './offline/db';
+import { enqueue, type Mutation } from './offline/db';
 import { flushNow } from './offline/sync';
 import {
   buildWorkoutUpsert,
@@ -251,6 +251,33 @@ async function autoSaveWorkout(): Promise<void> {
   } finally {
     isAutoSaving = false;
   }
+}
+
+// ==================== SYNC FEEDBACK CALLBACKS ====================
+// Called by the sync engine (via app.ts) after a successful workout PUT/POST.
+// Updates editingWorkoutUpdatedAt so subsequent auto-saves don't send stale
+// updated_at and trigger infinite 409 loops.
+export function handleWorkoutSynced(_mutation: Mutation, response: unknown): void {
+  const res = response as { updated_at?: number } | null | undefined;
+  if (res?.updated_at !== undefined && state.editingWorkoutId) {
+    // Only update if this response is for the workout we're currently editing
+    const resAny = response as { id?: string } | null | undefined;
+    if (!resAny?.id || resAny.id === state.editingWorkoutId) {
+      editingWorkoutUpdatedAt = res.updated_at;
+    }
+  }
+}
+
+// Called by the sync engine on 409 conflict with current server state.
+// Merges the server workout into the active editor and updates
+// editingWorkoutUpdatedAt so the re-enqueued mutation carries the fresh value.
+export function handleWorkoutConflict(mutation: Mutation, current: unknown): void {
+  const serverWorkout = current as Workout | null | undefined;
+  if (!serverWorkout || !state.currentWorkout || !state.editingWorkoutId) return;
+  // Only handle conflicts for the workout we're currently editing
+  if (mutation.resourceId !== state.editingWorkoutId) return;
+  mergeServerWorkout(serverWorkout, { localAuthoritative: true });
+  renderWorkout();
 }
 
 function mergeServerWorkout(

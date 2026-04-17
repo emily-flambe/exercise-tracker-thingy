@@ -102,14 +102,6 @@ onTabSwitch((tabName: string) => {
   if (tabName === 'prs') renderPRsTab();
 });
 
-// Re-render active tab when data loads (handles race conditions)
-window.addEventListener('data-loaded', () => {
-  const activeTab = document.querySelector('.tab-content.active');
-  if (activeTab?.id === 'tab-history') renderHistory();
-  else if (activeTab?.id === 'tab-exercises') renderExerciseCategories();
-  else if (activeTab?.id === 'tab-prs') renderPRsTab();
-});
-
 // ==================== INIT ====================
 async function init(): Promise<void> {
   $('app-version').textContent = `v${__APP_VERSION__}`;

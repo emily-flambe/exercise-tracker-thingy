@@ -277,21 +277,29 @@ function mergeServerWorkout(
   const merged = [];
 
   if (opts.localAuthoritative) {
-    // Local-biased: iterate local exercises, enrich from server matches,
-    // drop server-only exercises (they were deleted locally).
-    for (const localEx of localExercises) {
-      const serverEx = serverExercises.find(se => se.name === localEx.name);
-      if (serverEx) {
-        // Exercise exists in both: start with server data, overlay local edits
-        const mergedEx = JSON.parse(JSON.stringify(serverEx));
-        // Keep local notes if server has none
-        if (localEx.notes && !serverEx.notes) {
-          mergedEx.notes = localEx.notes;
+    // Safety: if local has no exercises but server does, don't wipe server data.
+    // An empty local list means stale state, not intentional deletion of everything.
+    if (localExercises.length === 0 && serverExercises.length > 0) {
+      for (const serverEx of serverExercises) {
+        merged.push(JSON.parse(JSON.stringify(serverEx)));
+      }
+    } else {
+      // Local-biased: iterate local exercises, enrich from server matches,
+      // drop server-only exercises (they were deleted locally).
+      for (const localEx of localExercises) {
+        const serverEx = serverExercises.find(se => se.name === localEx.name);
+        if (serverEx) {
+          // Exercise exists in both: start with server data, overlay local edits
+          const mergedEx = JSON.parse(JSON.stringify(serverEx));
+          // Keep local notes if server has none
+          if (localEx.notes && !serverEx.notes) {
+            mergedEx.notes = localEx.notes;
+          }
+          merged.push(mergedEx);
+        } else {
+          // Exercise only exists locally (user added it) — keep as-is
+          merged.push(JSON.parse(JSON.stringify(localEx)));
         }
-        merged.push(mergedEx);
-      } else {
-        // Exercise only exists locally (user added it) — keep as-is
-        merged.push(JSON.parse(JSON.stringify(localEx)));
       }
     }
   } else {

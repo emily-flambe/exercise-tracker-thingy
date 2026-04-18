@@ -548,6 +548,17 @@ export async function saveExercise(): Promise<void> {
       await flushNow();
     }
 
+    // Refresh history + PRs from the server BEFORE re-rendering the active
+    // workout, so recalculateAllPRs() (triggered by renderWorkout) sees the
+    // server-propagated rename in historical workouts. If we render first, PR
+    // stars are computed against stale history where the exercise still has
+    // the old name, producing false PR stars for sets that tie existing
+    // records. If offline, loadData will fail silently and we keep the
+    // optimistic local state.
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+      await loadData();
+    }
+
     if (oldName && oldName !== name && state.currentWorkout) {
       for (const exercise of state.currentWorkout.exercises) {
         if (exercise.name === oldName) {
@@ -555,13 +566,6 @@ export async function saveExercise(): Promise<void> {
         }
       }
       renderWorkout();
-    }
-
-    // Refresh history + PRs from the server so that renames that propagated
-    // to historical workouts are reflected in PR calculations. If offline,
-    // loadData will fail silently and we keep the optimistic local state.
-    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-      await loadData();
     }
 
     hideEditExercise();

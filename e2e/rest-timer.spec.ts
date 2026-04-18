@@ -117,6 +117,12 @@ test.describe('Rest Timer', () => {
     await expect(page.locator('#rest-timer-stop-btn')).toBeVisible();
     await expect(page.locator('#rest-timer-play-btn')).not.toBeVisible();
 
+    // Wait for the timer to actually advance past 00:00 before pausing.
+    // The Paused UI state requires accumulated seconds > 0 for stop-btn to remain
+    // visible (see updateTimerButtons in src/frontend/rest-timer.ts); if we pause
+    // within the same second as clicking play, accumulated=0 and stop-btn hides.
+    await expect(page.locator('#rest-timer-display')).not.toHaveText('00:00', { timeout: 5000 });
+
     // Pause the timer
     await page.locator('#rest-timer-pause-btn').click();
 

@@ -4,6 +4,9 @@ import { state, ALL_MUSCLE_GROUPS } from './state';
 import { $, escapeHtml } from './helpers';
 import { loadData } from './data';
 import { editWorkout } from './workout';
+import { enqueue } from './offline/db';
+import { flushNow } from './offline/sync';
+import { buildWorkoutDelete } from './offline/mutations';
 
 // ==================== HISTORY STATE ====================
 let currentCalendarDate = new Date();
@@ -349,9 +352,11 @@ export function cancelDeleteWorkout(): void {
 export async function confirmDeleteWorkout(id: string): Promise<void> {
   try {
     const workout = state.history.find(w => w.id === id);
-    await api.deleteWorkout(id);
+    // Optimistic: drop from local history immediately, enqueue, best-effort flush.
+    state.history = state.history.filter(w => w.id !== id);
+    await enqueue(buildWorkoutDelete(id));
+    void flushNow();
     pendingDeleteWorkoutId = null;
-    await loadData();
 
     if (hasActiveSearchFilter()) {
       renderHistory();

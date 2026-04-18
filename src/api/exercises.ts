@@ -5,6 +5,8 @@ import { authMiddleware } from '../middleware/auth';
 
 const app = new Hono<{ Bindings: Env }>();
 
+const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
 // Apply auth middleware to all routes
 app.use('*', authMiddleware);
 
@@ -35,17 +37,31 @@ app.get('/:id', async (c) => {
   return c.json(exercise);
 });
 
-// POST /api/exercises - Create custom exercise
+// POST /api/exercises - Create custom exercise (supports client-supplied id for idempotent retries)
 app.post('/', async (c) => {
   const userId = c.get('userId');
-  const body = await c.req.json<CreateExerciseRequest>();
+  const body = await c.req.json<CreateExerciseRequest & { id?: string }>();
 
   if (!body.name || !body.type || !body.category || !body.muscle_group || !body.unit) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
 
-  const exercise = await queries.createCustomExercise(c.env.DB, userId, body);
-  return c.json(exercise, 201);
+  // Validate optional client-supplied id: must be a canonical UUID.
+  if (body.id !== undefined) {
+    if (typeof body.id !== 'string' || !UUID_RE.test(body.id)) {
+      return c.json({ error: 'Invalid id' }, 400);
+    }
+  }
+
+  try {
+    const exercise = await queries.createCustomExercise(c.env.DB, userId, body);
+    return c.json(exercise, 201);
+  } catch (err) {
+    if (err instanceof queries.IdConflictError) {
+      return c.json({ error: 'id conflict' }, 409);
+    }
+    throw err;
+  }
 });
 
 // POST /api/exercises/:id/restore - Restore a soft-deleted exercise

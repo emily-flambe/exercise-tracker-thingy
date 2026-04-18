@@ -8,6 +8,13 @@ import { $, escapeHtml, formatDate, getAllExercises, getTypeColor, getTypeLabel,
 import { loadData } from './data';
 import { showWorkoutScreen } from './nav';
 import { recalculateAllPRs } from './pr-calc';
+import { enqueue, type Mutation } from './offline/db';
+import { flushNow } from './offline/sync';
+import {
+  buildWorkoutUpsert,
+  buildWorkoutDelete,
+  newClientId,
+} from './offline/mutations';
 
 // ==================== WORKOUT STATE ====================
 let isEditingFromHistory = false;
@@ -165,8 +172,11 @@ export function cancelDeleteCurrentWorkout(): void {
 export async function confirmDeleteCurrentWorkout(): Promise<void> {
   try {
     if (state.editingWorkoutId) {
-      await api.deleteWorkout(state.editingWorkoutId);
-      await loadData();
+      const deletedId = state.editingWorkoutId;
+      // Optimistic: drop from local history immediately.
+      state.history = state.history.filter(w => w.id !== deletedId);
+      await enqueue(buildWorkoutDelete(deletedId));
+      void flushNow();
     }
 
     state.currentWorkout = null;
@@ -211,7 +221,11 @@ async function autoSaveWorkout(): Promise<void> {
       exercises: state.currentWorkout.exercises,
     };
 
+    let resourceId: string;
+    let isNew: boolean;
     if (state.editingWorkoutId) {
+      resourceId = state.editingWorkoutId;
+      isNew = false;
       const originalWorkout = state.history.find(w => w.id === state.editingWorkoutId);
       if (originalWorkout?.end_time) {
         workoutData.end_time = originalWorkout.end_time;
@@ -219,35 +233,51 @@ async function autoSaveWorkout(): Promise<void> {
       if (editingWorkoutUpdatedAt !== null) {
         workoutData.updated_at = editingWorkoutUpdatedAt;
       }
-      const savedWorkout = await api.updateWorkout(state.editingWorkoutId, workoutData);
-      editingWorkoutUpdatedAt = savedWorkout.updated_at;
     } else {
-      const savedWorkout = await api.createWorkout(workoutData);
-      state.editingWorkoutId = savedWorkout.id;
-      editingWorkoutUpdatedAt = savedWorkout.updated_at;
+      // New workout: assign a client-generated id so the outbox can POST
+      // with idempotent semantics and subsequent edits route to the same resource.
+      resourceId = newClientId();
+      isNew = true;
+      state.editingWorkoutId = resourceId;
+      editingWorkoutUpdatedAt = null;
     }
 
-    await loadData();
+    await enqueue(buildWorkoutUpsert(resourceId, isNew, workoutData));
+    // Fire-and-forget flush: don't block UI on network.
+    void flushNow();
     autoSaveConflictRetries = 0;
-    console.log('Workout auto-saved');
   } catch (error) {
-    if (error instanceof ConflictError) {
-      autoSaveConflictRetries++;
-      if (autoSaveConflictRetries > MAX_AUTO_SAVE_CONFLICT_RETRIES) {
-        console.error(`Auto-save conflict persists after ${MAX_AUTO_SAVE_CONFLICT_RETRIES} retries, giving up`);
-        autoSaveConflictRetries = 0;
-        alert('Your workout could not be saved due to repeated conflicts with another session. Your changes are still in the editor — please try saving manually.');
-        return;
-      }
-      console.log(`Auto-save conflict detected (attempt ${autoSaveConflictRetries}/${MAX_AUTO_SAVE_CONFLICT_RETRIES}), merging server changes`);
-      mergeServerWorkout(error.currentWorkout, { localAuthoritative: true });
-      scheduleAutoSave();
-    } else {
-      console.error('Failed to auto-save workout:', error);
-    }
+    console.error('Failed to enqueue auto-save:', error);
   } finally {
     isAutoSaving = false;
   }
+}
+
+// ==================== SYNC FEEDBACK CALLBACKS ====================
+// Called by the sync engine (via app.ts) after a successful workout PUT/POST.
+// Updates editingWorkoutUpdatedAt so subsequent auto-saves don't send stale
+// updated_at and trigger infinite 409 loops.
+export function handleWorkoutSynced(_mutation: Mutation, response: unknown): void {
+  const res = response as { updated_at?: number } | null | undefined;
+  if (res?.updated_at !== undefined && state.editingWorkoutId) {
+    // Only update if this response is for the workout we're currently editing
+    const resAny = response as { id?: string } | null | undefined;
+    if (!resAny?.id || resAny.id === state.editingWorkoutId) {
+      editingWorkoutUpdatedAt = res.updated_at;
+    }
+  }
+}
+
+// Called by the sync engine on 409 conflict with current server state.
+// Merges the server workout into the active editor and updates
+// editingWorkoutUpdatedAt so the re-enqueued mutation carries the fresh value.
+export function handleWorkoutConflict(mutation: Mutation, current: unknown): void {
+  const serverWorkout = current as Workout | null | undefined;
+  if (!serverWorkout || !state.currentWorkout || !state.editingWorkoutId) return;
+  // Only handle conflicts for the workout we're currently editing
+  if (mutation.resourceId !== state.editingWorkoutId) return;
+  mergeServerWorkout(serverWorkout, { localAuthoritative: true });
+  renderWorkout();
 }
 
 function mergeServerWorkout(

@@ -20,6 +20,16 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+// Thrown when a client-supplied id already exists but belongs to a DIFFERENT
+// user (or a different resource table). The caller (API handler) translates
+// this to a 409 so the client can pick a new id.
+export class IdConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'IdConflictError';
+  }
+}
+
 function parseSettings(raw: string | null | undefined): Record<string, string> | undefined {
   if (!raw) return undefined;
   try {
@@ -190,17 +200,44 @@ async function getWorkoutExercises(db: D1Database, workoutId: string): Promise<W
   return exercises;
 }
 
-export async function createWorkout(db: D1Database, userId: string, data: CreateWorkoutRequest): Promise<Workout> {
-  const id = generateId();
+export async function createWorkout(db: D1Database, userId: string, data: CreateWorkoutRequest & { id?: string }): Promise<Workout> {
+  // Idempotency: if a client-supplied id already exists for this user,
+  // treat the POST as a no-op and return the existing workout. This lets
+  // the offline outbox retry mutations safely.
+  if (data.id) {
+    const existing = await getWorkout(db, data.id, userId);
+    if (existing) return existing;
+    // Not owned by this user — check whether it exists under another user.
+    // A cross-user collision would otherwise explode the INSERT with a
+    // confusing unique-constraint error; return a clean 409 instead.
+    const existsElsewhere = await db
+      .prepare('SELECT 1 FROM workouts WHERE id = ?')
+      .bind(data.id)
+      .first();
+    if (existsElsewhere) throw new IdConflictError('workout id collision');
+  }
+  const id = data.id ?? generateId();
   const now = Date.now();
   const targetCategoriesJson = data.target_categories
     ? JSON.stringify(data.target_categories)
     : null;
 
-  await db
-    .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now, now)
-    .run();
+  try {
+    await db
+      .prepare('INSERT INTO workouts (id, user_id, start_time, end_time, target_categories, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, userId, data.start_time, data.end_time !== undefined ? data.end_time : null, targetCategoriesJson, now, now)
+      .run();
+  } catch (e: unknown) {
+    // TOCTOU: a concurrent request may have inserted between our SELECT and INSERT.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE constraint failed') || msg.includes('unique')) {
+      // Same-user idempotent retry or cross-user collision?
+      const existing = await getWorkout(db, id, userId);
+      if (existing) return existing;
+      throw new IdConflictError(`id ${id} belongs to another user`);
+    }
+    throw e;
+  }
 
   // Insert exercises and sets
   for (let i = 0; i < data.exercises.length; i++) {
@@ -349,14 +386,37 @@ export async function getCustomExercise(db: D1Database, id: string, userId: stri
   };
 }
 
-export async function createCustomExercise(db: D1Database, userId: string, data: CreateExerciseRequest): Promise<CustomExercise> {
-  const id = generateId();
+export async function createCustomExercise(db: D1Database, userId: string, data: CreateExerciseRequest & { id?: string }): Promise<CustomExercise> {
+  // Idempotency: if a client-supplied id already exists for this user, return it.
+  if (data.id) {
+    const existing = await getCustomExercise(db, data.id, userId);
+    if (existing) return existing;
+    // Cross-user collision check (see createWorkout).
+    // Include soft-deleted rows so we don't silently collide with a tombstone.
+    const existsElsewhere = await db
+      .prepare('SELECT 1 FROM custom_exercises WHERE id = ?')
+      .bind(data.id)
+      .first();
+    if (existsElsewhere) throw new IdConflictError('exercise id collision');
+  }
+  const id = data.id ?? generateId();
   const now = Date.now();
 
-  await db
-    .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, muscle_group, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, data.name, data.type, data.category, data.muscle_group, data.unit, now)
-    .run();
+  try {
+    await db
+      .prepare('INSERT INTO custom_exercises (id, user_id, name, type, category, muscle_group, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, userId, data.name, data.type, data.category, data.muscle_group, data.unit, now)
+      .run();
+  } catch (e: unknown) {
+    // TOCTOU: a concurrent request may have inserted between our SELECT and INSERT.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE constraint failed') || msg.includes('unique')) {
+      const existing = await getCustomExercise(db, id, userId);
+      if (existing) return existing;
+      throw new IdConflictError(`id ${id} belongs to another user`);
+    }
+    throw e;
+  }
 
   return {
     id,

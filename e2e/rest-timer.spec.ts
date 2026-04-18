@@ -49,13 +49,11 @@ test.describe('Rest Timer', () => {
     // Click play
     await page.locator('#rest-timer-play-btn').click();
 
-    // Wait a bit and verify timer has incremented
-    await page.waitForTimeout(1500);
+    // Wait for timer to increment past 00:00
+    await expect(page.locator('#rest-timer-display')).not.toHaveText('00:00', { timeout: 5000 });
 
-    // Timer should show at least 00:01
-    const timerText = await page.locator('#rest-timer-display').textContent();
-    expect(timerText).not.toBe('00:00');
     // Verify it's in MM:SS format
+    const timerText = await page.locator('#rest-timer-display').textContent();
     expect(timerText).toMatch(/^\d{2}:\d{2}$/);
   });
 
@@ -67,8 +65,8 @@ test.describe('Rest Timer', () => {
     // Start the timer
     await page.locator('#rest-timer-play-btn').click();
 
-    // Wait for timer to increment
-    await page.waitForTimeout(1500);
+    // Wait for timer to increment past 00:00
+    await expect(page.locator('#rest-timer-display')).not.toHaveText('00:00', { timeout: 5000 });
 
     // Click pause
     await page.locator('#rest-timer-pause-btn').click();
@@ -76,7 +74,7 @@ test.describe('Rest Timer', () => {
     // Record the time
     const pausedTime = await page.locator('#rest-timer-display').textContent();
 
-    // Wait a bit more
+    // Wait a bit more to verify timer stays paused
     await page.waitForTimeout(1500);
 
     // Timer should still show the same time (paused)
@@ -91,12 +89,8 @@ test.describe('Rest Timer', () => {
     // Start the timer
     await page.locator('#rest-timer-play-btn').click();
 
-    // Wait for timer to increment
-    await page.waitForTimeout(1500);
-
-    // Verify timer is not 00:00
-    const timerText = await page.locator('#rest-timer-display').textContent();
-    expect(timerText).not.toBe('00:00');
+    // Wait for timer to increment past 00:00
+    await expect(page.locator('#rest-timer-display')).not.toHaveText('00:00', { timeout: 5000 });
 
     // Click stop
     await page.locator('#rest-timer-stop-btn').click();
@@ -117,12 +111,17 @@ test.describe('Rest Timer', () => {
 
     // Start the timer
     await page.locator('#rest-timer-play-btn').click();
-    await page.waitForTimeout(1200);
 
     // Running: pause and stop visible, play hidden
-    await expect(page.locator('#rest-timer-play-btn')).not.toBeVisible();
-    await expect(page.locator('#rest-timer-pause-btn')).toBeVisible();
+    await expect(page.locator('#rest-timer-pause-btn')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('#rest-timer-stop-btn')).toBeVisible();
+    await expect(page.locator('#rest-timer-play-btn')).not.toBeVisible();
+
+    // Wait for the timer to actually advance past 00:00 before pausing.
+    // The Paused UI state requires accumulated seconds > 0 for stop-btn to remain
+    // visible (see updateTimerButtons in src/frontend/rest-timer.ts); if we pause
+    // within the same second as clicking play, accumulated=0 and stop-btn hides.
+    await expect(page.locator('#rest-timer-display')).not.toHaveText('00:00', { timeout: 5000 });
 
     // Pause the timer
     await page.locator('#rest-timer-pause-btn').click();
@@ -149,8 +148,8 @@ test.describe('Rest Timer', () => {
     // Start the timer
     await page.locator('#rest-timer-play-btn').click();
 
-    // Wait for timer to increment
-    await page.waitForTimeout(1500);
+    // Wait for timer to increment past 00:00
+    await expect(page.locator('#rest-timer-display')).not.toHaveText('00:00', { timeout: 5000 });
 
     // Pause the timer
     await page.locator('#rest-timer-pause-btn').click();
@@ -163,13 +162,13 @@ test.describe('Rest Timer', () => {
     };
     const pausedSeconds = parseTime(pausedTime!);
 
-    // Wait a bit
+    // Wait a bit to confirm timer is paused
     await page.waitForTimeout(1000);
 
     // Resume the timer
     await page.locator('#rest-timer-play-btn').click();
 
-    // Wait for timer to continue
+    // Wait for timer to continue beyond paused time
     await page.waitForTimeout(1500);
 
     // Timer should have continued from paused time

@@ -3,10 +3,14 @@ import { verifyToken } from '../auth';
 import { getUserByApiKey } from '../db/queries';
 import type { Env } from '../types';
 
-// Extend Hono's context to include userId
+export type AuthMethod = 'jwt' | 'api_key' | 'unauthenticated';
+
+// Extend Hono's context
 declare module 'hono' {
   interface ContextVariableMap {
     userId: string;
+    authMethod: AuthMethod;
+    apiKeyName: string | null;
   }
 }
 
@@ -21,11 +25,13 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
 
   // Check if this is an API key (starts with wt_)
   if (token.startsWith('wt_')) {
-    const userId = await getUserByApiKey(c.env.DB, token);
-    if (!userId) {
+    const result = await getUserByApiKey(c.env.DB, token);
+    if (!result) {
       return c.json({ error: 'Invalid API key' }, 401);
     }
-    c.set('userId', userId);
+    c.set('userId', result.user_id);
+    c.set('authMethod', 'api_key');
+    c.set('apiKeyName', result.name);
     await next();
     return;
   }
@@ -38,5 +44,7 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
   }
 
   c.set('userId', payload.userId);
+  c.set('authMethod', 'jwt');
+  c.set('apiKeyName', null);
   await next();
 }

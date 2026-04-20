@@ -3,6 +3,7 @@ import type { Env, RegisterRequest, LoginRequest, AuthResponse } from '../types'
 import { hashPassword, verifyPassword, createToken } from '../auth';
 import { getUserByUsername, createUser, getUserById, createApiKey } from '../db/queries';
 import { authMiddleware } from '../middleware/auth';
+import { logAudit } from '../db/audit';
 
 const auth = new Hono<{ Bindings: Env }>();
 
@@ -34,6 +35,8 @@ auth.post('/register', async (c) => {
 
   // Generate token
   const token = await createToken(user.id, c.env.JWT_SECRET);
+
+  await logAudit(c, { action: 'create', entity_type: 'user', entity_id: user.id });
 
   const response: AuthResponse = { token, user };
   return c.json(response, 201);
@@ -93,6 +96,7 @@ auth.post('/api-keys', authMiddleware, async (c) => {
   }
 
   const { id, key } = await createApiKey(c.env.DB, userId, body.name);
+  await logAudit(c, { action: 'create', entity_type: 'api_key', entity_id: id });
   return c.json({ id, key, name: body.name }, 201);
 });
 

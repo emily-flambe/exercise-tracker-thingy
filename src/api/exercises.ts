@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, CreateExerciseRequest } from '../types';
 import * as queries from '../db/queries';
 import { authMiddleware } from '../middleware/auth';
+import { logAudit } from '../db/audit';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -55,6 +56,7 @@ app.post('/', async (c) => {
 
   try {
     const exercise = await queries.createCustomExercise(c.env.DB, userId, body);
+    await logAudit(c, { action: 'create', entity_type: 'custom_exercise', entity_id: exercise.id });
     return c.json(exercise, 201);
   } catch (err) {
     if (err instanceof queries.IdConflictError) {
@@ -74,6 +76,7 @@ app.post('/:id/restore', async (c) => {
     return c.json({ error: 'Deleted exercise not found' }, 404);
   }
 
+  await logAudit(c, { action: 'update', entity_type: 'custom_exercise', entity_id: id });
   return c.json({ success: true });
 });
 
@@ -93,6 +96,7 @@ app.put('/:id', async (c) => {
     return c.json({ error: 'Exercise not found' }, 404);
   }
 
+  await logAudit(c, { action: 'update', entity_type: 'custom_exercise', entity_id: exercise.id });
   return c.json(exercise);
 });
 
@@ -128,6 +132,7 @@ app.patch('/:id/settings', async (c) => {
   if (!result) {
     return c.json({ error: 'Exercise not found' }, 404);
   }
+  await logAudit(c, { action: 'update', entity_type: 'custom_exercise', entity_id: result.id });
   return c.json(result);
 });
 
@@ -141,6 +146,7 @@ app.delete('/:id', async (c) => {
     return c.json({ error: 'Exercise not found' }, 404);
   }
 
+  await logAudit(c, { action: 'delete', entity_type: 'custom_exercise', entity_id: id });
   return c.json({ success: true });
 });
 

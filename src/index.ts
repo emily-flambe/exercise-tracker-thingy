@@ -6,6 +6,7 @@ import workoutsApi from './api/workouts';
 import exercisesApi from './api/exercises';
 import * as queries from './db/queries';
 import { authMiddleware } from './middleware/auth';
+import { logAudit } from './db/audit';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -28,6 +29,7 @@ app.route('/api/exercises', exercisesApi);
 app.post('/api/data/clear', authMiddleware, async (c) => {
   const userId = c.get('userId');
   await queries.clearAllData(c.env.DB, userId);
+  await logAudit(c, { action: 'delete', entity_type: 'user', entity_id: userId });
   return c.json({ success: true });
 });
 

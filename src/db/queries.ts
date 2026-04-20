@@ -680,16 +680,16 @@ export async function createApiKey(db: D1Database, userId: string, name: string)
   return { id, key };
 }
 
-export async function getUserByApiKey(db: D1Database, key: string): Promise<string | null> {
+export async function getUserByApiKey(db: D1Database, key: string): Promise<{ user_id: string; name: string } | null> {
   // Hash the provided key
   const encoder = new TextEncoder();
   const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(key));
   const keyHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
   const row = await db
-    .prepare('SELECT user_id FROM api_keys WHERE key_hash = ?')
+    .prepare('SELECT user_id, name FROM api_keys WHERE key_hash = ?')
     .bind(keyHash)
-    .first<{ user_id: string }>();
+    .first<{ user_id: string; name: string }>();
 
-  return row?.user_id ?? null;
+  return row ?? null;
 }

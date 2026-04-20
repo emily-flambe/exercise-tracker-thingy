@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, CreateWorkoutRequest } from '../types';
 import * as queries from '../db/queries';
 import { authMiddleware } from '../middleware/auth';
+import { logAudit } from '../db/audit';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -48,6 +49,7 @@ app.post('/', async (c) => {
 
   try {
     const workout = await queries.createWorkout(c.env.DB, userId, body);
+    await logAudit(c, { action: 'create', entity_type: 'workout', entity_id: workout.id });
     return c.json(workout, 201);
   } catch (err) {
     if (err instanceof queries.IdConflictError) {
@@ -77,6 +79,7 @@ app.put('/:id', async (c) => {
     return c.json({ error: 'Conflict', current: result.current }, 409);
   }
 
+  await logAudit(c, { action: 'update', entity_type: 'workout', entity_id: result.workout.id });
   return c.json(result.workout);
 });
 
@@ -90,6 +93,7 @@ app.delete('/:id', async (c) => {
     return c.json({ error: 'Workout not found' }, 404);
   }
 
+  await logAudit(c, { action: 'delete', entity_type: 'workout', entity_id: id });
   return c.json({ success: true });
 });
 

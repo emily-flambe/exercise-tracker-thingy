@@ -775,22 +775,19 @@ function handleVisibilityChange(): void {
   }
 }
 
+// Sync poll disabled (emergency hot-fix): the server-biased merge was
+// racing with in-progress local edits and destroying sets/weight/reps
+// values mid-workout. The guard `autoSaveTimeout !== null` is checked at
+// entry, but any edit landing during the in-flight `getWorkout()` await
+// is then clobbered by the merge when the response returns. Until a
+// conflict-free merge is in place, never pull server state over the
+// active workout. A deleted-on-server (404) workout is still handled.
 async function syncPoll(): Promise<void> {
-  const activeEl = document.activeElement;
-  const isUserEditing = activeEl instanceof HTMLInputElement && activeEl.closest('#current-workout');
-  if (!state.editingWorkoutId || autoSaveTimeout !== null || isAutoSaving || isSyncPolling || isUserEditing) {
-    return;
-  }
-
+  if (!state.editingWorkoutId || isSyncPolling) return;
   isSyncPolling = true;
   try {
-    const workout = await api.getWorkout(state.editingWorkoutId);
-
-    if (workout.updated_at === editingWorkoutUpdatedAt) {
-      return;
-    }
-
-    mergeServerWorkout(workout, { localAuthoritative: false });
+    await api.getWorkout(state.editingWorkoutId);
+    // Intentionally do NOT merge. We only want the 404 side-effect below.
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       state.currentWorkout = null;

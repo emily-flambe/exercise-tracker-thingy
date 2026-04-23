@@ -299,6 +299,15 @@ export function handleWorkoutConflict(mutation: Mutation, current: unknown): voi
   // Only handle conflicts for the workout we're currently editing
   if (mutation.resourceId !== state.editingWorkoutId) return;
   mergeServerWorkout(serverWorkout, { localAuthoritative: true });
+  // Write the merged state back into the mutation body. Without this, the
+  // 409-replay in sync.ts only patches `updated_at` into the original body
+  // and re-sends the pre-merge local exercises — silently clobbering any
+  // remote additions we just merged in (e.g. a concurrent Lat Pulldown add).
+  if (mutation.body && typeof mutation.body === 'object') {
+    const body = mutation.body as Record<string, unknown>;
+    body.exercises = state.currentWorkout.exercises;
+    body.target_categories = state.currentWorkout.targetCategories ?? null;
+  }
   renderWorkout();
 }
 

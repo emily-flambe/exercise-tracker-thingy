@@ -21,6 +21,8 @@ test.describe('Sync Race Regression (issue #102)', () => {
   test.beforeEach(async ({ page, request }) => {
     setup = await setupTestUserWithExercises(request);
     await authenticatePage(page, setup.token);
+    // removeExercise() calls window.confirm(); auto-accept so the delete lands.
+    page.on('dialog', (dialog) => void dialog.accept());
     await expect(page.locator('#main-app')).toBeVisible({ timeout: 10000 });
   });
 
@@ -89,7 +91,13 @@ test.describe('Sync Race Regression (issue #102)', () => {
     //  - NOT resurrect the locally-deleted Squat
     //  - Keep the remotely-added Lat Pulldown (server addition not in base)
     //  - Preserve the existing completed Bench set
-    await page.evaluate(() => (window as any).app.addSet(0));
+    await page.evaluate(() => {
+      const app = (window as any).app;
+      // showAddSetForm populates #weight-0/#reps-0 with last-set defaults;
+      // saveSetInline reads them and calls scheduleAutoSave().
+      app.showAddSetForm(0);
+      app.saveSetInline(0);
+    });
     // Event-driven wait: poll the server until the merged shape settles —
     // Squat removed (local deletion honored), Lat Pulldown present (remote
     // addition preserved). This covers the 1.5s autosave debounce plus the

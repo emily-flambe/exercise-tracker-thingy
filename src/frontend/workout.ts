@@ -15,11 +15,17 @@ import {
   buildWorkoutDelete,
   newClientId,
 } from './offline/mutations';
+import { mergeWorkouts } from './merge';
 
 // ==================== WORKOUT STATE ====================
 let isEditingFromHistory = false;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let editingWorkoutUpdatedAt: number | null = null;
+// The "common ancestor" for 3-way merge: the last-known-server snapshot
+// of the workout we're currently editing. Used by mergeServerWorkout to
+// distinguish "local deletion" from "remote addition" (and vice versa).
+// Deep-cloned whenever we take a fresh authoritative server view.
+let baseServerWorkout: Workout | null = null;
 let autoSaveConflictRetries = 0;
 const MAX_AUTO_SAVE_CONFLICT_RETRIES = 3;
 let pollIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -124,6 +130,7 @@ function startWorkoutInternal(targetCategories?: MuscleGroup[]): void {
   };
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
+  baseServerWorkout = null;
   autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
@@ -150,6 +157,7 @@ export function startWorkout(): void {
   };
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
+  baseServerWorkout = null;
   autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
@@ -182,6 +190,7 @@ export async function confirmDeleteCurrentWorkout(): Promise<void> {
     state.currentWorkout = null;
     state.editingWorkoutId = null;
     editingWorkoutUpdatedAt = null;
+    baseServerWorkout = null;
     autoSaveConflictRetries = 0;
     isEditingFromHistory = false;
     expandedNotes.clear();
@@ -240,6 +249,7 @@ async function autoSaveWorkout(): Promise<void> {
       isNew = true;
       state.editingWorkoutId = resourceId;
       editingWorkoutUpdatedAt = null;
+      baseServerWorkout = null;
     }
 
     await enqueue(buildWorkoutUpsert(resourceId, isNew, workoutData));
@@ -258,12 +268,24 @@ async function autoSaveWorkout(): Promise<void> {
 // Updates editingWorkoutUpdatedAt so subsequent auto-saves don't send stale
 // updated_at and trigger infinite 409 loops.
 export function handleWorkoutSynced(_mutation: Mutation, response: unknown): void {
-  const res = response as { updated_at?: number } | null | undefined;
+  const res = response as (Workout & { updated_at?: number }) | null | undefined;
   if (res?.updated_at !== undefined && state.editingWorkoutId) {
     // Only update if this response is for the workout we're currently editing
-    const resAny = response as { id?: string } | null | undefined;
-    if (!resAny?.id || resAny.id === state.editingWorkoutId) {
+    if (!res.id || res.id === state.editingWorkoutId) {
       editingWorkoutUpdatedAt = res.updated_at;
+      // Refresh the 3-way merge baseline: the server has now accepted our
+      // write, so that exact shape is the new common ancestor for any
+      // future remote changes we haven't seen yet.
+      if (res.id && Array.isArray(res.exercises)) {
+        baseServerWorkout = structuredClone(res) as Workout;
+      } else {
+        // Thin response (bare ACK — has updated_at but no exercises array):
+        // we cannot trust the existing base to still be the common ancestor
+        // alongside the new updated_at. Invalidate it so the next merge
+        // takes the null-base fallback path rather than comparing against
+        // a stale snapshot and flagging everything as a conflict.
+        baseServerWorkout = null;
+      }
     }
   }
 }
@@ -277,9 +299,22 @@ export function handleWorkoutConflict(mutation: Mutation, current: unknown): voi
   // Only handle conflicts for the workout we're currently editing
   if (mutation.resourceId !== state.editingWorkoutId) return;
   mergeServerWorkout(serverWorkout, { localAuthoritative: true });
+  // Write the merged state back into the mutation body. Without this, the
+  // 409-replay in sync.ts only patches `updated_at` into the original body
+  // and re-sends the pre-merge local exercises — silently clobbering any
+  // remote additions we just merged in (e.g. a concurrent Lat Pulldown add).
+  if (mutation.body && typeof mutation.body === 'object') {
+    const body = mutation.body as Record<string, unknown>;
+    body.exercises = state.currentWorkout.exercises;
+    body.target_categories = state.currentWorkout.targetCategories ?? null;
+  }
   renderWorkout();
 }
 
+// ==================== 3-WAY MERGE ====================
+// Pure merge logic lives in ./merge.ts so it can be unit-tested without DOM.
+// This wrapper applies the result to state, refreshes the baseline, and
+// re-renders.
 function mergeServerWorkout(
   serverWorkout: Workout,
   opts: { localAuthoritative: boolean }
@@ -288,75 +323,27 @@ function mergeServerWorkout(
 
   editingWorkoutUpdatedAt = serverWorkout.updated_at;
 
-  const localExercises = state.currentWorkout.exercises;
-  const serverExercises = serverWorkout.exercises;
+  // Base must refer to the same workout we're merging; otherwise treat as
+  // absent and fall back to the legacy two-way behavior.
+  const base =
+    baseServerWorkout && baseServerWorkout.id === serverWorkout.id
+      ? baseServerWorkout
+      : null;
 
-  // The two callers have different semantic needs:
-  //
-  // - autoSaveWorkout (409 conflict path): localAuthoritative=true.
-  //   The local exercise list reflects the user's in-progress edits,
-  //   including pending DELETIONS that haven't been flushed yet.
-  //   If we re-introduced server-only exercises here, the next
-  //   auto-save would resurrect the exercise the user just deleted.
-  //
-  // - syncPoll (background poll path): localAuthoritative=false.
-  //   Another device/session may have ADDED exercises to this workout.
-  //   We must surface those additions; dropping server-only exercises
-  //   would hide remote work and the next auto-save would erase it
-  //   from the server too.
-  const merged = [];
+  const result = mergeWorkouts(base, state.currentWorkout, serverWorkout, opts);
 
-  if (opts.localAuthoritative) {
-    // Safety: if local has no exercises but server does, don't wipe server data.
-    // An empty local list means stale state, not intentional deletion of everything.
-    if (localExercises.length === 0 && serverExercises.length > 0) {
-      for (const serverEx of serverExercises) {
-        merged.push(JSON.parse(JSON.stringify(serverEx)));
-      }
-    } else {
-      // Local-biased: iterate local exercises, enrich from server matches,
-      // drop server-only exercises (they were deleted locally).
-      for (const localEx of localExercises) {
-        const serverEx = serverExercises.find(se => se.name === localEx.name);
-        if (serverEx) {
-          // Exercise exists in both: start with server data, overlay local edits
-          const mergedEx = JSON.parse(JSON.stringify(serverEx));
-          // Keep local notes if server has none
-          if (localEx.notes && !serverEx.notes) {
-            mergedEx.notes = localEx.notes;
-          }
-          merged.push(mergedEx);
-        } else {
-          // Exercise only exists locally (user added it) — keep as-is
-          merged.push(JSON.parse(JSON.stringify(localEx)));
-        }
-      }
-    }
-  } else {
-    // Server-biased: start with server exercises (preserves server ordering
-    // and any remote additions), then append local-only exercises the user
-    // has added but not yet synced.
-    for (const serverEx of serverExercises) {
-      const localEx = localExercises.find(le => le.name === serverEx.name);
-      const mergedEx = JSON.parse(JSON.stringify(serverEx));
-      // Keep local notes if server has none
-      if (localEx?.notes && !serverEx.notes) {
-        mergedEx.notes = localEx.notes;
-      }
-      merged.push(mergedEx);
-    }
-    for (const localEx of localExercises) {
-      const serverEx = serverExercises.find(se => se.name === localEx.name);
-      if (!serverEx) {
-        merged.push(JSON.parse(JSON.stringify(localEx)));
-      }
-    }
+  state.currentWorkout.exercises = result.exercises;
+  state.currentWorkout.targetCategories = result.targetCategories;
+
+  // Update the baseline to the just-merged server view. This becomes the
+  // common ancestor for the next merge round.
+  baseServerWorkout = structuredClone(serverWorkout);
+
+  if (result.hadConflict && opts.localAuthoritative) {
+    // In the autosave (localAuthoritative) path local wins on true
+    // conflicts; show a toast so the user knows their changes were kept.
+    showToast('Merged conflicting edits — your changes kept');
   }
-
-  state.currentWorkout.exercises = merged;
-
-  // Always take server's target categories (including when cleared)
-  state.currentWorkout.targetCategories = serverWorkout.target_categories;
 
   renderWorkout();
 }
@@ -693,6 +680,9 @@ export async function refreshCurrentWorkout(): Promise<boolean> {
       exercises: JSON.parse(JSON.stringify(workout.exercises)),
     };
     editingWorkoutUpdatedAt = workout.updated_at;
+    // Fresh authoritative server view: reset the 3-way merge baseline so
+    // subsequent server polls/conflicts have a correct common ancestor.
+    baseServerWorkout = structuredClone(workout);
     renderWorkout();
     return true;
   } catch (error) {
@@ -701,6 +691,7 @@ export async function refreshCurrentWorkout(): Promise<boolean> {
       state.currentWorkout = null;
       state.editingWorkoutId = null;
       editingWorkoutUpdatedAt = null;
+      baseServerWorkout = null;
       autoSaveConflictRetries = 0;
       isEditingFromHistory = false;
       expandedNotes.clear();
@@ -724,6 +715,10 @@ export function editWorkout(id: string): void {
   };
   state.editingWorkoutId = id;
   editingWorkoutUpdatedAt = source.updated_at;
+  // Capture the initial server view as the 3-way merge baseline. Any
+  // subsequent server poll/conflict compares local edits against this
+  // snapshot to detect one-sided changes unambiguously.
+  baseServerWorkout = structuredClone(source);
   isEditingFromHistory = true;
   expandedNotes.clear();
   updateWorkoutTitle();
@@ -793,6 +788,7 @@ async function syncPoll(): Promise<void> {
       state.currentWorkout = null;
       state.editingWorkoutId = null;
       editingWorkoutUpdatedAt = null;
+      baseServerWorkout = null;
       autoSaveConflictRetries = 0;
       isEditingFromHistory = false;
       expandedNotes.clear();
@@ -878,5 +874,6 @@ export function addExerciseSetting(exerciseId: string): void {
 // ==================== RESET HELPERS ====================
 export function resetWorkoutState(): void {
   editingWorkoutUpdatedAt = null;
+  baseServerWorkout = null;
   autoSaveConflictRetries = 0;
 }

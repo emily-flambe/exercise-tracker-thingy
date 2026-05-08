@@ -22,7 +22,7 @@ import {
   editWorkout, resetWorkoutState,
   startSyncPolling, stopSyncPolling,
   editExerciseSetting, addExerciseSetting,
-  handleWorkoutSynced, handleWorkoutConflict,
+  handleWorkoutSynced,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -99,7 +99,6 @@ function startSyncEngine(): void {
     toast: showToast,
     onStatusChange: updateSyncIndicator,
     onWorkoutSynced: handleWorkoutSynced,
-    onWorkoutConflict: handleWorkoutConflict,
   });
 }
 

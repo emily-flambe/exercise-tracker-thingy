@@ -2,8 +2,9 @@ import * as api from './api';
 import { state } from './state';
 import { $, showToast } from './helpers';
 import { loadData, hydrateFromCache } from './data';
-import { startSync, stopSync, type SyncStatus } from './offline/sync';
+import { startSync, stopSync, flushNow, type SyncStatus } from './offline/sync';
 import { sendMutation } from './offline/client';
+import { cacheClear } from './offline/db';
 import { decodeJwtUnverified, isJwtExpired } from './offline/jwt';
 import { switchTab, onTabSwitch, showWorkoutScreen } from './nav';
 import { startRestTimer, pauseRestTimer, stopRestTimer } from './rest-timer';
@@ -18,8 +19,8 @@ import {
   toggleSetCompleted, toggleSetMissed, toggleNoteField,
   showAddSetForm, hideAddSetForm, saveSetInline, updateSet, deleteSet,
   showExerciseNotes, hideExerciseNotes, saveExerciseNotes,
-  renderWorkout, scheduleAutoSave, editWorkout, editWorkoutDate, resetWorkoutState,
-  refreshCurrentWorkout, startSyncPolling, stopSyncPolling,
+  editWorkout, editWorkoutDate, resetWorkoutState,
+  startSyncPolling, stopSyncPolling,
   editExerciseSetting, addExerciseSetting,
   handleWorkoutSynced, handleWorkoutConflict,
 } from './workout';
@@ -110,10 +111,24 @@ async function handleLogout(): Promise<void> {
 }
 
 // ==================== REFRESH HANDLER ====================
+// Refresh is "show me the server's truth" — it nukes local UI state and the
+// offline cache, then reloads from the network. This is the same recovery as
+// logout/login but without dropping auth, so users don't have to re-enter
+// credentials to escape a stale in-memory editing session (e.g. an SPA left
+// open across days that's still pointing at yesterday's editingWorkoutId).
 async function handleRefresh(): Promise<void> {
   try {
+    // Flush any pending offline writes first so they're not lost when we
+    // clear the cache and re-read from server.
+    try { await flushNow(); } catch (err) { console.warn('Flush before refresh failed:', err); }
+
+    state.currentWorkout = null;
+    state.editingWorkoutId = null;
+    resetWorkoutState();
+    try { await cacheClear(); } catch (err) { console.warn('cacheClear failed:', err); }
+
     await loadData();
-    const refreshedFromServer = await refreshCurrentWorkout();
+
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab?.id === 'tab-history') {
       renderHistory();
@@ -121,8 +136,8 @@ async function handleRefresh(): Promise<void> {
       renderExerciseCategories();
     } else if (activeTab?.id === 'tab-prs') {
       renderPRsTab();
-    } else if (activeTab?.id === 'tab-workout' && state.currentWorkout && !refreshedFromServer) {
-      renderWorkout();
+    } else if (activeTab?.id === 'tab-workout') {
+      showWorkoutScreen('workout-empty');
     }
     showToast('Refreshed');
   } catch (error) {

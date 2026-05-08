@@ -1,6 +1,6 @@
 import * as api from './api';
-import { ApiError, ConflictError } from './api';
-import type { Workout, Set as WorkoutSet } from './api';
+import { ApiError } from './api';
+import type { Set as WorkoutSet } from './api';
 import type { MuscleGroup } from './api';
 import type { CreateWorkoutRequest } from '../types';
 import { state, ALL_MUSCLE_GROUPS } from './state';
@@ -15,19 +15,10 @@ import {
   buildWorkoutDelete,
   newClientId,
 } from './offline/mutations';
-import { mergeWorkouts } from './merge';
-
 // ==================== WORKOUT STATE ====================
 let isEditingFromHistory = false;
 let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let editingWorkoutUpdatedAt: number | null = null;
-// The "common ancestor" for 3-way merge: the last-known-server snapshot
-// of the workout we're currently editing. Used by mergeServerWorkout to
-// distinguish "local deletion" from "remote addition" (and vice versa).
-// Deep-cloned whenever we take a fresh authoritative server view.
-let baseServerWorkout: Workout | null = null;
-let autoSaveConflictRetries = 0;
-const MAX_AUTO_SAVE_CONFLICT_RETRIES = 3;
 let pollIntervalId: ReturnType<typeof setInterval> | null = null;
 let isSyncPolling = false;
 let isAutoSaving = false;
@@ -130,8 +121,6 @@ function startWorkoutInternal(targetCategories?: MuscleGroup[]): void {
   };
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
-  baseServerWorkout = null;
-  autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
   selectedTargetCategories.clear();
@@ -225,8 +214,6 @@ export function startWorkout(): void {
   };
   state.editingWorkoutId = null;
   editingWorkoutUpdatedAt = null;
-  baseServerWorkout = null;
-  autoSaveConflictRetries = 0;
   isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
@@ -259,8 +246,6 @@ export async function confirmDeleteCurrentWorkout(): Promise<void> {
     state.currentWorkout = null;
     state.editingWorkoutId = null;
     editingWorkoutUpdatedAt = null;
-    baseServerWorkout = null;
-    autoSaveConflictRetries = 0;
     isEditingFromHistory = false;
     expandedNotes.clear();
 
@@ -318,13 +303,11 @@ async function autoSaveWorkout(): Promise<void> {
       isNew = true;
       state.editingWorkoutId = resourceId;
       editingWorkoutUpdatedAt = null;
-      baseServerWorkout = null;
     }
 
     await enqueue(buildWorkoutUpsert(resourceId, isNew, workoutData));
     // Fire-and-forget flush: don't block UI on network.
     void flushNow();
-    autoSaveConflictRetries = 0;
   } catch (error) {
     console.error('Failed to enqueue auto-save:', error);
   } finally {
@@ -337,84 +320,12 @@ async function autoSaveWorkout(): Promise<void> {
 // Updates editingWorkoutUpdatedAt so subsequent auto-saves don't send stale
 // updated_at and trigger infinite 409 loops.
 export function handleWorkoutSynced(_mutation: Mutation, response: unknown): void {
-  const res = response as (Workout & { updated_at?: number }) | null | undefined;
+  const res = response as { id?: string; updated_at?: number } | null | undefined;
   if (res?.updated_at !== undefined && state.editingWorkoutId) {
-    // Only update if this response is for the workout we're currently editing
     if (!res.id || res.id === state.editingWorkoutId) {
       editingWorkoutUpdatedAt = res.updated_at;
-      // Refresh the 3-way merge baseline: the server has now accepted our
-      // write, so that exact shape is the new common ancestor for any
-      // future remote changes we haven't seen yet.
-      if (res.id && Array.isArray(res.exercises)) {
-        baseServerWorkout = structuredClone(res) as Workout;
-      } else {
-        // Thin response (bare ACK — has updated_at but no exercises array):
-        // we cannot trust the existing base to still be the common ancestor
-        // alongside the new updated_at. Invalidate it so the next merge
-        // takes the null-base fallback path rather than comparing against
-        // a stale snapshot and flagging everything as a conflict.
-        baseServerWorkout = null;
-      }
     }
   }
-}
-
-// Called by the sync engine on 409 conflict with current server state.
-// Merges the server workout into the active editor and updates
-// editingWorkoutUpdatedAt so the re-enqueued mutation carries the fresh value.
-export function handleWorkoutConflict(mutation: Mutation, current: unknown): void {
-  const serverWorkout = current as Workout | null | undefined;
-  if (!serverWorkout || !state.currentWorkout || !state.editingWorkoutId) return;
-  // Only handle conflicts for the workout we're currently editing
-  if (mutation.resourceId !== state.editingWorkoutId) return;
-  mergeServerWorkout(serverWorkout, { localAuthoritative: true });
-  // Write the merged state back into the mutation body. Without this, the
-  // 409-replay in sync.ts only patches `updated_at` into the original body
-  // and re-sends the pre-merge local exercises — silently clobbering any
-  // remote additions we just merged in (e.g. a concurrent Lat Pulldown add).
-  if (mutation.body && typeof mutation.body === 'object') {
-    const body = mutation.body as Record<string, unknown>;
-    body.exercises = state.currentWorkout.exercises;
-    body.target_categories = state.currentWorkout.targetCategories ?? null;
-  }
-  renderWorkout();
-}
-
-// ==================== 3-WAY MERGE ====================
-// Pure merge logic lives in ./merge.ts so it can be unit-tested without DOM.
-// This wrapper applies the result to state, refreshes the baseline, and
-// re-renders.
-function mergeServerWorkout(
-  serverWorkout: Workout,
-  opts: { localAuthoritative: boolean }
-): void {
-  if (!state.currentWorkout) return;
-
-  editingWorkoutUpdatedAt = serverWorkout.updated_at;
-
-  // Base must refer to the same workout we're merging; otherwise treat as
-  // absent and fall back to the legacy two-way behavior.
-  const base =
-    baseServerWorkout && baseServerWorkout.id === serverWorkout.id
-      ? baseServerWorkout
-      : null;
-
-  const result = mergeWorkouts(base, state.currentWorkout, serverWorkout, opts);
-
-  state.currentWorkout.exercises = result.exercises;
-  state.currentWorkout.targetCategories = result.targetCategories;
-
-  // Update the baseline to the just-merged server view. This becomes the
-  // common ancestor for the next merge round.
-  baseServerWorkout = structuredClone(serverWorkout);
-
-  if (result.hadConflict && opts.localAuthoritative) {
-    // In the autosave (localAuthoritative) path local wins on true
-    // conflicts; show a toast so the user knows their changes were kept.
-    showToast('Merged conflicting edits — your changes kept');
-  }
-
-  renderWorkout();
 }
 
 // ==================== RENDER WORKOUT ====================
@@ -749,9 +660,6 @@ export async function refreshCurrentWorkout(): Promise<boolean> {
       exercises: JSON.parse(JSON.stringify(workout.exercises)),
     };
     editingWorkoutUpdatedAt = workout.updated_at;
-    // Fresh authoritative server view: reset the 3-way merge baseline so
-    // subsequent server polls/conflicts have a correct common ancestor.
-    baseServerWorkout = structuredClone(workout);
     renderWorkout();
     return true;
   } catch (error) {
@@ -760,8 +668,6 @@ export async function refreshCurrentWorkout(): Promise<boolean> {
       state.currentWorkout = null;
       state.editingWorkoutId = null;
       editingWorkoutUpdatedAt = null;
-      baseServerWorkout = null;
-      autoSaveConflictRetries = 0;
       isEditingFromHistory = false;
       expandedNotes.clear();
       showWorkoutScreen('workout-empty');
@@ -784,10 +690,6 @@ export function editWorkout(id: string): void {
   };
   state.editingWorkoutId = id;
   editingWorkoutUpdatedAt = source.updated_at;
-  // Capture the initial server view as the 3-way merge baseline. Any
-  // subsequent server poll/conflict compares local edits against this
-  // snapshot to detect one-sided changes unambiguously.
-  baseServerWorkout = structuredClone(source);
   isEditingFromHistory = true;
   expandedNotes.clear();
   updateWorkoutTitle();
@@ -839,31 +741,24 @@ function handleVisibilityChange(): void {
   }
 }
 
-// Sync poll disabled (emergency hot-fix): the server-biased merge was
-// racing with in-progress local edits and destroying sets/weight/reps
-// values mid-workout. The guard `autoSaveTimeout !== null` is checked at
-// entry, but any edit landing during the in-flight `getWorkout()` await
-// is then clobbered by the merge when the response returns. Until a
-// conflict-free merge is in place, never pull server state over the
-// active workout. A deleted-on-server (404) workout is still handled.
+// Sync poll only handles the 404-on-server case (workout deleted elsewhere).
+// In single-device LWW mode there's no merge — auto-save PUTs are the
+// canonical write path; concurrent edits on a second device will be
+// resolved by last-write-wins on the next save.
 async function syncPoll(): Promise<void> {
   if (!state.editingWorkoutId || isSyncPolling) return;
   isSyncPolling = true;
   try {
     await api.getWorkout(state.editingWorkoutId);
-    // Intentionally do NOT merge. We only want the 404 side-effect below.
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       state.currentWorkout = null;
       state.editingWorkoutId = null;
       editingWorkoutUpdatedAt = null;
-      baseServerWorkout = null;
-      autoSaveConflictRetries = 0;
       isEditingFromHistory = false;
       expandedNotes.clear();
       showWorkoutScreen('workout-empty');
     }
-    // Silently ignore network errors
   } finally {
     isSyncPolling = false;
   }
@@ -943,6 +838,4 @@ export function addExerciseSetting(exerciseId: string): void {
 // ==================== RESET HELPERS ====================
 export function resetWorkoutState(): void {
   editingWorkoutUpdatedAt = null;
-  baseServerWorkout = null;
-  autoSaveConflictRetries = 0;
 }

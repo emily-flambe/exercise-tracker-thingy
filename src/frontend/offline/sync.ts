@@ -32,9 +32,6 @@ export interface SyncDeps {
   // the parsed server response so the caller can update local state (e.g.
   // editingWorkoutUpdatedAt).
   onWorkoutSynced?: (mutation: Mutation, response: unknown) => void;
-  // Callback when a 409 conflict on a workout update returns current server state.
-  // The caller should merge the server state and re-enqueue.
-  onWorkoutConflict?: (mutation: Mutation, current: unknown) => void;
 }
 
 export interface SyncStatus {
@@ -127,15 +124,12 @@ async function doFlush(): Promise<void> {
               return;
             }
             if (err.status === 409) {
-              // Last-write-wins with one replay: inject the server's current
-              // updated_at into our payload and retry once. A second conflict
-              // is terminal — drop and tell the truth, but merge server state.
+              // Last-write-wins: inject the server's current updated_at into
+              // our payload and retry once so the local edit overwrites the
+              // server. A second conflict is terminal — drop with a toast and
+              // let the next user edit converge.
               const current = (err.body as { current?: Record<string, unknown> } | undefined)?.current;
               if (current?.updated_at !== undefined && !m.replayedOnce) {
-                // Notify workout module to merge server state before retrying
-                if (m.kind === 'workout.upsert' && deps.onWorkoutConflict) {
-                  try { deps.onWorkoutConflict(m, current); } catch { /* non-fatal */ }
-                }
                 const bodyObj = (m.body && typeof m.body === 'object')
                   ? (m.body as Record<string, unknown>)
                   : null;
@@ -148,12 +142,7 @@ async function doFlush(): Promise<void> {
                   replayedOnce: true,
                 };
                 await updateQueueEntry(replayed);
-                // Retry this mutation immediately in the next pass.
                 break;
-              }
-              // Terminal conflict: merge server state if available, then drop
-              if (current && m.kind === 'workout.upsert' && deps.onWorkoutConflict) {
-                try { deps.onWorkoutConflict(m, current); } catch { /* non-fatal */ }
               }
               deps.toast?.('A newer version from another device replaced your offline edit.');
               await removeFromQueue(m.id);

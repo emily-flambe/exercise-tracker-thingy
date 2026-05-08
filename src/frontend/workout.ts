@@ -143,11 +143,79 @@ function startWorkoutInternal(targetCategories?: MuscleGroup[]): void {
 function updateWorkoutTitle(): void {
   if (!state.currentWorkout) return;
 
+  const dateBtn = document.getElementById('edit-workout-date-btn');
   if (isEditingFromHistory) {
     $('workout-title').textContent = formatDate(state.currentWorkout.startTime);
+    dateBtn?.classList.remove('hidden');
   } else {
     $('workout-title').textContent = "Today's Workout";
+    dateBtn?.classList.add('hidden');
   }
+}
+
+// ==================== EDIT WORKOUT DATE ====================
+// Format a timestamp as YYYY-MM-DD in the user's local timezone so the
+// native date-input pre-fills correctly regardless of UTC offset.
+function formatLocalDateInput(ts: number): string {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+let dateInputBound = false;
+
+export function editWorkoutDate(): void {
+  if (!state.currentWorkout) return;
+  const input = document.getElementById('workout-date-input') as HTMLInputElement | null;
+  if (!input) return;
+
+  input.value = formatLocalDateInput(state.currentWorkout.startTime);
+
+  if (!dateInputBound) {
+    input.addEventListener('change', handleWorkoutDateChange);
+    dateInputBound = true;
+  }
+
+  // showPicker is supported on modern Chromium/Firefox/Safari. Fall back
+  // to focus+click for older browsers (the input is offscreen, so click
+  // still surfaces the native picker on mobile).
+  try {
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+  } catch {
+    // showPicker can throw if not user-activated; fall through to click.
+  }
+  input.focus();
+  input.click();
+}
+
+function handleWorkoutDateChange(e: Event): void {
+  if (!state.currentWorkout) return;
+  const input = e.target as HTMLInputElement;
+  if (!input.value) return;
+
+  // Parse YYYY-MM-DD as local-date components and preserve the existing
+  // time-of-day so a 7pm workout stays at 7pm after a date swap.
+  const [y, m, d] = input.value.split('-').map(Number);
+  if (!y || !m || !d) return;
+
+  const original = new Date(state.currentWorkout.startTime);
+  const next = new Date(
+    y, m - 1, d,
+    original.getHours(), original.getMinutes(),
+    original.getSeconds(), original.getMilliseconds(),
+  );
+  const nextTs = next.getTime();
+  if (Number.isNaN(nextTs) || nextTs === state.currentWorkout.startTime) return;
+
+  state.currentWorkout.startTime = nextTs;
+  updateWorkoutTitle();
+  scheduleAutoSave();
+  showToast('Date updated');
 }
 
 export function startWorkout(): void {
@@ -162,6 +230,7 @@ export function startWorkout(): void {
   isEditingFromHistory = false;
   expandedNotes.clear();
   $('workout-title').textContent = "Today's Workout";
+  document.getElementById('edit-workout-date-btn')?.classList.add('hidden');
   showWorkoutScreen('workout-active');
   renderWorkout();
 }

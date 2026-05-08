@@ -19,7 +19,7 @@ import {
   toggleSetCompleted, toggleSetMissed, toggleNoteField,
   showAddSetForm, hideAddSetForm, saveSetInline, updateSet, deleteSet,
   showExerciseNotes, hideExerciseNotes, saveExerciseNotes,
-  editWorkout, resetWorkoutState,
+  editWorkout, editWorkoutDate, resetWorkoutState,
   startSyncPolling, stopSyncPolling,
   editExerciseSetting, addExerciseSetting,
   handleWorkoutSynced, handleWorkoutConflict,
@@ -238,6 +238,7 @@ async function init(): Promise<void> {
 // Export app object to window for onclick handlers
 (window as unknown as Record<string, unknown>).app = {
   startWorkout,
+  editWorkoutDate,
   showDeleteCurrentWorkoutConfirm,
   cancelDeleteCurrentWorkout,
   confirmDeleteCurrentWorkout,

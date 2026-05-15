@@ -149,8 +149,13 @@ async function refresh(): Promise<void> {
   const btns = document.querySelectorAll('.refresh-icon');
   if (btns[0]?.classList.contains('refreshing')) return;
   btns.forEach(btn => btn.classList.add('refreshing'));
-  await handleRefresh();
-  btns.forEach(btn => btn.classList.remove('refreshing'));
+  try {
+    await handleRefresh();
+  } finally {
+    // try/finally so a thrown error inside handleRefresh can't leave the
+    // spinner pinned and block further refresh attempts.
+    btns.forEach(btn => btn.classList.remove('refreshing'));
+  }
 }
 
 // ==================== TAB SWITCH WIRING ====================

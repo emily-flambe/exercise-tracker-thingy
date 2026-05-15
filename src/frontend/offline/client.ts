@@ -15,11 +15,17 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
+// Cap per-mutation requests so a stalled fetch can't pin the sync loop's
+// inFlight promise forever — that would deadlock callers like handleRefresh
+// that await flushNow() before reloading.
+const FETCH_TIMEOUT_MS = 10000;
+
 async function request(method: string, path: string, body: unknown): Promise<unknown> {
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: authHeaders(),
     body: body === null || body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     const parsed = await res.json().catch(() => ({}));

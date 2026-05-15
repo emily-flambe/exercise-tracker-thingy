@@ -37,6 +37,10 @@ export function isAuthenticated(): boolean {
   return !!getToken();
 }
 
+// Default cap so a stalled request can't lock the UI (e.g. Refresh spinner
+// stuck forever waiting on a fetch that never resolves on flaky networks).
+const DEFAULT_FETCH_TIMEOUT_MS = 10000;
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -51,6 +55,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
+    signal: options.signal ?? AbortSignal.timeout(DEFAULT_FETCH_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -205,6 +210,7 @@ export async function updateWorkout(id: string, data: {
     method: 'PUT',
     headers,
     body: JSON.stringify(data),
+    signal: AbortSignal.timeout(DEFAULT_FETCH_TIMEOUT_MS),
   });
 
   if (response.status === 409) {

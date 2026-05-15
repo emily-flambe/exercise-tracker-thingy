@@ -105,8 +105,6 @@ export function createAuthSubmitHandler(onLoginSuccess: () => void): (e: Event) 
         const response = await api.login(username, password);
         currentUser = response.user;
       }
-      await loadData();
-      onLoginSuccess();
     } catch (error) {
       setSubmitLoading(false);
       if (error instanceof api.ApiError) {
@@ -114,7 +112,16 @@ export function createAuthSubmitHandler(onLoginSuccess: () => void): (e: Event) 
       } else {
         showAuthError('An error occurred. Please try again.');
       }
+      return;
     }
+
+    // Auth succeeded — switch to the main app immediately. loadData() can hang
+    // on a slow/stalled fetch, and gating the screen transition on it leaves
+    // the user staring at a spinner with a valid token already in localStorage
+    // (reload would then drop them straight into the app). Mirror init()'s
+    // optimistic path: show the app first, hydrate data in the background.
+    onLoginSuccess();
+    void loadData();
   };
 }
 

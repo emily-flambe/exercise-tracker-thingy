@@ -109,6 +109,19 @@ async function handleLogout(): Promise<void> {
   await logout();
 }
 
+// Re-render whichever data-driven tab is currently visible. Called after
+// background loadData() resolves so the UI reflects freshly-fetched state —
+// without this, History/Exercises/PRs that rendered with empty state.history
+// during the load would stay stuck on an empty calendar forever.
+function renderActiveTab(): void {
+  const activeTab = document.querySelector('.tab-content.active');
+  if (activeTab?.id === 'tab-history') renderHistory();
+  else if (activeTab?.id === 'tab-exercises') renderExerciseCategories();
+  else if (activeTab?.id === 'tab-prs') renderPRsTab();
+  // The workout tab is driven by in-progress edit state, not state.history —
+  // no re-render needed when background data lands.
+}
+
 // ==================== REFRESH HANDLER ====================
 // Refresh is "show me the server's truth" — it nukes local UI state and the
 // offline cache, then reloads from the network. This is the same recovery as
@@ -129,14 +142,10 @@ async function handleRefresh(): Promise<void> {
     await loadData();
 
     const activeTab = document.querySelector('.tab-content.active');
-    if (activeTab?.id === 'tab-history') {
-      renderHistory();
-    } else if (activeTab?.id === 'tab-exercises') {
-      renderExerciseCategories();
-    } else if (activeTab?.id === 'tab-prs') {
-      renderPRsTab();
-    } else if (activeTab?.id === 'tab-workout') {
+    if (activeTab?.id === 'tab-workout') {
       showWorkoutScreen('workout-empty');
+    } else {
+      renderActiveTab();
     }
     showToast('Refreshed');
   } catch (error) {
@@ -173,6 +182,11 @@ async function init(): Promise<void> {
     showMainApp(handleRefresh);
     startSyncPolling();
     startSyncEngine();
+    // Background data load: must re-render the active tab when it resolves,
+    // otherwise a user who clicks History/Exercises/PRs before loadData
+    // finishes sees an empty view that never updates (auth.ts can't do this
+    // itself without an import cycle into the render modules).
+    void loadData().then(renderActiveTab);
   }));
 
   if (api.isAuthenticated()) {
@@ -202,11 +216,15 @@ async function init(): Promise<void> {
       startSyncEngine();
       if (online) {
         // Background refresh + auth validation. Failure kicks user back to auth.
+        // Re-render the active tab after loadData so a user viewing History
+        // sees freshly-fetched workouts replace the cached snapshot, not the
+        // other way around.
         void (async () => {
           try {
             const user = await api.getCurrentUser();
             setCurrentUser(user);
             await loadData();
+            renderActiveTab();
           } catch {
             api.logout();
             stopSync();

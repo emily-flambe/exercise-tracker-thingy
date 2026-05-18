@@ -2,7 +2,6 @@ import * as api from './api';
 import type { User } from './api';
 import { state } from './state';
 import { $, showToast } from './helpers';
-import { loadData } from './data';
 import { setupPullToRefresh } from './pull-to-refresh';
 import { cacheClear, clearQueue } from './offline/db';
 
@@ -120,8 +119,11 @@ export function createAuthSubmitHandler(onLoginSuccess: () => void): (e: Event) 
     // the user staring at a spinner with a valid token already in localStorage
     // (reload would then drop them straight into the app). Mirror init()'s
     // optimistic path: show the app first, hydrate data in the background.
+    // The caller is responsible for kicking off loadData() and re-rendering
+    // the active tab once it resolves; if we did `void loadData()` here, the
+    // History/Exercises/PRs tabs would render with empty state and never
+    // update when data arrived.
     onLoginSuccess();
-    void loadData();
   };
 }
 

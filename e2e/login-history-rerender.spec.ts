@@ -116,15 +116,20 @@ test.describe('login → history re-renders when data arrives', () => {
     // refreshed from the server, not just the stale cache).
     await page.waitForTimeout(2500);
     await page.locator('#tab-history div[onclick*="showDayWorkouts"]').first().click();
-    // Expect two workout rows since both are on the same day.
-    await expect(page.locator('text=2 exercises, text=1 exercises').first()).toBeVisible({ timeout: 5000 });
+    // showDayWorkouts renders one card per workout. Two workouts on the same
+    // day = two cards; if loadData hadn't re-rendered, we'd still be looking
+    // at the cached snapshot with only one.
+    await expect(page.locator('#history-list div[onclick*="editWorkout"]')).toHaveCount(2, { timeout: 5000 });
   });
 });
 
-// Unit-style guard: make sure auth.ts no longer imports loadData. If it does,
-// someone has reintroduced the bug pattern of firing background loadData from
-// inside the auth module (which can't re-render the active tab without
-// creating an import cycle into the render modules).
+// Unit-style guard: make sure auth.ts no longer imports or calls loadData.
+// If it does, someone has reintroduced the bug pattern of firing background
+// loadData from inside the auth module (which can't re-render the active tab
+// without creating an import cycle into the render modules).
+//
+// We strip comments before matching so the comments in auth.ts that explain
+// why the import was removed don't trip the guard.
 test('auth.ts does not import loadData (architectural guard)', async () => {
   const fs = await import('fs');
   const path = await import('path');
@@ -132,6 +137,10 @@ test('auth.ts does not import loadData (architectural guard)', async () => {
     path.resolve(process.cwd(), 'src/frontend/auth.ts'),
     'utf-8',
   );
-  expect(authSrc).not.toMatch(/from\s+['"]\.\/data['"]/);
-  expect(authSrc).not.toMatch(/loadData/);
+  const codeOnly = authSrc
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+  expect(codeOnly).not.toMatch(/from\s+['"]\.\/data['"]/);
+  expect(codeOnly).not.toMatch(/\bloadData\s*\(/);
+  expect(codeOnly).not.toMatch(/import\s*\{[^}]*\bloadData\b/);
 });

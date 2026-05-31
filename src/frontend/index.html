@@ -104,6 +104,34 @@
       </div>
     </div>
 
+    <!-- Workout Conflict Modal: shown when the workout changed elsewhere (e.g. the
+         coach agent) while you had local edits. No backdrop-dismiss — pick a side. -->
+    <div id="workout-conflict-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
+      <div class="absolute inset-0 bg-black/80"></div>
+      <div class="relative bg-swiss-card border border-swiss-border rounded-sm max-w-sm w-full mx-4 overflow-hidden">
+        <div class="flex items-center p-4 border-b border-swiss-border">
+          <h2 class="text-sm font-bold uppercase tracking-[0.2em]">Workout changed elsewhere</h2>
+        </div>
+        <div class="p-4">
+          <p class="text-sm text-swiss-text-secondary mb-4">This workout was updated somewhere else (likely your coach agent) while you were editing it. Pick which version to keep — they won't be merged.</p>
+          <div class="grid grid-cols-2 gap-3 mb-4 text-sm">
+            <div class="bg-swiss-surface border border-swiss-border rounded-sm p-3">
+              <div class="text-xs uppercase tracking-wider text-swiss-text-secondary mb-1">Your version</div>
+              <div id="conflict-mine-summary" class="text-white font-mono">—</div>
+            </div>
+            <div class="bg-swiss-surface border border-swiss-border rounded-sm p-3">
+              <div class="text-xs uppercase tracking-wider text-swiss-text-secondary mb-1">Their version</div>
+              <div id="conflict-theirs-summary" class="text-white font-mono">—</div>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="app.resolveConflictKeepMine()" class="flex-1 border border-swiss-border hover:border-white text-white font-bold px-4 py-2 rounded-sm text-sm uppercase tracking-wider">Keep mine</button>
+            <button onclick="app.resolveConflictLoadTheirs()" class="flex-1 bg-swiss-red hover:bg-red-700 text-white font-bold px-4 py-2 rounded-sm text-sm uppercase tracking-wider">Load theirs</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- PR History Modal -->
     <div id="pr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
       <div class="absolute inset-0 bg-black/80" onclick="app.hidePRHistory()"></div>

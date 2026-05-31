@@ -1,15 +1,15 @@
 import * as api from './api';
 import { ApiError } from './api';
 import type { Set as WorkoutSet } from './api';
-import type { MuscleGroup } from './api';
+import type { MuscleGroup, Workout } from './api';
 import type { CreateWorkoutRequest } from '../types';
 import { state, ALL_MUSCLE_GROUPS } from './state';
 import { $, escapeHtml, formatDate, getAllExercises, getTypeColor, getTypeLabel, showToast } from './helpers';
 import { loadData } from './data';
 import { showWorkoutScreen } from './nav';
 import { recalculateAllPRs } from './pr-calc';
-import { enqueue, type Mutation } from './offline/db';
-import { flushNow } from './offline/sync';
+import { enqueue, listQueue, type Mutation } from './offline/db';
+import { flushNow, resolveConflictKeepMine as syncKeepMine, resolveConflictTakeTheirs as syncTakeTheirs } from './offline/sync';
 import {
   buildWorkoutUpsert,
   buildWorkoutDelete,
@@ -26,6 +26,9 @@ let expandedNotes = new Set<string>();
 let selectedTargetCategories = new Set<MuscleGroup>();
 let isEditingCategories = false;
 let editingNotesExerciseIndex: number | null = null;
+// The server version awaiting a user decision in the conflict dialog. Non-null
+// only while the "Workout changed elsewhere" modal is open.
+let pendingConflict: Workout | null = null;
 
 // ==================== CATEGORY SELECTION ====================
 export function showCategorySelection(): void {
@@ -741,15 +744,29 @@ function handleVisibilityChange(): void {
   }
 }
 
-// Sync poll only handles the 404-on-server case (workout deleted elsewhere).
-// In single-device LWW mode there's no merge — auto-save PUTs are the
-// canonical write path; concurrent edits on a second device will be
-// resolved by last-write-wins on the next save.
+// Sync poll detects when the open workout changed underneath us — e.g. the
+// coach agent (MCP) edited it. If we have divergent local edits, prompt the user
+// to pick a side (never silently merge — see the killed 3-way-merge history).
+// If we have nothing local pending, quietly adopt the server's version so the
+// agent's change just appears. Also handles the 404 case (deleted elsewhere).
 async function syncPoll(): Promise<void> {
   if (!state.editingWorkoutId || isSyncPolling) return;
+  // Don't poll-prompt while a conflict dialog is already open.
+  if (pendingConflict) return;
   isSyncPolling = true;
   try {
-    await api.getWorkout(state.editingWorkoutId);
+    const workout = await api.getWorkout(state.editingWorkoutId);
+    // No known base, or server unchanged relative to it — nothing to reconcile.
+    if (editingWorkoutUpdatedAt === null || workout.updated_at === editingWorkoutUpdatedAt) {
+      return;
+    }
+    // Server moved ahead of our base. Prompt if we'd lose local work, else adopt.
+    if (await hasLocalDivergence()) {
+      showWorkoutConflict(workout);
+    } else {
+      adoptServerWorkout(workout);
+      showToast('Updated from server');
+    }
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       state.currentWorkout = null;
@@ -761,6 +778,103 @@ async function syncPoll(): Promise<void> {
     }
   } finally {
     isSyncPolling = false;
+  }
+}
+
+// We have un-synced local work if a debounced auto-save is pending/running or a
+// mutation for this workout is still queued (including one already conflicted).
+async function hasLocalDivergence(): Promise<boolean> {
+  if (autoSaveTimeout !== null || isAutoSaving) return true;
+  const id = state.editingWorkoutId;
+  if (!id) return false;
+  const queued = await listQueue();
+  return queued.some((m) => m.resourceId === id);
+}
+
+// Replace local editing state with the server's version. Used when the workout
+// changed remotely and either we have nothing local to lose, or the user chose
+// "Load theirs" in the conflict prompt.
+function adoptServerWorkout(workout: Workout): void {
+  state.currentWorkout = {
+    startTime: workout.start_time,
+    targetCategories: workout.target_categories,
+    exercises: JSON.parse(JSON.stringify(workout.exercises)),
+  };
+  editingWorkoutUpdatedAt = workout.updated_at;
+  renderWorkout();
+}
+
+// ==================== CONFLICT PROMPT ====================
+function summarize(exercises: { sets: unknown[] }[]): string {
+  const ex = exercises.length;
+  const sets = exercises.reduce((n, e) => n + e.sets.length, 0);
+  return `${ex} exercise${ex === 1 ? '' : 's'}, ${sets} set${sets === 1 ? '' : 's'}`;
+}
+
+// Show the "Workout changed elsewhere" modal. `current` is the server version.
+// Reached from two triggers: the poll (proactive) and a 409 during sync (at
+// write time, e.g. an offline edit landing late).
+export function showWorkoutConflict(current: Workout): void {
+  pendingConflict = current;
+  const mineEl = document.getElementById('conflict-mine-summary');
+  const theirsEl = document.getElementById('conflict-theirs-summary');
+  if (mineEl) mineEl.textContent = state.currentWorkout ? summarize(state.currentWorkout.exercises) : '(empty)';
+  if (theirsEl) theirsEl.textContent = summarize(current.exercises);
+  const modal = $('workout-conflict-modal');
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function hideWorkoutConflict(): void {
+  pendingConflict = null;
+  const modal = $('workout-conflict-modal');
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+// "Keep mine": rebase the local edit onto the server's current version so the
+// next save wins the compare-and-swap, then push it.
+export async function resolveConflictKeepMine(): Promise<void> {
+  const current = pendingConflict;
+  if (!current) return;
+  editingWorkoutUpdatedAt = current.updated_at;
+  const id = state.editingWorkoutId;
+  if (id) {
+    const mutationId = `workout.upsert:${id}`;
+    const queued = (await listQueue()).find((m) => m.id === mutationId);
+    if (queued) {
+      // A mutation is already queued (possibly conflicted) — rebase + resend it.
+      await syncKeepMine(mutationId, current.updated_at);
+    } else {
+      // Poll caught the conflict before anything was queued — enqueue current state.
+      scheduleAutoSave();
+    }
+  }
+  hideWorkoutConflict();
+  showToast('Kept your version');
+}
+
+// "Load theirs": discard the local edit and adopt the server's version.
+export async function resolveConflictLoadTheirs(): Promise<void> {
+  const current = pendingConflict;
+  if (!current) return;
+  // Cancel any pending auto-save so it can't re-enqueue the discarded local edit.
+  if (autoSaveTimeout) { clearTimeout(autoSaveTimeout); autoSaveTimeout = null; }
+  const id = state.editingWorkoutId;
+  if (id) await syncTakeTheirs(`workout.upsert:${id}`);
+  adoptServerWorkout(current);
+  hideWorkoutConflict();
+  showToast('Loaded latest version');
+}
+
+// Wired to the sync engine's onConflict (a 409 during background flush). Routes
+// the currently-edited workout to the prompt; otherwise informs the user.
+export function handleSyncConflict(mutation: Mutation, current: Record<string, unknown> | undefined): void {
+  if (!current) return;
+  if (mutation.resourceId === state.editingWorkoutId) {
+    showWorkoutConflict(current as unknown as Workout);
+  } else {
+    showToast('A workout changed elsewhere — open it to resolve');
   }
 }
 

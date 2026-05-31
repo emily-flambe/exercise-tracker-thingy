@@ -22,7 +22,8 @@ import {
   editWorkout, editWorkoutDate, resetWorkoutState,
   startSyncPolling, stopSyncPolling,
   editExerciseSetting, addExerciseSetting,
-  handleWorkoutSynced,
+  handleWorkoutSynced, handleSyncConflict,
+  resolveConflictKeepMine, resolveConflictLoadTheirs,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -99,6 +100,7 @@ function startSyncEngine(): void {
     toast: showToast,
     onStatusChange: updateSyncIndicator,
     onWorkoutSynced: handleWorkoutSynced,
+    onConflict: handleSyncConflict,
   });
 }
 
@@ -337,6 +339,9 @@ async function init(): Promise<void> {
   stopRestTimer,
   // Refresh
   refresh,
+  // Conflict prompt
+  resolveConflictKeepMine,
+  resolveConflictLoadTheirs,
 };
 
 init();

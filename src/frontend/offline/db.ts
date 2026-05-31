@@ -24,9 +24,11 @@ export interface Mutation {
   createdAt: number;
   attempts: number;
   lastError?: string;
-  // Set once if a 409 conflict has already been replayed with a fresh updated_at.
-  // A second conflict on the same mutation is terminal (drop + tell the truth).
-  replayedOnce?: boolean;
+  // Set when a 409 conflict is detected. A conflicted mutation is held in the
+  // queue and skipped by the drain (no auto-retry, no last-write-wins) until the
+  // user resolves it via the conflict prompt — keep mine (rebase + resend) or
+  // take theirs (drop). This is what stops the agent's edits from being clobbered.
+  conflicted?: boolean;
 }
 
 export type CacheKey = 'user' | 'workouts' | 'exercises' | 'prs';

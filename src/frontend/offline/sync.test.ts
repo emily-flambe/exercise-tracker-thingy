@@ -12,6 +12,7 @@ type Mutation = {
   createdAt: number;
   attempts: number;
   lastError?: string;
+  conflicted?: boolean;
 };
 
 // Mock the db module before importing sync so sync picks up the mock.
@@ -27,7 +28,10 @@ vi.mock('./db', () => ({
   },
 }));
 
-import { flushNow, __resetSyncForTests, startSync, stopSync, SyncHttpError } from './sync';
+import {
+  flushNow, __resetSyncForTests, startSync, stopSync, SyncHttpError,
+  resolveConflictKeepMine, resolveConflictTakeTheirs,
+} from './sync';
 
 function makeMutation(id: string, seq: number): Mutation {
   return {
@@ -154,5 +158,55 @@ describe('sync engine', () => {
     stopSync();
     expect(sent).toEqual(['a']);
     expect(state.queue).toEqual([]);
+  });
+
+  // A 409 must NOT silently last-write-wins anymore. The mutation is held in the
+  // queue (marked conflicted) and surfaced via onConflict so the user can choose.
+  it('409 holds the mutation as conflicted and fires onConflict (no auto-overwrite)', async () => {
+    state.queue = [makeMutation('w1', 1)];
+    const server = { id: 'w1', updated_at: 999 };
+    const send = vi.fn(async () => {
+      throw new SyncHttpError(409, { error: 'Conflict', current: server });
+    });
+    const onConflict = vi.fn();
+    startSync({ send, isOnline: () => true, onConflict }, 60_000);
+    await flushNow();
+    stopSync();
+    // Mutation is retained, marked conflicted — not dropped, not replayed.
+    expect(state.queue.length).toBe(1);
+    expect(state.queue[0].conflicted).toBe(true);
+    expect(onConflict).toHaveBeenCalledTimes(1);
+    expect(onConflict.mock.calls[0][1]).toEqual(server);
+  });
+
+  it('a conflicted mutation is skipped by the drain (no retry until resolved)', async () => {
+    state.queue = [{ ...makeMutation('w1', 1), conflicted: true }];
+    const send = vi.fn(async () => {});
+    startSync({ send, isOnline: () => true }, 60_000);
+    await flushNow();
+    stopSync();
+    expect(send).not.toHaveBeenCalled();
+    expect(state.queue.length).toBe(1);
+  });
+
+  it('resolveConflictKeepMine clears the flag, rebases updated_at, and resends', async () => {
+    state.queue = [{ ...makeMutation('w1', 1), isNew: false, body: { id: 'w1' }, conflicted: true }];
+    const sent: unknown[] = [];
+    const send = vi.fn(async (m: Mutation) => { sent.push(m.body); });
+    startSync({ send, isOnline: () => true }, 60_000);
+    await resolveConflictKeepMine('w1', 999);
+    // resolveConflictKeepMine kicks a flush; wait for it.
+    await flushNow();
+    stopSync();
+    expect(sent).toEqual([{ id: 'w1', updated_at: 999 }]);
+    expect(state.queue).toEqual([]);
+  });
+
+  it('resolveConflictTakeTheirs drops the local mutation', async () => {
+    state.queue = [{ ...makeMutation('w1', 1), conflicted: true }];
+    startSync({ send: vi.fn(async () => {}), isOnline: () => true }, 60_000);
+    await resolveConflictTakeTheirs('w1');
+    stopSync();
+    expect(state.queue.length).toBe(0);
   });
 });

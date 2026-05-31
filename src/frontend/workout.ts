@@ -289,23 +289,24 @@ async function autoSaveWorkout(): Promise<void> {
 
     let resourceId: string;
     let isNew: boolean;
-    if (state.editingWorkoutId) {
+    if (state.editingWorkoutId && editingWorkoutUpdatedAt !== null) {
+      // Known existing workout — PUT with the version we're based on. The
+      // backend now requires updated_at and rejects a PUT without it.
       resourceId = state.editingWorkoutId;
       isNew = false;
       const originalWorkout = state.history.find(w => w.id === state.editingWorkoutId);
       if (originalWorkout?.end_time) {
         workoutData.end_time = originalWorkout.end_time;
       }
-      if (editingWorkoutUpdatedAt !== null) {
-        workoutData.updated_at = editingWorkoutUpdatedAt;
-      }
+      workoutData.updated_at = editingWorkoutUpdatedAt;
     } else {
-      // New workout: assign a client-generated id so the outbox can POST
-      // with idempotent semantics and subsequent edits route to the same resource.
-      resourceId = newClientId();
+      // New workout, or one created offline that the server hasn't confirmed
+      // yet (no base updated_at). (Re)POST with a stable client-generated id —
+      // POST is idempotent on the id, so re-sending is safe and returns the
+      // server's updated_at. Never PUT without a base version.
+      resourceId = state.editingWorkoutId ?? newClientId();
       isNew = true;
       state.editingWorkoutId = resourceId;
-      editingWorkoutUpdatedAt = null;
     }
 
     await enqueue(buildWorkoutUpsert(resourceId, isNew, workoutData));

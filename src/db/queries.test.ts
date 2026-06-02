@@ -807,7 +807,7 @@ describe('Exercise Notes', () => {
         }
       ]
     };
-    const result = await updateWorkout(env.DB, created.id, userId, updateData);
+    const result = await updateWorkout(env.DB, created.id, userId, { ...updateData, updated_at: created.updated_at });
 
     expect(result.status).toBe('success');
     const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
@@ -849,7 +849,7 @@ describe('Exercise Notes', () => {
         }
       ]
     };
-    const result = await updateWorkout(env.DB, created.id, userId, updateData);
+    const result = await updateWorkout(env.DB, created.id, userId, { ...updateData, updated_at: created.updated_at });
 
     expect(result.status).toBe('success');
     const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
@@ -1016,7 +1016,7 @@ describe('Exercise Notes', () => {
         }
       ]
     };
-    const result = await updateWorkout(env.DB, created.id, userId, updateData);
+    const result = await updateWorkout(env.DB, created.id, userId, { ...updateData, updated_at: created.updated_at });
 
     expect(result.status).toBe('success');
     const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
@@ -1105,8 +1105,9 @@ describe('Optimistic Locking', () => {
     };
     const created = await createWorkout(env.DB, userId, workout);
 
-    // Simulate external update (updates updated_at on server)
-    const externalUpdate: CreateWorkoutRequest = {
+    // Simulate external update (updates updated_at on server). Uses the create's
+    // version so it wins the compare-and-swap and bumps updated_at.
+    const externalUpdate: CreateWorkoutRequest & { updated_at: number } = {
       start_time: created.start_time,
       end_time: created.end_time,
       exercises: [
@@ -1116,6 +1117,7 @@ describe('Optimistic Locking', () => {
           sets: [{ weight: 135, reps: 10, completed: true }]
         }
       ],
+      updated_at: created.updated_at,
     };
     const externalResult = await updateWorkout(env.DB, created.id, userId, externalUpdate);
     expect(externalResult.status).toBe('success');
@@ -1143,7 +1145,7 @@ describe('Optimistic Locking', () => {
     expect(conflict.current.exercises[0].notes).toBe('Coach says: great form!');
   });
 
-  it('should allow update without updated_at (backward compatible)', async () => {
+  it('has no version-less escape hatch — a stale updated_at conflicts, never blind-overwrites', async () => {
     const workout: CreateWorkoutRequest = {
       start_time: Date.now(),
       end_time: Date.now() + 3600000,
@@ -1156,23 +1158,28 @@ describe('Optimistic Locking', () => {
     };
     const created = await createWorkout(env.DB, userId, workout);
 
-    // Update without sending updated_at - should always succeed (backward compat)
-    const updateData: CreateWorkoutRequest = {
+    // First update establishes a new version using the create's updated_at.
+    const first = await updateWorkout(env.DB, created.id, userId, {
       start_time: created.start_time,
       end_time: created.end_time,
       exercises: [
-        {
-          name: 'Bench Press',
-          notes: 'No version check',
-          sets: [{ weight: 135, reps: 10, completed: true }]
-        }
+        { name: 'Bench Press', notes: 'v2', sets: [{ weight: 135, reps: 10, completed: true }] }
       ],
-    };
-    const result = await updateWorkout(env.DB, created.id, userId, updateData);
+      updated_at: created.updated_at,
+    });
+    expect(first.status).toBe('success');
 
-    expect(result.status).toBe('success');
-    const updated = (result as Extract<UpdateWorkoutResult, { status: 'success' }>).workout;
-    expect(updated.exercises[0].notes).toBe('No version check');
+    // A second update still based on the ORIGINAL version must conflict. There
+    // is no path that skips the version check (the blind-overwrite branch is gone).
+    const stale = await updateWorkout(env.DB, created.id, userId, {
+      start_time: created.start_time,
+      end_time: created.end_time,
+      exercises: [
+        { name: 'Bench Press', notes: 'should be rejected', sets: [{ weight: 135, reps: 10, completed: true }] }
+      ],
+      updated_at: created.updated_at,
+    });
+    expect(stale.status).toBe('conflict');
   });
 
   it('should return not_found for non-existent workout', async () => {
@@ -1185,7 +1192,7 @@ describe('Optimistic Locking', () => {
         }
       ],
     };
-    const result = await updateWorkout(env.DB, 'nonexistent-id', userId, updateData);
+    const result = await updateWorkout(env.DB, 'nonexistent-id', userId, { ...updateData, updated_at: Date.now() });
 
     expect(result.status).toBe('not_found');
   });

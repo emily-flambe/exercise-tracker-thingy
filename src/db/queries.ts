@@ -269,26 +269,19 @@ export type UpdateWorkoutResult =
   | { status: 'not_found' }
   | { status: 'conflict'; current: Workout };
 
-export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest & { updated_at?: number }): Promise<UpdateWorkoutResult> {
+export async function updateWorkout(db: D1Database, id: string, userId: string, data: CreateWorkoutRequest & { updated_at: number }): Promise<UpdateWorkoutResult> {
   const now = Date.now();
   const targetCategoriesJson = data.target_categories
     ? JSON.stringify(data.target_categories)
     : null;
 
-  // Atomic compare-and-swap: include updated_at in WHERE clause to prevent TOCTOU races
-  let result;
-  if (data.updated_at !== undefined) {
-    result = await db
-      .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ?, updated_at = ? WHERE id = ? AND user_id = ? AND updated_at = ?')
-      .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, now, id, userId, data.updated_at)
-      .run();
-  } else {
-    // No version check (backward compatible) - still scope to user_id
-    result = await db
-      .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ?, updated_at = ? WHERE id = ? AND user_id = ?')
-      .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, now, id, userId)
-      .run();
-  }
+  // Atomic compare-and-swap: updated_at is REQUIRED and included in the WHERE
+  // clause. There is no version-less update path — a write that doesn't know the
+  // version it's based on cannot prove it isn't clobbering a concurrent edit.
+  const result = await db
+    .prepare('UPDATE workouts SET start_time = ?, end_time = ?, target_categories = ?, updated_at = ? WHERE id = ? AND user_id = ? AND updated_at = ?')
+    .bind(data.start_time, data.end_time ?? null, targetCategoriesJson, now, id, userId, data.updated_at)
+    .run();
 
   if (result.meta.changes === 0) {
     // Either not found or version mismatch - check which

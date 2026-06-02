@@ -3,7 +3,8 @@
 // Responsibilities:
 // - Drain the IndexedDB mutation queue in FIFO order.
 // - Single-flight: only one flush runs at a time.
-// - On 409 (conflict), replay with last-write-wins semantics and surface a toast.
+// - On 409 (conflict), hold the mutation (marked `conflicted`) and surface it to
+//   the UI via onConflict so the user can pick a side. No silent last-write-wins.
 // - Listen to `online` events and a 60s interval for periodic retry.
 // - Expose a small API that workout.ts / app.ts can call without caring about the queue internals.
 
@@ -22,7 +23,7 @@ export interface SyncDeps {
   // Should throw on non-2xx with { status, body }.
   // Returns the parsed response body on success.
   send: (m: Mutation) => Promise<unknown>;
-  // User-visible notification (optional — used on 409 LWW replay).
+  // User-visible notification (optional).
   toast?: (message: string) => void;
   // Callback invoked whenever queue length or status changes (for UI indicator).
   onStatusChange?: (status: SyncStatus) => void;
@@ -32,6 +33,12 @@ export interface SyncDeps {
   // the parsed server response so the caller can update local state (e.g.
   // editingWorkoutUpdatedAt).
   onWorkoutSynced?: (mutation: Mutation, response: unknown) => void;
+  // Callback when a mutation hits a 409 conflict (the resource changed under us,
+  // e.g. the coach agent edited the workout). The mutation is held in the queue
+  // marked `conflicted`; the UI must prompt the user and then call
+  // resolveConflictKeepMine() or resolveConflictTakeTheirs() to unblock it.
+  // `current` is the server's current version of the resource (from the 409 body).
+  onConflict?: (mutation: Mutation, current: Record<string, unknown> | undefined) => void;
 }
 
 export interface SyncStatus {
@@ -99,7 +106,9 @@ async function doFlush(): Promise<void> {
     // Loop: fetch a snapshot, send each in order, re-snapshot if new ones arrive.
     // Bounded to avoid infinite loops under adversarial enqueue-during-flush.
     for (let pass = 0; pass < 5; pass++) {
-      const queue = await listQueue();
+      // Conflicted mutations are held until the user resolves them — they are
+      // invisible to the drain so they neither retry nor block other resources.
+      const queue = (await listQueue()).filter((m) => !m.conflicted);
       if (queue.length === 0) break;
 
       for (const m of queue) {
@@ -124,29 +133,15 @@ async function doFlush(): Promise<void> {
               return;
             }
             if (err.status === 409) {
-              // Last-write-wins: inject the server's current updated_at into
-              // our payload and retry once so the local edit overwrites the
-              // server. A second conflict is terminal — drop with a toast and
-              // let the next user edit converge.
+              // The resource changed under us (another device, or the coach
+              // agent). Do NOT silently overwrite either side. Hold the mutation
+              // (marked conflicted so the drain skips it) and surface it to the
+              // UI, which prompts the user to keep theirs or take the server's.
               const current = (err.body as { current?: Record<string, unknown> } | undefined)?.current;
-              if (current?.updated_at !== undefined && !m.replayedOnce) {
-                const bodyObj = (m.body && typeof m.body === 'object')
-                  ? (m.body as Record<string, unknown>)
-                  : null;
-                if (bodyObj) {
-                  bodyObj.updated_at = current.updated_at;
-                }
-                const replayed: Mutation = {
-                  ...m,
-                  body: bodyObj ?? m.body,
-                  replayedOnce: true,
-                };
-                await updateQueueEntry(replayed);
-                break;
-              }
-              deps.toast?.('A newer version from another device replaced your offline edit.');
-              await removeFromQueue(m.id);
+              const conflicted: Mutation = { ...m, conflicted: true };
+              await updateQueueEntry(conflicted);
               emitStatus({ pending: await queueLength() });
+              try { deps.onConflict?.(conflicted, current); } catch { /* non-fatal */ }
               continue;
             }
             if (err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429) {
@@ -214,6 +209,29 @@ export function stopSync(): void {
     window.removeEventListener('online', onlineHandler);
     onlineHandler = null;
   }
+}
+
+// Resolve a conflicted mutation by keeping the local (user's) version: rebase it
+// onto the server's current updated_at so the next send wins the compare-and-swap,
+// clear the conflicted flag, and kick a flush. No-op if the entry is gone.
+export async function resolveConflictKeepMine(id: string, serverUpdatedAt: number): Promise<void> {
+  const entry = (await listQueue()).find((m) => m.id === id);
+  if (!entry) return;
+  const bodyObj = (entry.body && typeof entry.body === 'object')
+    ? (entry.body as Record<string, unknown>)
+    : null;
+  if (bodyObj) bodyObj.updated_at = serverUpdatedAt;
+  await updateQueueEntry({ ...entry, body: bodyObj ?? entry.body, conflicted: false });
+  emitStatus({ pending: await queueLength(), lastError: null });
+  void flushNow();
+}
+
+// Resolve a conflicted mutation by taking the server's (their) version: drop the
+// local mutation entirely. The caller is responsible for loading server state
+// into the UI. No-op if the entry is gone.
+export async function resolveConflictTakeTheirs(id: string): Promise<void> {
+  await removeFromQueue(id);
+  emitStatus({ pending: await queueLength(), lastError: null });
 }
 
 // Test-only: reset module state between tests.

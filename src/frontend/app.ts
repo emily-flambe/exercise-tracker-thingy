@@ -19,10 +19,11 @@ import {
   toggleSetCompleted, toggleSetMissed, toggleNoteField,
   showAddSetForm, hideAddSetForm, saveSetInline, updateSet, deleteSet,
   showExerciseNotes, hideExerciseNotes, saveExerciseNotes,
-  editWorkout, editWorkoutDate, resetWorkoutState,
+  editWorkout, editWorkoutDate, resetWorkoutState, refreshCurrentWorkout,
   startSyncPolling, stopSyncPolling,
   editExerciseSetting, addExerciseSetting,
-  handleWorkoutSynced,
+  handleWorkoutSynced, handleSyncConflict,
+  resolveConflictKeepMine, resolveConflictLoadTheirs,
 } from './workout';
 import {
   showAddExercise, hideAddExercise, toggleAddExerciseSort, toggleAddExerciseCategory,
@@ -99,6 +100,7 @@ function startSyncEngine(): void {
     toast: showToast,
     onStatusChange: updateSyncIndicator,
     onWorkoutSynced: handleWorkoutSynced,
+    onConflict: handleSyncConflict,
   });
 }
 
@@ -123,27 +125,33 @@ function renderActiveTab(): void {
 }
 
 // ==================== REFRESH HANDLER ====================
-// Refresh is "show me the server's truth" — it nukes local UI state and the
-// offline cache, then reloads from the network. This is the same recovery as
-// logout/login but without dropping auth, so users don't have to re-enter
-// credentials to escape a stale in-memory editing session (e.g. an SPA left
-// open across days that's still pointing at yesterday's editingWorkoutId).
+// Refresh pulls the server's truth — flush pending writes, clear the cache, and
+// reload from the network — while keeping you on the current view. If you're
+// editing a workout, that workout is re-fetched and re-rendered in place (so the
+// coach agent's changes show up) instead of dumping you back to the empty screen.
 async function handleRefresh(): Promise<void> {
   try {
     // Flush any pending offline writes first so they're not lost when we
     // clear the cache and re-read from server.
     try { await flushNow(); } catch (err) { console.warn('Flush before refresh failed:', err); }
 
-    state.currentWorkout = null;
-    state.editingWorkoutId = null;
-    resetWorkoutState();
+    // Remember what we're looking at so we can restore it after reloading.
+    const editingId = state.editingWorkoutId;
+
     try { await cacheClear(); } catch (err) { console.warn('cacheClear failed:', err); }
 
     await loadData();
 
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab?.id === 'tab-workout') {
-      showWorkoutScreen('workout-empty');
+      if (editingId) {
+        // Stay on the workout being edited; re-fetch it from the server.
+        // refreshCurrentWorkout handles the deleted-server-side case itself
+        // (cleans up and shows the empty screen).
+        await refreshCurrentWorkout();
+      }
+      // Nothing being edited (e.g. an in-progress new workout or the empty
+      // screen) — leave the current workout screen untouched.
     } else {
       renderActiveTab();
     }
@@ -337,6 +345,9 @@ async function init(): Promise<void> {
   stopRestTimer,
   // Refresh
   refresh,
+  // Conflict prompt
+  resolveConflictKeepMine,
+  resolveConflictLoadTheirs,
 };
 
 init();

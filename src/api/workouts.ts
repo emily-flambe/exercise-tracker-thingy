@@ -69,7 +69,15 @@ app.put('/:id', async (c) => {
     return c.json({ error: 'Missing required fields' }, 400);
   }
 
-  const result = await queries.updateWorkout(c.env.DB, id, userId, body);
+  // updated_at is mandatory: it's the version this update is based on, and the
+  // only thing that lets the compare-and-swap reject a stale write. Without it
+  // we cannot distinguish an intentional update from one that would clobber a
+  // concurrent edit, so refuse rather than blind-overwrite.
+  if (typeof body.updated_at !== 'number') {
+    return c.json({ error: 'Missing required field: updated_at' }, 400);
+  }
+
+  const result = await queries.updateWorkout(c.env.DB, id, userId, { ...body, updated_at: body.updated_at });
 
   if (result.status === 'not_found') {
     return c.json({ error: 'Workout not found' }, 404);

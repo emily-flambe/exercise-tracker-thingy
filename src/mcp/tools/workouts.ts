@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { WorkoutApiClient } from '../client.js';
+import { type WorkoutApiClient, WorkoutApiError } from '../client.js';
 
 function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', {
@@ -110,10 +110,45 @@ export function registerWorkoutTools(server: McpServer, client: WorkoutApiClient
       },
     },
     async ({ id, ...data }) => {
-      const workout = await client.updateWorkout(id, data);
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(workout, null, 2) }],
-      };
+      // Read current state so we can send its updated_at and hit the backend's
+      // compare-and-swap path. Without this the PUT takes the blind-overwrite
+      // branch and silently clobbers an edit the user just made in the app.
+      let updatedAt: number | undefined;
+      try {
+        const current = await client.getWorkout(id) as { updated_at?: number } | null;
+        updatedAt = current?.updated_at;
+      } catch {
+        // If the read fails (e.g. 404), let the update surface the real error.
+      }
+
+      try {
+        const workout = await client.updateWorkout(
+          id,
+          updatedAt !== undefined ? { ...data, updated_at: updatedAt } : data,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(workout, null, 2) }],
+        };
+      } catch (err) {
+        if (err instanceof WorkoutApiError && err.status === 409) {
+          // Someone (almost certainly the user in the app) changed this workout
+          // between our read and write. Do NOT retry blindly — surface the
+          // current server state so the model can reconcile and re-apply.
+          const serverCurrent = (err.body as { current?: unknown } | undefined)?.current;
+          return {
+            isError: true,
+            content: [{
+              type: 'text' as const,
+              text:
+                `Conflict: workout ${id} was modified since you read it (likely the user edited it in the app). ` +
+                `Your update was NOT applied, to avoid clobbering their change.\n\n` +
+                `Current server state:\n${JSON.stringify(serverCurrent ?? null, null, 2)}\n\n` +
+                `Reconcile your intended change with this current state, then call update_workout again.`,
+            }],
+          };
+        }
+        throw err;
+      }
     },
   );
 }

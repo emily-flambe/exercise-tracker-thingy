@@ -1,3 +1,12 @@
+// Carries the HTTP status and parsed body so callers can react to specific
+// failures (notably 409 conflicts from the backend's compare-and-swap).
+export class WorkoutApiError extends Error {
+  constructor(public status: number, public body: unknown, message?: string) {
+    super(message ?? `API error ${status}`);
+    this.name = 'WorkoutApiError';
+  }
+}
+
 export class WorkoutApiClient {
   private baseUrl: string;
   private apiKey: string;
@@ -19,8 +28,10 @@ export class WorkoutApiClient {
     });
 
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`API error ${res.status}: ${body}`);
+      const text = await res.text();
+      let parsed: unknown = text;
+      try { parsed = JSON.parse(text); } catch { /* not JSON — keep raw text */ }
+      throw new WorkoutApiError(res.status, parsed, `API error ${res.status}: ${text}`);
     }
 
     return res.json() as Promise<T>;

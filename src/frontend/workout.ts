@@ -746,13 +746,24 @@ function handleVisibilityChange(): void {
 }
 
 // Sync poll detects when the open workout changed underneath us — e.g. the
-// coach agent (MCP) edited it. If we have divergent local edits, prompt the user
-// to pick a side (never silently merge — see the killed 3-way-merge history).
-// If we have nothing local pending, quietly adopt the server's version so the
-// agent's change just appears. Also handles the 404 case (deleted elsewhere).
+// coach agent (MCP) edited it.
+//
+// The poll NEVER prompts. It only quietly adopts the server's version when we
+// have nothing pending locally, so an agent's edit just appears live. If we DO
+// have local work in flight, the poll stays silent and lets the write path
+// handle reconciliation: our next save PUTs with our base updated_at, and if the
+// server genuinely moved ahead (real concurrent edit) the compare-and-swap 409
+// surfaces the conflict modal accurately, at write time.
+//
+// Why no poll-prompt: it raced against our OWN autosave. Our save advances the
+// server's updated_at, but for a beat the local base hasn't caught up and a
+// mutation is still queued/debouncing, so the poll saw "server moved ahead +
+// local divergence" and flagged our own edit as a remote conflict — firing the
+// modal constantly for no real reason. The 409 path already covers real
+// conflicts without the race. Also handles the 404 case (deleted elsewhere).
 async function syncPoll(): Promise<void> {
   if (!state.editingWorkoutId || isSyncPolling) return;
-  // Don't poll-prompt while a conflict dialog is already open.
+  // Don't poll while a conflict dialog is already open.
   if (pendingConflict) return;
   isSyncPolling = true;
   try {
@@ -761,13 +772,14 @@ async function syncPoll(): Promise<void> {
     if (editingWorkoutUpdatedAt === null || workout.updated_at === editingWorkoutUpdatedAt) {
       return;
     }
-    // Server moved ahead of our base. Prompt if we'd lose local work, else adopt.
+    // Server moved ahead of our base. If we have unsynced local work, leave it
+    // to the write-path 409 to reconcile (avoids the self-conflict race). With
+    // nothing pending, quietly adopt so a remote/agent edit shows up live.
     if (await hasLocalDivergence()) {
-      showWorkoutConflict(workout);
-    } else {
-      adoptServerWorkout(workout);
-      showToast('Updated from server');
+      return;
     }
+    adoptServerWorkout(workout);
+    showToast('Updated from server');
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       state.currentWorkout = null;

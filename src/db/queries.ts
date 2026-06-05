@@ -106,10 +106,91 @@ export async function getAllWorkouts(db: D1Database, userId: string): Promise<Wo
     .bind(userId)
     .all<WorkoutRow>();
 
-  const workouts: Workout[] = [];
+  if (workoutRows.results.length === 0) return [];
 
+  // Batch-fetch all child rows for this user's workouts in 3 queries, then
+  // assemble in memory. The previous implementation called getWorkoutExercises()
+  // per workout — one exercises query + one PRs query each, plus one sets query
+  // per exercise — i.e. an N+1 explosion of hundreds of sequential D1 round
+  // trips for a typical history (~90 workouts × ~5 exercises ≈ 500+ queries).
+  // That made GET /workouts take ~6s. Joining through `workouts` scopes each
+  // child query to this user without a giant IN(...) list, and the result is
+  // byte-for-byte identical to the per-workout assembly below.
+  const exerciseRows = (await db
+    .prepare(
+      `SELECT we.* FROM workout_exercises we
+       JOIN workouts w ON we.workout_id = w.id
+       WHERE w.user_id = ?
+       ORDER BY we.workout_id, we.position`
+    )
+    .bind(userId)
+    .all<WorkoutExerciseRow>()).results;
+
+  const setRows = (await db
+    .prepare(
+      `SELECT s.* FROM sets s
+       JOIN workout_exercises we ON s.workout_exercise_id = we.id
+       JOIN workouts w ON we.workout_id = w.id
+       WHERE w.user_id = ?
+       ORDER BY s.workout_exercise_id, s.position`
+    )
+    .bind(userId)
+    .all<SetRow>()).results;
+
+  const prRows = (await db
+    .prepare('SELECT * FROM personal_records WHERE user_id = ?')
+    .bind(userId)
+    .all<PersonalRecordRow>()).results;
+
+  // Group children by parent id (insertion order preserves the ORDER BY above).
+  const exercisesByWorkout = new Map<string, WorkoutExerciseRow[]>();
+  for (const e of exerciseRows) {
+    const arr = exercisesByWorkout.get(e.workout_id);
+    if (arr) arr.push(e);
+    else exercisesByWorkout.set(e.workout_id, [e]);
+  }
+  const setsByExercise = new Map<string, SetRow[]>();
+  for (const s of setRows) {
+    const arr = setsByExercise.get(s.workout_exercise_id);
+    if (arr) arr.push(s);
+    else setsByExercise.set(s.workout_exercise_id, [s]);
+  }
+  const prsByWorkout = new Map<string, PersonalRecordRow[]>();
+  for (const pr of prRows) {
+    const arr = prsByWorkout.get(pr.workout_id);
+    if (arr) arr.push(pr);
+    else prsByWorkout.set(pr.workout_id, [pr]);
+  }
+
+  const workouts: Workout[] = [];
   for (const row of workoutRows.results) {
-    const exercises = await getWorkoutExercises(db, row.id);
+    const workoutPRs = prsByWorkout.get(row.id) ?? [];
+    const exercises: WorkoutExercise[] = (exercisesByWorkout.get(row.id) ?? []).map((exRow) => {
+      const sets: Set[] = (setsByExercise.get(exRow.id) ?? []).map((s, index) => {
+        // PR match mirrors getWorkoutExercises(): same exercise name, the set's
+        // ordinal position, weight, and reps.
+        const isPR = workoutPRs.some(pr =>
+          pr.exercise_name === exRow.exercise_name &&
+          pr.set_index === index &&
+          pr.weight === s.weight &&
+          pr.reps === s.reps
+        );
+        return {
+          weight: s.weight,
+          reps: s.reps,
+          note: s.note ?? undefined,
+          isPR,
+          completed: s.completed === 1,
+          missed: s.missed === 1,
+        };
+      });
+      return {
+        name: exRow.exercise_name,
+        sets,
+        completed: exRow.completed === 1,
+        notes: exRow.notes ?? undefined,
+      };
+    });
     const targetCategories = row.target_categories
       ? [...new Set((JSON.parse(row.target_categories) as string[]).map(mapToMuscleGroup))]
       : undefined;

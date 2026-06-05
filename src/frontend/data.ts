@@ -2,28 +2,33 @@ import * as api from './api';
 import { state } from './state';
 import { cacheGet, cacheSet } from './offline/db';
 
+// Loads workouts/exercises/PRs into state and write-through caches them.
+//
+// THROWS on failure (network error, or a fetch aborted by its timeout on a slow
+// connection). Callers MUST handle the rejection — historically this swallowed
+// errors and returned void, which meant a timed-out load silently left stale
+// state on screen (e.g. the newest month's workouts never appeared because the
+// big /workouts payload aborted before it arrived). Surfacing the error lets the
+// caller show a retry affordance instead of pretending the load succeeded.
 export async function loadData(): Promise<void> {
+  const [workouts, exercises, prs] = await Promise.all([
+    api.getWorkouts(),
+    api.getCustomExercises(),
+    api.getAllPRs(),
+  ]);
+  state.history = workouts;
+  state.customExercises = exercises;
+  state.allPRs = prs;
+  // Write-through cache so the next cold start can hydrate offline. Best-effort:
+  // a cache write failure must not fail the load itself.
   try {
-    const [workouts, exercises, prs] = await Promise.all([
-      api.getWorkouts(),
-      api.getCustomExercises(),
-      api.getAllPRs(),
+    await Promise.all([
+      cacheSet('workouts', workouts),
+      cacheSet('exercises', exercises),
+      cacheSet('prs', prs),
     ]);
-    state.history = workouts;
-    state.customExercises = exercises;
-    state.allPRs = prs;
-    // Write-through cache so the next cold start can hydrate offline.
-    try {
-      await Promise.all([
-        cacheSet('workouts', workouts),
-        cacheSet('exercises', exercises),
-        cacheSet('prs', prs),
-      ]);
-    } catch (err) {
-      console.warn('Failed to update offline cache:', err);
-    }
-  } catch (error) {
-    console.error('Failed to load data:', error);
+  } catch (err) {
+    console.warn('Failed to update offline cache:', err);
   }
 }
 

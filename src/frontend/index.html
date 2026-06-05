@@ -78,6 +78,14 @@
       <div class="pull-spinner"></div>
     </div>
 
+    <!-- Data load-failure banner. Shown when loadData() fails (e.g. slow network
+         aborts the fetch) so a failed load never silently leaves stale data on
+         screen with no way to recover short of a full reload. -->
+    <div id="load-error-banner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-swiss-red text-white px-4 py-2 rounded-sm text-sm font-bold uppercase tracking-wider flex items-center gap-3 shadow-lg">
+      <span>Couldn't load your data</span>
+      <button onclick="app.retryLoad()" class="underline hover:no-underline">Retry</button>
+    </div>
+
     <!-- Auto-save toast notification -->
     <div id="save-toast" class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 bg-white text-black px-4 py-2 rounded-sm z-50 transition-opacity duration-300 font-bold text-sm uppercase tracking-wider">
       Saved

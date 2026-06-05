@@ -124,6 +124,42 @@ function renderActiveTab(): void {
   // no re-render needed when background data lands.
 }
 
+// ==================== DATA LOAD + ERROR SURFACING ====================
+function showLoadError(): void {
+  $('load-error-banner').classList.remove('hidden');
+}
+
+function hideLoadError(): void {
+  $('load-error-banner').classList.add('hidden');
+}
+
+// Load fresh data and re-render the active tab. On failure (e.g. a slow-network
+// fetch aborted by its timeout), surface a retry banner instead of silently
+// leaving stale data on screen. This is auth-agnostic: a data-load failure must
+// NOT log the user out — auth is validated separately via getCurrentUser().
+async function loadDataAndRender(): Promise<void> {
+  try {
+    await loadData();
+    hideLoadError();
+    renderActiveTab();
+  } catch (error) {
+    console.error('Failed to load data:', error);
+    showLoadError();
+  }
+}
+
+// Retry handler wired to the load-error banner's Retry button. Spins the refresh
+// icons for feedback and re-attempts the load.
+async function retryLoad(): Promise<void> {
+  const btns = document.querySelectorAll('.refresh-icon');
+  btns.forEach(btn => btn.classList.add('refreshing'));
+  try {
+    await loadDataAndRender();
+  } finally {
+    btns.forEach(btn => btn.classList.remove('refreshing'));
+  }
+}
+
 // ==================== REFRESH HANDLER ====================
 // Refresh pulls the server's truth — flush pending writes, clear the cache, and
 // reload from the network — while keeping you on the current view. If you're
@@ -142,6 +178,7 @@ async function handleRefresh(): Promise<void> {
 
     await loadData();
 
+    hideLoadError();
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab?.id === 'tab-workout') {
       if (editingId) {
@@ -159,6 +196,7 @@ async function handleRefresh(): Promise<void> {
   } catch (error) {
     console.error('Failed to refresh:', error);
     showToast('Refresh failed');
+    showLoadError();
   }
 }
 
@@ -193,8 +231,9 @@ async function init(): Promise<void> {
     // Background data load: must re-render the active tab when it resolves,
     // otherwise a user who clicks History/Exercises/PRs before loadData
     // finishes sees an empty view that never updates (auth.ts can't do this
-    // itself without an import cycle into the render modules).
-    void loadData().then(renderActiveTab);
+    // itself without an import cycle into the render modules). A failed load
+    // surfaces a retry banner rather than leaving an empty view forever.
+    void loadDataAndRender();
   }));
 
   if (api.isAuthenticated()) {
@@ -223,21 +262,24 @@ async function init(): Promise<void> {
       startSyncPolling();
       startSyncEngine();
       if (online) {
-        // Background refresh + auth validation. Failure kicks user back to auth.
-        // Re-render the active tab after loadData so a user viewing History
-        // sees freshly-fetched workouts replace the cached snapshot, not the
-        // other way around.
+        // Background auth validation + data refresh. These are handled
+        // SEPARATELY: only an auth failure (invalid/expired token) should kick
+        // the user back to the login screen. A data-load failure (e.g. a slow
+        // network aborting the big /workouts fetch) must keep the user in the
+        // app on cached data and surface a retry banner — logging them out over
+        // a transient network blip would be a far worse experience.
         void (async () => {
           try {
             const user = await api.getCurrentUser();
             setCurrentUser(user);
-            await loadData();
-            renderActiveTab();
           } catch {
             api.logout();
             stopSync();
             showAuthScreen();
+            return;
           }
+          // Auth is valid — refresh data, surfacing failures without logout.
+          await loadDataAndRender();
         })();
       }
       return;
@@ -252,14 +294,19 @@ async function init(): Promise<void> {
     try {
       const user = await api.getCurrentUser();
       setCurrentUser(user);
-      await loadData();
-      showMainApp(handleRefresh);
-      startSyncPolling();
-      startSyncEngine();
     } catch {
+      // Auth validation failed — token is bad. Back to login.
       api.logout();
       showAuthScreen();
+      return;
     }
+    // Auth is valid: enter the app, then load data. A data-load failure here
+    // shows the app (empty) with a retry banner rather than bouncing a
+    // legitimately-logged-in user back to the auth screen.
+    showMainApp(handleRefresh);
+    startSyncPolling();
+    startSyncEngine();
+    await loadDataAndRender();
   } else {
     showAuthScreen();
   }
@@ -345,6 +392,8 @@ async function init(): Promise<void> {
   stopRestTimer,
   // Refresh
   refresh,
+  // Retry a failed data load (load-error banner button)
+  retryLoad,
   // Conflict prompt
   resolveConflictKeepMine,
   resolveConflictLoadTheirs,

@@ -553,10 +553,16 @@ export async function saveExercise(): Promise<void> {
     // server-propagated rename in historical workouts. If we render first, PR
     // stars are computed against stale history where the exercise still has
     // the old name, producing false PR stars for sets that tie existing
-    // records. If offline, loadData will fail silently and we keep the
-    // optimistic local state.
+    // records. If offline or the load fails, swallow it here and keep the
+    // optimistic local state — the rename itself is already enqueued, so a
+    // failed history refresh must not abort the save flow. (loadData() throws
+    // on failure; this call site deliberately ignores that.)
     if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-      await loadData();
+      try {
+        await loadData();
+      } catch (err) {
+        console.warn('History refresh after rename failed; keeping local state:', err);
+      }
     }
 
     if (oldName && oldName !== name && state.currentWorkout) {

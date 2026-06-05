@@ -39,7 +39,14 @@ export function isAuthenticated(): boolean {
 
 // Default cap so a stalled request can't lock the UI (e.g. Refresh spinner
 // stuck forever waiting on a fetch that never resolves on flaky networks).
-const DEFAULT_FETCH_TIMEOUT_MS = 10000;
+//
+// 10s was too aggressive: the GET /workouts payload is large (every workout with
+// all nested sets) and takes ~6s even on a fast connection, so real mobile
+// connections routinely crossed 10s and the load aborted, silently leaving stale
+// data on screen. 30s gives slow connections room to finish while still bounding
+// a genuinely dead request. The real fix is shrinking that payload (pagination);
+// tracked as a follow-up.
+const DEFAULT_FETCH_TIMEOUT_MS = 30000;
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();

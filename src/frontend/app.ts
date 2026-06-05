@@ -124,39 +124,26 @@ function renderActiveTab(): void {
   // no re-render needed when background data lands.
 }
 
-// ==================== DATA LOAD + ERROR SURFACING ====================
-function showLoadError(): void {
-  $('load-error-banner').classList.remove('hidden');
-}
-
-function hideLoadError(): void {
-  $('load-error-banner').classList.add('hidden');
-}
-
+// ==================== DATA LOAD ====================
 // Load fresh data and re-render the active tab. On failure (e.g. a slow-network
-// fetch aborted by its timeout), surface a retry banner instead of silently
-// leaving stale data on screen. This is auth-agnostic: a data-load failure must
-// NOT log the user out — auth is validated separately via getCurrentUser().
+// fetch aborted by its timeout) we DON'T nag with a sticky banner — we just
+// re-render with whatever state we have so cached data stays on screen, and show
+// a brief auto-dismissing toast only when there's genuinely nothing to show.
+// This is auth-agnostic: a data-load failure must NOT log the user out — auth is
+// validated separately via getCurrentUser().
 async function loadDataAndRender(): Promise<void> {
   try {
     await loadData();
-    hideLoadError();
     renderActiveTab();
   } catch (error) {
     console.error('Failed to load data:', error);
-    showLoadError();
-  }
-}
-
-// Retry handler wired to the load-error banner's Retry button. Spins the refresh
-// icons for feedback and re-attempts the load.
-async function retryLoad(): Promise<void> {
-  const btns = document.querySelectorAll('.refresh-icon');
-  btns.forEach(btn => btn.classList.add('refreshing'));
-  try {
-    await loadDataAndRender();
-  } finally {
-    btns.forEach(btn => btn.classList.remove('refreshing'));
+    // Keep showing whatever we already have (cache / prior load).
+    renderActiveTab();
+    // Only surface a message if we have nothing at all — otherwise the cached
+    // data on screen is fine and a toast would just be noise.
+    if (state.history.length === 0) {
+      showToast('Couldn\'t load — check connection');
+    }
   }
 }
 
@@ -178,7 +165,6 @@ async function handleRefresh(): Promise<void> {
 
     await loadData();
 
-    hideLoadError();
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab?.id === 'tab-workout') {
       if (editingId) {
@@ -196,7 +182,6 @@ async function handleRefresh(): Promise<void> {
   } catch (error) {
     console.error('Failed to refresh:', error);
     showToast('Refresh failed');
-    showLoadError();
   }
 }
 
@@ -392,8 +377,6 @@ async function init(): Promise<void> {
   stopRestTimer,
   // Refresh
   refresh,
-  // Retry a failed data load (load-error banner button)
-  retryLoad,
   // Conflict prompt
   resolveConflictKeepMine,
   resolveConflictLoadTheirs,

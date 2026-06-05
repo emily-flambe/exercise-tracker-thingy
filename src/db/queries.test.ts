@@ -4,6 +4,7 @@ import {
   createUser,
   createWorkout,
   getWorkout,
+  getAllWorkouts,
   updateWorkout,
   createCustomExercise,
   updateCustomExercise,
@@ -1799,5 +1800,93 @@ describe('Exercise Settings', () => {
     const found = deleted.find(e => e.id === exercise.id);
     expect(found).toBeDefined();
     expect(found!.settings).toBeUndefined();
+  });
+});
+
+describe('getAllWorkouts (batched assembly)', () => {
+  let userId: string;
+  const testUsername = 'testuser_getall';
+
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM users WHERE username = ?').bind(testUsername).run();
+    const user = await createUser(env.DB, testUsername, 'hash123');
+    userId = user.id;
+  });
+
+  it('returns an empty array for a user with no workouts', async () => {
+    const all = await getAllWorkouts(env.DB, userId);
+    expect(all).toEqual([]);
+  });
+
+  it('returns workouts newest-first with exercises and sets in position order', async () => {
+    const older: CreateWorkoutRequest = {
+      start_time: Date.now() - 86400000,
+      exercises: [
+        { name: 'Squat', sets: [{ weight: 200, reps: 5, completed: true }] },
+      ],
+    };
+    const newer: CreateWorkoutRequest = {
+      start_time: Date.now(),
+      exercises: [
+        { name: 'Bench Press', sets: [
+          { weight: 100, reps: 10, completed: true },
+          { weight: 110, reps: 8, completed: true },
+        ] },
+        { name: 'Row', sets: [{ weight: 90, reps: 12, completed: true }] },
+      ],
+    };
+    await createWorkout(env.DB, userId, older);
+    await createWorkout(env.DB, userId, newer);
+
+    const all = await getAllWorkouts(env.DB, userId);
+
+    expect(all).toHaveLength(2);
+    // Newest first.
+    expect(all[0].start_time).toBeGreaterThan(all[1].start_time);
+    // Exercises preserved in order.
+    expect(all[0].exercises.map(e => e.name)).toEqual(['Bench Press', 'Row']);
+    // Sets preserved in order within an exercise.
+    expect(all[0].exercises[0].sets.map(s => s.weight)).toEqual([100, 110]);
+    expect(all[0].exercises[0].sets.map(s => s.reps)).toEqual([10, 8]);
+    expect(all[1].exercises[0].name).toBe('Squat');
+  });
+
+  it('matches single-workout getWorkout output exactly (incl. PR flags)', async () => {
+    // Two workouts so a PR is detected on the second; then assert the batched
+    // getAllWorkouts produces the same object as the per-workout getWorkout.
+    await createWorkout(env.DB, userId, {
+      start_time: Date.now() - 86400000,
+      exercises: [{ name: 'Deadlift', sets: [{ weight: 300, reps: 5, completed: true }] }],
+    });
+    const second = await createWorkout(env.DB, userId, {
+      start_time: Date.now(),
+      exercises: [{ name: 'Deadlift', sets: [{ weight: 300, reps: 8, completed: true }] }],
+    });
+
+    const viaSingle = await getWorkout(env.DB, second.id, userId);
+    const all = await getAllWorkouts(env.DB, userId);
+    const viaAll = all.find(w => w.id === second.id);
+
+    expect(viaAll).toEqual(viaSingle);
+    // The heavier-rep set at the same weight is a PR.
+    expect(viaAll!.exercises[0].sets[0].isPR).toBe(true);
+  });
+
+  it('scopes strictly to the requesting user', async () => {
+    const otherUsername = 'testuser_getall_other';
+    await env.DB.prepare('DELETE FROM users WHERE username = ?').bind(otherUsername).run();
+    const other = await createUser(env.DB, otherUsername, 'hash123');
+    await createWorkout(env.DB, other.id, {
+      start_time: Date.now(),
+      exercises: [{ name: 'Curl', sets: [{ weight: 30, reps: 12, completed: true }] }],
+    });
+    await createWorkout(env.DB, userId, {
+      start_time: Date.now(),
+      exercises: [{ name: 'Press', sets: [{ weight: 60, reps: 10, completed: true }] }],
+    });
+
+    const all = await getAllWorkouts(env.DB, userId);
+    expect(all).toHaveLength(1);
+    expect(all[0].exercises[0].name).toBe('Press');
   });
 });

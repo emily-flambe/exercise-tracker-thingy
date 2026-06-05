@@ -14,7 +14,12 @@ test.describe('refresh bug repro', () => {
   });
 
   test('refresh recovers spinner when network hangs', async ({ page, request, context }) => {
-    test.setTimeout(30000);
+    // The spinner clears when the read fetch aborts, which is bounded by
+    // DEFAULT_FETCH_TIMEOUT_MS (30s) — raised from 10s to stop the large
+    // /workouts payload from aborting on real connections and silently
+    // dropping data. The original bug this guards against was "spins forever";
+    // bounded-at-30s still proves recovery. Budget must exceed the expect below.
+    test.setTimeout(50000);
 
     await createWorkoutViaApi(request, setup.token, {
       start_time: Date.now() - 60000,
@@ -39,8 +44,10 @@ test.describe('refresh bug repro', () => {
     const refreshBtn = page.locator('#tab-history .refresh-icon');
     await refreshBtn.click();
 
-    // Spinner must clear within 20s even though network never responds.
-    // Pre-fix: stayed spinning forever.
-    await expect(refreshBtn).not.toHaveClass(/refreshing/, { timeout: 20000 });
+    // Spinner must clear once the read aborts (~30s) even though the network
+    // never responds. Pre-fix: stayed spinning forever. 36s = the 30s fetch
+    // timeout plus generous margin for the abort to propagate through
+    // handleRefresh on a slow CI runner.
+    await expect(refreshBtn).not.toHaveClass(/refreshing/, { timeout: 36000 });
   });
 });
